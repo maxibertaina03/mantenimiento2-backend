@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { AuthModule } from './common/auth/auth.module';
 import { validarEntorno } from './config/env.validation';
 import { ProveedoresModule } from './modules/proveedores/proveedores.module';
 import { CategoriasMaterialModule } from './modules/categorias-material/categorias-material.module';
@@ -16,6 +17,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
       validate: validarEntorno,
     }),
     PrismaModule,
+    AuthModule, // guard global de autenticación (Clerk)
     // Módulos de dominio
     ProveedoresModule,
     CategoriasMaterialModule,

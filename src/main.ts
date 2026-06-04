@@ -41,6 +41,8 @@ async function bootstrap() {
     .setTitle('API Mantenimiento')
     .setDescription('Gestión de stock de materiales con trazabilidad de movimientos')
     .setVersion('0.1.0')
+    // Permite pegar un JWT de Clerk en Swagger ("Authorize") para probar con auth activa.
+    .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, document);

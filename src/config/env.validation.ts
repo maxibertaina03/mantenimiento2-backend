@@ -21,6 +21,18 @@ class VariablesEntorno {
   @IsOptional()
   @IsString()
   FRONTEND_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  CLERK_SECRET_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  CLERK_PUBLISHABLE_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  AUTH_DISABLED?: string;
 }
 
 export function validarEntorno(config: Record<string, unknown>) {

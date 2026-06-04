@@ -10,7 +10,7 @@ import { MovimientosStockRepository } from './movimientos-stock.repository';
 export class MovimientosStockService {
   constructor(private readonly repo: MovimientosStockRepository) {}
 
-  async crear(dto: CrearMovimientoDto): Promise<MovimientoRespuestaDto> {
+  async crear(dto: CrearMovimientoDto, usuarioIdActual?: string): Promise<MovimientoRespuestaDto> {
     // Regla: ENTRADA/SALIDA deben mover una cantidad > 0 (no tendría sentido 0).
     if (dto.tipo !== TipoMovimiento.AJUSTE && dto.cantidad <= 0) {
       throw new BadRequestException('La cantidad debe ser mayor a 0 para ENTRADA y SALIDA.');
@@ -47,7 +47,7 @@ export class MovimientosStockService {
         cantidad: dto.cantidad,
         fecha: dto.fecha ? new Date(dto.fecha) : undefined,
         proveedorId: dto.proveedorId,
-        usuarioId: dto.usuarioId,
+        usuarioId: usuarioIdActual ?? dto.usuarioId,
         referenciaTrabajo: dto.referenciaTrabajo,
         notas: dto.notas,
       },

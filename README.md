@@ -107,13 +107,39 @@ Todos bajo el prefijo `/api`.
 
 ---
 
-## Autenticación (preparada para Clerk)
+## Autenticación (Clerk)
 
-Hoy la API está **sin autenticación** (endpoints abiertos). Está todo listo para enchufar Clerk:
+La API usa **Clerk** para autenticar. El `GuardAutenticacion` (en `src/common/auth/`) está
+registrado como **guard global**: toda la app queda detrás del login, salvo rutas marcadas
+con `@Public()`.
 
-- `Usuario.idExterno` (nullable) almacenará el ID de Clerk.
-- `src/common/auth/guards/auth.guard.ts` es un guard **no-op** (deja pasar todo). Es el
-  único punto a reemplazar por la verificación real del JWT de Clerk, sin tocar la lógica de negocio.
+Flujo del guard:
+1. Verifica el JWT de Clerk del header `Authorization: Bearer <token>`.
+2. **Just-in-time provisioning**: en el primer request de cada usuario, crea (o vincula por
+   email) su fila en la tabla `usuarios`, guardando el ID de Clerk en `idExterno` y rol
+   `OPERARIO` por defecto.
+3. Adjunta el usuario a la request (disponible vía `@UsuarioActual()`). Los movimientos
+   registran automáticamente quién los creó.
+
+### Configurar Clerk
+
+1. Creá una aplicación en [clerk.com](https://clerk.com).
+2. En **API Keys**, copiá la **Secret key** (`sk_test_…`).
+3. En el `.env`:
+   ```
+   CLERK_SECRET_KEY="sk_test_..."
+   AUTH_DISABLED="false"
+   ```
+4. Reiniciá la API. A partir de ahí, cada request necesita un JWT válido de Clerk
+   (el frontend lo adjunta solo; en Swagger usá el botón **Authorize** y pegá un token).
+
+### `AUTH_DISABLED` (solo desarrollo)
+
+`AUTH_DISABLED="true"` deja **todos** los endpoints abiertos (sin verificar token). Útil
+para probar sin login mientras configurás Clerk. Default seguro: `"false"`.
+
+> El `Usuario.idExterno` (nullable) almacena el ID de Clerk. El guard es el único punto que
+> toca la autenticación; la lógica de negocio de los módulos no cambia.
 
 ---
 

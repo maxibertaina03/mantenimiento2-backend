@@ -22,6 +22,14 @@ export class UsuariosRepository {
     return this.prisma.usuario.findUnique({ where: { id } });
   }
 
+  buscarPorIdExterno(idExterno: string): Promise<Usuario | null> {
+    return this.prisma.usuario.findUnique({ where: { idExterno } });
+  }
+
+  buscarPorEmail(email: string): Promise<Usuario | null> {
+    return this.prisma.usuario.findUnique({ where: { email } });
+  }
+
   actualizar(id: string, data: Prisma.UsuarioUpdateInput): Promise<Usuario> {
     return this.prisma.usuario.update({ where: { id }, data });
   }
