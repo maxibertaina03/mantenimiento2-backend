@@ -59,16 +59,20 @@ export class MovimientosStockRepository {
     });
   }
 
-  async buscarConFiltros(
-    where: Prisma.MovimientoStockWhereInput,
-    skip: number,
-    take: number,
-  ): Promise<MovimientoStock[]> {
+  // Incluye los nombres de material/proveedor/usuario para listar y exportar.
+  private readonly relaciones = {
+    material: { select: { nombre: true } },
+    proveedor: { select: { nombre: true } },
+    usuario: { select: { nombre: true } },
+  };
+
+  buscarConFiltros(where: Prisma.MovimientoStockWhereInput, skip: number, take: number) {
     return this.prisma.movimientoStock.findMany({
       where,
       skip,
       take,
       orderBy: { fecha: 'desc' },
+      include: this.relaciones,
     });
   }
 
@@ -76,7 +80,10 @@ export class MovimientosStockRepository {
     return this.prisma.movimientoStock.count({ where });
   }
 
-  buscarPorId(id: string): Promise<MovimientoStock | null> {
-    return this.prisma.movimientoStock.findUnique({ where: { id } });
+  buscarPorId(id: string) {
+    return this.prisma.movimientoStock.findUnique({
+      where: { id },
+      include: this.relaciones,
+    });
   }
 }
