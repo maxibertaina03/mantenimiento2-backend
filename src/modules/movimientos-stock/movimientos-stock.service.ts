@@ -1,10 +1,26 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, TipoMovimiento } from '@prisma/client';
+import { MotivoMovimiento, Prisma, TipoMovimiento } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { CrearMovimientoDto } from './dto/crear-movimiento.dto';
 import { FiltrarMovimientosDto } from './dto/filtrar-movimientos.dto';
 import { MovimientoRespuestaDto } from './dto/movimiento-respuesta.dto';
 import { MovimientosStockRepository } from './movimientos-stock.repository';
+
+/**
+ * Motivos válidos según el tipo de movimiento.
+ * - ENTRADA suma stock: COMPRA u OTRO.
+ * - SALIDA resta stock: TRABAJO, DEVOLUCION (al proveedor) u OTRO.
+ * - AJUSTE fija el stock: AJUSTE u OTRO.
+ */
+export const MOTIVOS_POR_TIPO: Record<TipoMovimiento, MotivoMovimiento[]> = {
+  [TipoMovimiento.ENTRADA]: [MotivoMovimiento.COMPRA, MotivoMovimiento.OTRO],
+  [TipoMovimiento.SALIDA]: [
+    MotivoMovimiento.TRABAJO,
+    MotivoMovimiento.DEVOLUCION,
+    MotivoMovimiento.OTRO,
+  ],
+  [TipoMovimiento.AJUSTE]: [MotivoMovimiento.AJUSTE, MotivoMovimiento.OTRO],
+};
 
 @Injectable()
 export class MovimientosStockService {
@@ -14,6 +30,15 @@ export class MovimientosStockService {
     // Regla: ENTRADA/SALIDA deben mover una cantidad > 0 (no tendría sentido 0).
     if (dto.tipo !== TipoMovimiento.AJUSTE && dto.cantidad <= 0) {
       throw new BadRequestException('La cantidad debe ser mayor a 0 para ENTRADA y SALIDA.');
+    }
+
+    // Regla: el motivo tiene que ser coherente con el tipo de movimiento.
+    const motivosValidos = MOTIVOS_POR_TIPO[dto.tipo];
+    if (!motivosValidos.includes(dto.motivo)) {
+      throw new BadRequestException(
+        `El motivo ${dto.motivo} no corresponde a un movimiento de tipo ${dto.tipo}. ` +
+          `Motivos válidos: ${motivosValidos.join(', ')}.`,
+      );
     }
 
     // Regla de negocio: cómo cambia el stock según el tipo de movimiento.
