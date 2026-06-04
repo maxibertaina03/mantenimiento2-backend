@@ -1,0 +1,142 @@
+// Schema de Prisma — Sistema de gestión de mantenimiento (MVP: stock de materiales)
+// Convención: nombres de modelos/campos/enums en español.
+// Postgres alojado en Supabase (usado solo como Postgres gestionado).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Pooler (pgbouncer) — usado por la app en runtime.
+  directUrl = env("DIRECT_URL")   // Conexión directa — usada por Prisma para migraciones.
+}
+
+// ───────────────────────── Enums ─────────────────────────
+
+enum TipoMovimiento {
+  ENTRADA // Suma al stock
+  SALIDA  // Resta del stock
+  AJUSTE  // Fija el stock a un valor absoluto (corrección de inventario)
+}
+
+enum MotivoMovimiento {
+  COMPRA
+  TRABAJO
+  AJUSTE
+  DEVOLUCION
+  OTRO
+}
+
+enum RolUsuario {
+  ADMIN
+  OPERARIO
+}
+
+// ───────────────────────── Catálogo ─────────────────────────
+
+model Proveedor {
+  id            String   @id @default(uuid())
+  nombre        String
+  cuit          String?  @unique
+  email         String?
+  telefono      String?
+  notas         String?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  movimientos MovimientoStock[]
+
+  @@map("proveedores")
+}
+
+model CategoriaMaterial {
+  id          String  @id @default(uuid())
+  nombre      String  @unique
+  descripcion String?
+
+  materiales Material[]
+
+  @@map("categorias_material")
+}
+
+model Material {
+  id          String @id @default(uuid())
+  nombre      String
+  categoriaId String
+
+  // Unidad de medida (u, kg, m, lt, etc.)
+  unidad String
+
+  // stockActual: cantidad actual, DERIVADA de los movimientos.
+  // Se recalcula en transacción cada vez que se registra un movimiento.
+  stockActual Decimal @default(0) @db.Decimal(14, 3)
+
+  // stockMinimo: umbral para alertas de bajo stock.
+  stockMinimo Decimal @default(0) @db.Decimal(14, 3)
+
+  notas         String?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  categoria   CategoriaMaterial @relation(fields: [categoriaId], references: [id])
+  movimientos MovimientoStock[]
+
+  @@index([categoriaId])
+  @@map("materiales")
+}
+
+// ───────────────────────── Trazabilidad ─────────────────────────
+
+model MovimientoStock {
+  id         String           @id @default(uuid())
+  materialId String
+  tipo       TipoMovimiento
+  motivo     MotivoMovimiento
+
+  // Siempre positiva. Para ENTRADA/SALIDA es un delta; para AJUSTE es el valor absoluto final.
+  cantidad Decimal @db.Decimal(14, 3)
+
+  fecha DateTime @default(now())
+
+  // Se usa cuando motivo = COMPRA.
+  proveedorId String?
+
+  // Quién registró el movimiento (nullable hasta enchufar auth real).
+  usuarioId String?
+
+  // Asociar el movimiento a un trabajo (texto libre).
+  referenciaTrabajo String?
+
+  notas    String?
+  creadoEn DateTime @default(now())
+
+  material  Material   @relation(fields: [materialId], references: [id])
+  proveedor Proveedor? @relation(fields: [proveedorId], references: [id])
+  usuario   Usuario?   @relation(fields: [usuarioId], references: [id])
+
+  @@index([materialId])
+  @@index([tipo])
+  @@index([motivo])
+  @@index([fecha])
+  @@map("movimientos_stock")
+}
+
+// ───────────────────────── Usuario (preparado para Clerk) ─────────────────────────
+
+model Usuario {
+  id     String @id @default(uuid())
+  nombre String
+  email  String @unique
+
+  // Futuro ID de Clerk. Hoy null (auth desactivada).
+  idExterno String? @unique
+
+  rol           RolUsuario @default(OPERARIO)
+  creadoEn      DateTime   @default(now())
+  actualizadoEn DateTime   @updatedAt
+
+  movimientos MovimientoStock[]
+
+  @@map("usuarios")
+}
