@@ -1,0 +1,27 @@
+# Blueprint de Render para la API (NestJS + Prisma).
+# Los secretos (sync: false) se cargan en el dashboard de Render, NO acá.
+services:
+  - type: web
+    name: mantenimiento2-backend
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    # --include=dev: Render usa NODE_ENV=production y sin esto no instala las
+    # devDependencies (nest-cli, typescript, prisma) necesarias para compilar.
+    buildCommand: npm install --include=dev && npx prisma generate && npx prisma migrate deploy && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /docs
+    envVars:
+      - key: AUTH_DISABLED
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
