@@ -13,8 +13,13 @@ export class MaterialesRepository {
     return this.prisma.material.create({ data, include: { categoria: true } });
   }
 
-  buscarTodos(skip: number, take: number): Promise<MaterialConCategoria[]> {
+  buscarTodos(
+    skip: number,
+    take: number,
+    where: Prisma.MaterialWhereInput = {},
+  ): Promise<MaterialConCategoria[]> {
     return this.prisma.material.findMany({
+      where,
       skip,
       take,
       include: { categoria: true },
@@ -22,8 +27,8 @@ export class MaterialesRepository {
     });
   }
 
-  contar(): Promise<number> {
-    return this.prisma.material.count();
+  contar(where: Prisma.MaterialWhereInput = {}): Promise<number> {
+    return this.prisma.material.count({ where });
   }
 
   buscarPorId(id: string): Promise<MaterialConCategoria | null> {

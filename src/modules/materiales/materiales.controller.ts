@@ -12,9 +12,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PaginacionDto } from '../../common/dto/paginacion.dto';
 import { CrearMaterialDto } from './dto/crear-material.dto';
 import { ActualizarMaterialDto } from './dto/actualizar-material.dto';
+import { ListarMaterialesDto } from './dto/listar-materiales.dto';
 import { MaterialesService } from './materiales.service';
 
 @ApiTags('Materiales')
@@ -29,9 +29,9 @@ export class MaterialesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar materiales (paginado)' })
-  listar(@Query() paginacion: PaginacionDto) {
-    return this.service.listar(paginacion);
+  @ApiOperation({ summary: 'Listar materiales (paginado, con búsqueda por nombre)' })
+  listar(@Query() query: ListarMaterialesDto) {
+    return this.service.listar(query);
   }
 
   @Get('bajo-stock')

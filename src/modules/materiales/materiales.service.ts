@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PaginacionDto, RespuestaPaginada } from '../../common/dto/paginacion.dto';
+import { Prisma } from '@prisma/client';
+import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { CategoriasMaterialService } from '../categorias-material/categorias-material.service';
 import { CrearMaterialDto } from './dto/crear-material.dto';
 import { ActualizarMaterialDto } from './dto/actualizar-material.dto';
+import { ListarMaterialesDto } from './dto/listar-materiales.dto';
 import { MaterialRespuestaDto } from './dto/material-respuesta.dto';
 import { MaterialConHistorialDto } from './dto/material-con-historial.dto';
 import { MaterialesRepository } from './materiales.repository';
@@ -29,16 +31,21 @@ export class MaterialesService {
     return MaterialRespuestaDto.desde(creado);
   }
 
-  async listar(paginacion: PaginacionDto): Promise<RespuestaPaginada<MaterialRespuestaDto>> {
+  async listar(query: ListarMaterialesDto): Promise<RespuestaPaginada<MaterialRespuestaDto>> {
+    // Filtro por nombre (contiene, sin distinguir mayúsculas/minúsculas).
+    const where: Prisma.MaterialWhereInput = query.buscar
+      ? { nombre: { contains: query.buscar, mode: 'insensitive' } }
+      : {};
+
     const [items, total] = await Promise.all([
-      this.repo.buscarTodos(paginacion.skip, paginacion.limite),
-      this.repo.contar(),
+      this.repo.buscarTodos(query.skip, query.limite, where),
+      this.repo.contar(where),
     ]);
     return {
       datos: items.map(MaterialRespuestaDto.desde),
       total,
-      pagina: paginacion.pagina,
-      limite: paginacion.limite,
+      pagina: query.pagina,
+      limite: query.limite,
     };
   }
 
