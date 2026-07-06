@@ -13,16 +13,21 @@ export class ProveedoresRepository {
     return this.prisma.proveedor.create({ data });
   }
 
-  buscarTodos(skip: number, take: number): Promise<Proveedor[]> {
+  buscarTodos(
+    skip: number,
+    take: number,
+    where: Prisma.ProveedorWhereInput = {},
+  ): Promise<Proveedor[]> {
     return this.prisma.proveedor.findMany({
+      where,
       skip,
       take,
       orderBy: { nombre: 'asc' },
     });
   }
 
-  contar(): Promise<number> {
-    return this.prisma.proveedor.count();
+  contar(where: Prisma.ProveedorWhereInput = {}): Promise<number> {
+    return this.prisma.proveedor.count({ where });
   }
 
   buscarPorId(id: string): Promise<Proveedor | null> {

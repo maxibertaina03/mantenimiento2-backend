@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PaginacionDto, RespuestaPaginada } from '../../common/dto/paginacion.dto';
+import { Prisma } from '@prisma/client';
+import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { CrearProveedorDto } from './dto/crear-proveedor.dto';
 import { ActualizarProveedorDto } from './dto/actualizar-proveedor.dto';
+import { ListarProveedoresDto } from './dto/listar-proveedores.dto';
 import { ProveedorRespuestaDto } from './dto/proveedor-respuesta.dto';
 import { ProveedoresRepository } from './proveedores.repository';
 
@@ -14,16 +16,26 @@ export class ProveedoresService {
     return ProveedorRespuestaDto.desde(creado);
   }
 
-  async listar(paginacion: PaginacionDto): Promise<RespuestaPaginada<ProveedorRespuestaDto>> {
+  async listar(query: ListarProveedoresDto): Promise<RespuestaPaginada<ProveedorRespuestaDto>> {
+    // Filtro por nombre o CUIT (contiene, sin distinguir mayúsculas/minúsculas).
+    const where: Prisma.ProveedorWhereInput = query.buscar
+      ? {
+          OR: [
+            { nombre: { contains: query.buscar, mode: 'insensitive' } },
+            { cuit: { contains: query.buscar, mode: 'insensitive' } },
+          ],
+        }
+      : {};
+
     const [items, total] = await Promise.all([
-      this.repo.buscarTodos(paginacion.skip, paginacion.limite),
-      this.repo.contar(),
+      this.repo.buscarTodos(query.skip, query.limite, where),
+      this.repo.contar(where),
     ]);
     return {
       datos: items.map(ProveedorRespuestaDto.desde),
       total,
-      pagina: paginacion.pagina,
-      limite: paginacion.limite,
+      pagina: query.pagina,
+      limite: query.limite,
     };
   }
 

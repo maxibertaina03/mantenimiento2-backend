@@ -12,9 +12,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PaginacionDto } from '../../common/dto/paginacion.dto';
 import { CrearProveedorDto } from './dto/crear-proveedor.dto';
 import { ActualizarProveedorDto } from './dto/actualizar-proveedor.dto';
+import { ListarProveedoresDto } from './dto/listar-proveedores.dto';
 import { ProveedoresService } from './proveedores.service';
 
 @ApiTags('Proveedores')
@@ -29,9 +29,9 @@ export class ProveedoresController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar proveedores (paginado)' })
-  listar(@Query() paginacion: PaginacionDto) {
-    return this.service.listar(paginacion);
+  @ApiOperation({ summary: 'Listar proveedores (paginado, con búsqueda por nombre/CUIT)' })
+  listar(@Query() query: ListarProveedoresDto) {
+    return this.service.listar(query);
   }
 
   @Get(':id')
