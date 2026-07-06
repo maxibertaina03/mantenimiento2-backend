@@ -4,7 +4,7 @@
   "description": "API de gestión de mantenimiento (stock de materiales) - NestJS + Prisma",
   "private": true,
   "engines": {
-    "node": ">=18"
+    "node": "22.x"
   },
   "scripts": {
     "build": "nest build",
