@@ -38,7 +38,8 @@ enum RolUsuario {
 model Proveedor {
   id            String   @id @default(uuid())
   nombre        String
-  cuit          String?  @unique
+  // No es único: en los datos reales hay CUITs repetidos (mismas empresas / sucursales).
+  cuit          String?
   email         String?
   telefono      String?
   notas         String?
