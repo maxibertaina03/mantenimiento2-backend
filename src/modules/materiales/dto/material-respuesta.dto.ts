@@ -52,7 +52,8 @@ export class MaterialRespuestaDto {
       unidad: m.unidad,
       stockActual,
       stockMinimo,
-      bajoStock: stockActual <= stockMinimo,
+      // Solo se marca bajo stock si hay un mínimo definido (> 0).
+      bajoStock: stockMinimo > 0 && stockActual <= stockMinimo,
       notas: m.notas,
       creadoEn: m.creadoEn,
       actualizadoEn: m.actualizadoEn,
