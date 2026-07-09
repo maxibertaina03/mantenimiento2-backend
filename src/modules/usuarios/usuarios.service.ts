@@ -27,11 +27,23 @@ export class UsuariosService {
    */
   async buscarOCrearPorClerk(datos: DatosUsuarioClerk): Promise<Usuario> {
     const porIdExterno = await this.repo.buscarPorIdExterno(datos.idExterno);
-    if (porIdExterno) return porIdExterno;
+    if (porIdExterno) {
+      // Sincroniza nombre/email con Clerk en cada login (por si cambió el username).
+      if (porIdExterno.nombre !== datos.nombre || porIdExterno.email !== datos.email) {
+        return this.repo.actualizar(porIdExterno.id, {
+          nombre: datos.nombre,
+          email: datos.email,
+        });
+      }
+      return porIdExterno;
+    }
 
     const porEmail = await this.repo.buscarPorEmail(datos.email);
     if (porEmail) {
-      return this.repo.actualizar(porEmail.id, { idExterno: datos.idExterno });
+      return this.repo.actualizar(porEmail.id, {
+        idExterno: datos.idExterno,
+        nombre: datos.nombre,
+      });
     }
 
     return this.repo.crear({

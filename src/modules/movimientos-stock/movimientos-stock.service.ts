@@ -1,7 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { MotivoMovimiento, Prisma, TipoMovimiento } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { MotivoMovimiento, Prisma, RolUsuario, TipoMovimiento, Usuario } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
+import { ActualizarMovimientoDto } from './dto/actualizar-movimiento.dto';
 import { CrearMovimientoDto } from './dto/crear-movimiento.dto';
+import { EdicionRespuestaDto } from './dto/edicion-respuesta.dto';
 import { FiltrarMovimientosDto } from './dto/filtrar-movimientos.dto';
 import { MovimientoRespuestaDto } from './dto/movimiento-respuesta.dto';
 import { MovimientosStockRepository } from './movimientos-stock.repository';
@@ -116,5 +123,90 @@ export class MovimientosStockService {
       throw new NotFoundException(`No existe el movimiento con id ${id}`);
     }
     return MovimientoRespuestaDto.desde(movimiento);
+  }
+
+  /**
+   * Edita un movimiento (corrección). Solo lo puede hacer quien lo creó o un ADMIN.
+   * Exige un motivo de edición, recalcula el stock del material y deja auditoría.
+   */
+  async editar(
+    id: string,
+    dto: ActualizarMovimientoDto,
+    usuarioActual?: Usuario,
+  ): Promise<MovimientoRespuestaDto> {
+    const actual = await this.repo.buscarPorId(id);
+    if (!actual) {
+      throw new NotFoundException(`No existe el movimiento con id ${id}`);
+    }
+
+    // Permiso: solo el creador o un admin (si hay sesión; en dev sin auth se permite).
+    if (usuarioActual) {
+      const esCreador = actual.usuarioId === usuarioActual.id;
+      const esAdmin = usuarioActual.rol === RolUsuario.ADMIN;
+      if (!esCreador && !esAdmin) {
+        throw new ForbiddenException('Solo quien registró el movimiento (o un admin) puede editarlo.');
+      }
+    }
+
+    // Valores nuevos = lo enviado sobre lo actual.
+    const tipo = dto.tipo ?? actual.tipo;
+    const motivo = dto.motivo ?? actual.motivo;
+    const cantidad = dto.cantidad ?? Number(actual.cantidad);
+    const fecha = dto.fecha ? new Date(dto.fecha) : actual.fecha;
+    const proveedorId = dto.proveedorId !== undefined ? dto.proveedorId : actual.proveedorId;
+    const referenciaTrabajo =
+      dto.referenciaTrabajo !== undefined ? dto.referenciaTrabajo : actual.referenciaTrabajo;
+    const notas = dto.notas !== undefined ? dto.notas : actual.notas;
+
+    // Validaciones de negocio (mismas reglas que al crear).
+    if (tipo !== TipoMovimiento.AJUSTE && cantidad <= 0) {
+      throw new BadRequestException('La cantidad debe ser mayor a 0 para ENTRADA y SALIDA.');
+    }
+    const motivosValidos = MOTIVOS_POR_TIPO[tipo];
+    if (!motivosValidos.includes(motivo)) {
+      throw new BadRequestException(
+        `El motivo ${motivo} no corresponde a un movimiento de tipo ${tipo}. ` +
+          `Motivos válidos: ${motivosValidos.join(', ')}.`,
+      );
+    }
+
+    // Snapshot antes/después (valores serializables para la auditoría).
+    const antes = {
+      tipo: actual.tipo,
+      motivo: actual.motivo,
+      cantidad: Number(actual.cantidad),
+      fecha: actual.fecha.toISOString(),
+      proveedorId: actual.proveedorId,
+      referenciaTrabajo: actual.referenciaTrabajo,
+      notas: actual.notas,
+    };
+    const despues = {
+      tipo,
+      motivo,
+      cantidad,
+      fecha: fecha.toISOString(),
+      proveedorId,
+      referenciaTrabajo,
+      notas,
+    };
+
+    const actualizado = await this.repo.editarConAuditoria({
+      id,
+      materialId: actual.materialId,
+      datos: { tipo, motivo, cantidad, fecha, proveedorId, referenciaTrabajo, notas },
+      edicion: {
+        usuarioId: usuarioActual?.id ?? null,
+        motivo: dto.motivoEdicion,
+        cambios: { antes, despues },
+      },
+    });
+
+    return MovimientoRespuestaDto.desde(actualizado);
+  }
+
+  async listarEdiciones(id: string): Promise<EdicionRespuestaDto[]> {
+    await this.obtener(id); // valida que el movimiento exista
+    const ediciones = await this.repo.listarEdiciones(id);
+    return ediciones.map(EdicionRespuestaDto.desde);
   }
 }

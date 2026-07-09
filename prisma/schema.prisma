@@ -115,12 +115,29 @@ model MovimientoStock {
   material  Material   @relation(fields: [materialId], references: [id])
   proveedor Proveedor? @relation(fields: [proveedorId], references: [id])
   usuario   Usuario?   @relation(fields: [usuarioId], references: [id])
+  ediciones EdicionMovimiento[]
 
   @@index([materialId])
   @@index([tipo])
   @@index([motivo])
   @@index([fecha])
   @@map("movimientos_stock")
+}
+
+// Auditoría: registro de cada edición de un movimiento (trazabilidad de correcciones).
+model EdicionMovimiento {
+  id           String   @id @default(uuid())
+  movimientoId String
+  usuarioId    String? // quién hizo la edición
+  motivo       String // explicación obligatoria del cambio
+  cambios      Json // { antes: {...}, despues: {...} }
+  creadoEn     DateTime @default(now())
+
+  movimiento MovimientoStock @relation(fields: [movimientoId], references: [id], onDelete: Cascade)
+  usuario    Usuario?        @relation(fields: [usuarioId], references: [id])
+
+  @@index([movimientoId])
+  @@map("ediciones_movimiento")
 }
 
 // ───────────────────────── Usuario (preparado para Clerk) ─────────────────────────
@@ -137,7 +154,8 @@ model Usuario {
   creadoEn      DateTime   @default(now())
   actualizadoEn DateTime   @updatedAt
 
-  movimientos MovimientoStock[]
+  movimientos         MovimientoStock[]
+  edicionesMovimiento EdicionMovimiento[]
 
   @@map("usuarios")
 }

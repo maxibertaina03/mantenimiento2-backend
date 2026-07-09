@@ -76,8 +76,9 @@ export class GuardAutenticacion implements CanActivate {
       throw new UnauthorizedException('El usuario de Clerk no tiene email.');
     }
 
-    const nombre =
-      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim() || email;
+    // Preferimos el username; si no hay, nombre y apellido; y como último recurso, el email.
+    const nombreCompleto = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim();
+    const nombre = clerkUser.username?.trim() || nombreCompleto || email;
 
     const usuario = await this.usuarios.buscarOCrearPorClerk({
       idExterno: clerkUserId,

@@ -6,6 +6,7 @@ export type MovimientoConRelaciones = MovimientoStock & {
   material?: { nombre: string } | null;
   proveedor?: { nombre: string } | null;
   usuario?: { nombre: string } | null;
+  _count?: { ediciones: number };
 };
 
 export class MovimientoRespuestaDto {
@@ -51,6 +52,9 @@ export class MovimientoRespuestaDto {
   @ApiProperty()
   creadoEn!: Date;
 
+  @ApiProperty({ description: 'true si el movimiento fue editado alguna vez' })
+  editado!: boolean;
+
   static desde(m: MovimientoConRelaciones): MovimientoRespuestaDto {
     return {
       id: m.id,
@@ -67,6 +71,7 @@ export class MovimientoRespuestaDto {
       referenciaTrabajo: m.referenciaTrabajo,
       notas: m.notas,
       creadoEn: m.creadoEn,
+      editado: (m._count?.ediciones ?? 0) > 0,
     };
   }
 }
