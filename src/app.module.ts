@@ -5,8 +5,10 @@ import { AuthModule } from './common/auth/auth.module';
 import { validarEntorno } from './config/env.validation';
 import { ProveedoresModule } from './modules/proveedores/proveedores.module';
 import { CategoriasMaterialModule } from './modules/categorias-material/categorias-material.module';
+import { EquiposItModule } from './modules/equipos-it/equipos-it.module';
 import { MaterialesModule } from './modules/materiales/materiales.module';
 import { MovimientosStockModule } from './modules/movimientos-stock/movimientos-stock.module';
+import { OrdenesCompraModule } from './modules/ordenes-compra/ordenes-compra.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 
 @Module({
@@ -23,6 +25,8 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     CategoriasMaterialModule,
     MaterialesModule,
     MovimientosStockModule,
+    OrdenesCompraModule,
+    EquiposItModule,
     UsuariosModule,
   ],
 })

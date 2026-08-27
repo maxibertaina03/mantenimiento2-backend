@@ -9,15 +9,15 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL") // Pooler (pgbouncer) — usado por la app en runtime.
-  directUrl = env("DIRECT_URL")   // Conexión directa — usada por Prisma para migraciones.
+  directUrl = env("DIRECT_URL") // Conexión directa — usada por Prisma para migraciones.
 }
 
 // ───────────────────────── Enums ─────────────────────────
 
 enum TipoMovimiento {
   ENTRADA // Suma al stock
-  SALIDA  // Resta del stock
-  AJUSTE  // Fija el stock a un valor absoluto (corrección de inventario)
+  SALIDA // Resta del stock
+  AJUSTE // Fija el stock a un valor absoluto (corrección de inventario)
 }
 
 enum MotivoMovimiento {
@@ -47,6 +47,8 @@ model Proveedor {
   actualizadoEn DateTime @updatedAt
 
   movimientos MovimientoStock[]
+  equiposIt   EquipoIT[]
+  ordenes     OrdenCompra[]
 
   @@map("proveedores")
 }
@@ -80,8 +82,9 @@ model Material {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  categoria   CategoriaMaterial @relation(fields: [categoriaId], references: [id])
-  movimientos MovimientoStock[]
+  categoria        CategoriaMaterial    @relation(fields: [categoriaId], references: [id])
+  movimientos      MovimientoStock[]
+  renglonesOrdenes RenglonOrdenCompra[]
 
   @@index([categoriaId])
   @@map("materiales")
@@ -112,10 +115,11 @@ model MovimientoStock {
   notas    String?
   creadoEn DateTime @default(now())
 
-  material  Material   @relation(fields: [materialId], references: [id])
-  proveedor Proveedor? @relation(fields: [proveedorId], references: [id])
-  usuario   Usuario?   @relation(fields: [usuarioId], references: [id])
-  ediciones EdicionMovimiento[]
+  material      Material            @relation(fields: [materialId], references: [id])
+  proveedor     Proveedor?          @relation(fields: [proveedorId], references: [id])
+  usuario       Usuario?            @relation(fields: [usuarioId], references: [id])
+  ediciones     EdicionMovimiento[]
+  renglonOrigen RenglonOrdenCompra?
 
   @@index([materialId])
   // Cubre exactamente el orden que pide recalcularStock (historial de un material).
@@ -159,5 +163,205 @@ model Usuario {
   movimientos         MovimientoStock[]
   edicionesMovimiento EdicionMovimiento[]
 
+  equiposAsignados        EquipoIT[]           @relation("EquiposAsignados")
+  asignacionesRecibidas   AsignacionEquipoIT[] @relation("AsignacionesRecibidas")
+  asignacionesRegistradas AsignacionEquipoIT[] @relation("AsignacionesRegistradas")
+  ordenesCreadas          OrdenCompra[]        @relation("OrdenesCreadas")
+  ordenesRecibidas        OrdenCompra[]        @relation("OrdenesRecibidas")
+
   @@map("usuarios")
+}
+
+// ═════════════════════════════ Módulo IT ═════════════════════════════
+// Equipos informáticos: activos INDIVIDUALES y rastreables (cada unidad tiene
+// su propia identidad y su historial), a diferencia de los materiales, que son
+// consumibles fungibles con un stock agregado.
+
+enum TipoEquipoIT {
+  PC
+  NOTEBOOK
+  SERVIDOR
+  CELULAR
+  CAMARA_SEGURIDAD
+  TABLET
+  IMPRESORA
+  MONITOR
+  EQUIPO_RED // router, switch, access point
+  OTRO
+}
+
+enum EstadoEquipoIT {
+  EN_USO
+  EN_DEPOSITO
+  EN_REPARACION
+  DADO_DE_BAJA
+}
+
+enum TipoDisco {
+  HDD
+  SSD
+  NVME
+  EMMC
+}
+
+enum TipoAccesoRemoto {
+  NINGUNO
+  ANYDESK
+  TEAMVIEWER
+  RDP
+  VNC
+  SSH
+  OTRO
+}
+
+model EquipoIT {
+  id String @id @default(uuid())
+
+  // Etiqueta de inventario que se le pega al equipo. Único cuando está cargado.
+  codigoInterno String?        @unique
+  tipo          TipoEquipoIT
+  estado        EstadoEquipoIT @default(EN_DEPOSITO)
+
+  marca       String
+  modelo      String
+  numeroSerie String?
+
+  // Especificaciones técnicas. Todas opcionales a propósito: una cámara de
+  // seguridad no tiene RAM ni procesador, pero sí IP y firmware.
+  procesador       String?
+  memoriaRamGb     Int?
+  discoTipo        TipoDisco?
+  discoCapacidadGb Int?
+  sistemaOperativo String?
+
+  // Red y acceso remoto
+  direccionIp    String?
+  direccionMac   String?
+  nombreEnRed    String?
+  accesoRemoto   TipoAccesoRemoto @default(NINGUNO)
+  accesoRemotoId String? // ID de AnyDesk / TeamViewer / host de RDP
+
+  ubicacion String?
+
+  // Compra y garantía
+  proveedorId   String?
+  fechaCompra   DateTime?
+  garantiaHasta DateTime?
+
+  notas String?
+
+  // Usuario que tiene el equipo AHORA. El histórico vive en asignaciones.
+  asignadoAId String?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  proveedor    Proveedor?           @relation(fields: [proveedorId], references: [id])
+  asignadoA    Usuario?             @relation("EquiposAsignados", fields: [asignadoAId], references: [id])
+  asignaciones AsignacionEquipoIT[]
+
+  @@index([tipo])
+  @@index([estado])
+  @@index([asignadoAId])
+  @@map("equipos_it")
+}
+
+// Historial de asignaciones: quién tuvo cada equipo, desde cuándo y hasta cuándo.
+// La asignación vigente es la que tiene `hasta` en null.
+model AsignacionEquipoIT {
+  id              String  @id @default(uuid())
+  equipoId        String
+  // A quién se asignó. Null = se devolvió a depósito.
+  usuarioId       String?
+  // Quién registró el movimiento.
+  registradoPorId String?
+
+  desde  DateTime  @default(now())
+  hasta  DateTime?
+  motivo String?
+  notas  String?
+
+  creadoEn DateTime @default(now())
+
+  equipo        EquipoIT @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  usuario       Usuario? @relation("AsignacionesRecibidas", fields: [usuarioId], references: [id])
+  registradoPor Usuario? @relation("AsignacionesRegistradas", fields: [registradoPorId], references: [id])
+
+  @@index([equipoId])
+  @@index([usuarioId])
+  @@map("asignaciones_equipo_it")
+}
+
+// ═══════════════════════ Módulo Órdenes de Compra ═══════════════════════
+
+enum EstadoOrdenCompra {
+  BORRADOR // se puede editar libremente
+  EMITIDA // enviada al proveedor, esperando la mercadería
+  RECIBIDA // llegó: generó los movimientos de ENTRADA en stock
+  ANULADA
+}
+
+model OrdenCompra {
+  id String @id @default(uuid())
+
+  // Correlativo legible: OC-2026-0001. Lo asigna el backend de forma atómica.
+  numero String            @unique
+  estado EstadoOrdenCompra @default(BORRADOR)
+
+  proveedorId          String
+  fecha                DateTime  @default(now())
+  fechaEntregaEstimada DateTime?
+
+  observaciones String?
+
+  creadoPorId   String?
+  emitidaEn     DateTime?
+  recibidaEn    DateTime?
+  recibidaPorId String?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  proveedor   Proveedor            @relation(fields: [proveedorId], references: [id])
+  creadoPor   Usuario?             @relation("OrdenesCreadas", fields: [creadoPorId], references: [id])
+  recibidaPor Usuario?             @relation("OrdenesRecibidas", fields: [recibidaPorId], references: [id])
+  renglones   RenglonOrdenCompra[]
+
+  @@index([estado])
+  @@index([proveedorId])
+  @@index([fecha])
+  @@map("ordenes_compra")
+}
+
+model RenglonOrdenCompra {
+  id      String @id @default(uuid())
+  ordenId String
+
+  materialId     String
+  cantidad       Decimal  @db.Decimal(14, 3)
+  // Precio unitario pactado. Opcional: a veces se pide sin precio cerrado.
+  precioUnitario Decimal? @db.Decimal(14, 2)
+  notas          String?
+
+  // Movimiento de ENTRADA generado al recibir la orden. Es la trazabilidad
+  // que une el stock con la OC que lo originó.
+  movimientoId String? @unique
+
+  orden      OrdenCompra      @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  material   Material         @relation(fields: [materialId], references: [id])
+  movimiento MovimientoStock? @relation(fields: [movimientoId], references: [id])
+
+  @@index([ordenId])
+  @@index([materialId])
+  @@map("renglones_orden_compra")
+}
+
+// Contadores atómicos para numerar documentos (una fila por serie, ej "OC-2026").
+// Se incrementa con un INSERT ... ON CONFLICT DO UPDATE, que es atómico y no
+// sufre la race de "leer el máximo y sumarle uno".
+model ContadorDocumento {
+  clave  String @id
+  ultimo Int    @default(0)
+
+  @@map("contadores_documento")
 }

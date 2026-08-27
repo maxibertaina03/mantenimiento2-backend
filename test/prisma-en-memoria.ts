@@ -15,6 +15,11 @@ export function crearPrismaEnMemoria() {
     movimientos: [] as any[],
     usuarios: [] as any[],
     ediciones: [] as any[],
+    equiposIt: [] as any[],
+    asignacionesIt: [] as any[],
+    ordenes: [] as any[],
+    renglones: [] as any[],
+    contadores: [] as any[],
   };
 
   // Los DTO validan @IsUUID(), asi que los ids generados deben tener forma de
@@ -73,11 +78,11 @@ export function crearPrismaEnMemoria() {
     }
     if (include.material) {
       const m = db.materiales.find((x) => x.id === fila.materialId);
-      salida.material = m ? { nombre: m.nombre } : null;
+      salida.material = m ? { nombre: m.nombre, unidad: m.unidad } : null;
     }
     if (include.proveedor) {
       const p = db.proveedores.find((x) => x.id === fila.proveedorId);
-      salida.proveedor = p ? { nombre: p.nombre } : null;
+      salida.proveedor = p ? { nombre: p.nombre, cuit: p.cuit ?? null } : null;
     }
     if (include.usuario) {
       const u = db.usuarios.find((x) => x.id === fila.usuarioId);
@@ -89,6 +94,27 @@ export function crearPrismaEnMemoria() {
         include.movimientos.orderBy,
       );
     }
+    if (include.asignadoA) {
+      const u = db.usuarios.find((x) => x.id === fila.asignadoAId);
+      salida.asignadoA = u ? { nombre: u.nombre } : null;
+    }
+    if (include.creadoPor) {
+      const u = db.usuarios.find((x) => x.id === fila.creadoPorId);
+      salida.creadoPor = u ? { nombre: u.nombre } : null;
+    }
+    if (include.recibidaPor) {
+      const u = db.usuarios.find((x) => x.id === fila.recibidaPorId);
+      salida.recibidaPor = u ? { nombre: u.nombre } : null;
+    }
+    if (include.registradoPor) {
+      const u = db.usuarios.find((x) => x.id === fila.registradoPorId);
+      salida.registradoPor = u ? { nombre: u.nombre } : null;
+    }
+    if (include.renglones) {
+      salida.renglones = db.renglones
+        .filter((r) => r.ordenId === fila.id)
+        .map((r) => hidratar(r, include.renglones.include));
+    }
     if (include._count?.select?.ediciones) {
       salida._count = { ediciones: db.ediciones.filter((e) => e.movimientoId === fila.id).length };
     }
@@ -99,15 +125,67 @@ export function crearPrismaEnMemoria() {
   function delegate(coleccion: any[], defaults: () => any = () => ({})) {
     return {
       create: async ({ data, include }: any) => {
+        // `create` anidado (ej: orden con sus renglones) se resuelve aparte.
+        const anidados: [string, any[]][] = [];
+        const plano: any = {};
+        for (const [k, v] of Object.entries(data ?? {})) {
+          if (v && typeof v === 'object' && 'create' in (v as any)) {
+            anidados.push([k, (v as any).create]);
+          } else {
+            plano[k] = v;
+          }
+        }
         const fila = {
-          id: data.id ?? nuevoId(),
+          id: plano.id ?? nuevoId(),
           creadoEn: new Date(),
           actualizadoEn: new Date(),
           ...defaults(),
-          ...aplanarConnect(data),
+          ...aplanarConnect(plano),
         };
         coleccion.push(fila);
+        for (const [campo, hijos] of anidados) {
+          const destino = coleccionHija(campo);
+          for (const hijo of Array.isArray(hijos) ? hijos : [hijos]) {
+            destino.push({
+              id: nuevoId(),
+              creadoEn: new Date(),
+              [clavePadre(campo)]: fila.id,
+              ...hijo,
+            });
+          }
+        }
         return hidratar(fila, include);
+      },
+      createMany: async ({ data }: any) => {
+        for (const d of data) {
+          coleccion.push({ id: nuevoId(), creadoEn: new Date(), ...defaults(), ...d });
+        }
+        return { count: data.length };
+      },
+      updateMany: async ({ where, data }: any) => {
+        const filas = coleccion.filter((f) => coincide(f, where));
+        for (const f of filas) Object.assign(f, data);
+        return { count: filas.length };
+      },
+      deleteMany: async ({ where }: any = {}) => {
+        const quedan = coleccion.filter((f) => !coincide(f, where));
+        const borradas = coleccion.length - quedan.length;
+        coleccion.length = 0;
+        coleccion.push(...quedan);
+        return { count: borradas };
+      },
+      groupBy: async ({ by }: any) => {
+        const grupos = new Map<string, number>();
+        for (const f of coleccion) {
+          const clave = by.map((c: string) => f[c]).join('|');
+          grupos.set(clave, (grupos.get(clave) ?? 0) + 1);
+        }
+        return [...grupos].map(([clave, cantidad]) => {
+          const partes = clave.split('|');
+          const fila: any = { _count: { _all: cantidad } };
+          by.forEach((c: string, i: number) => (fila[c] = partes[i]));
+          return fila;
+        });
       },
       findMany: async ({ where, skip = 0, take, orderBy, include }: any = {}) => {
         const filtradas = ordenar(
@@ -158,6 +236,20 @@ export function crearPrismaEnMemoria() {
     };
   }
 
+  /** Colección donde viven los hijos de un `create` anidado. */
+  function coleccionHija(campo: string): any[] {
+    if (campo === 'renglones') return db.renglones;
+    if (campo === 'asignaciones') return db.asignacionesIt;
+    throw new Error(`create anidado no soportado en el fake: ${campo}`);
+  }
+
+  /** Campo con el que el hijo apunta al padre. */
+  function clavePadre(campo: string): string {
+    if (campo === 'renglones') return 'ordenId';
+    if (campo === 'asignaciones') return 'equipoId';
+    throw new Error(`create anidado no soportado en el fake: ${campo}`);
+  }
+
   /** Traduce `{ categoria: { connect: { id } } }` a `{ categoriaId: id }`. */
   function aplanarConnect(data: any): any {
     const salida: any = {};
@@ -194,6 +286,51 @@ export function crearPrismaEnMemoria() {
     usuario: delegate(db.usuarios, () => ({ idExterno: null, rol: 'OPERARIO' })),
     edicionMovimiento: delegate(db.ediciones, () => ({ usuarioId: null })),
 
+    equipoIT: delegate(db.equiposIt, () => ({
+      codigoInterno: null,
+      estado: 'EN_DEPOSITO',
+      numeroSerie: null,
+      procesador: null,
+      memoriaRamGb: null,
+      discoTipo: null,
+      discoCapacidadGb: null,
+      sistemaOperativo: null,
+      direccionIp: null,
+      direccionMac: null,
+      nombreEnRed: null,
+      accesoRemoto: 'NINGUNO',
+      accesoRemotoId: null,
+      ubicacion: null,
+      proveedorId: null,
+      fechaCompra: null,
+      garantiaHasta: null,
+      notas: null,
+      asignadoAId: null,
+    })),
+    asignacionEquipoIT: delegate(db.asignacionesIt, () => ({
+      usuarioId: null,
+      registradoPorId: null,
+      desde: new Date(),
+      hasta: null,
+      motivo: null,
+      notas: null,
+    })),
+    ordenCompra: delegate(db.ordenes, () => ({
+      estado: 'BORRADOR',
+      fecha: new Date(),
+      fechaEntregaEstimada: null,
+      observaciones: null,
+      creadoPorId: null,
+      emitidaEn: null,
+      recibidaEn: null,
+      recibidaPorId: null,
+    })),
+    renglonOrdenCompra: delegate(db.renglones, () => ({
+      precioUnitario: null,
+      notas: null,
+      movimientoId: null,
+    })),
+
     // El repositorio usa SELECT ... FOR UPDATE para tomar lock del material.
     $queryRaw: async (fragmentos: TemplateStringsArray, ...valores: any[]) => {
       const sql = fragmentos.join('?');
@@ -213,6 +350,17 @@ export function crearPrismaEnMemoria() {
   const queryRawOriginal = prisma.$queryRaw;
   prisma.$queryRaw = async (fragmentos: TemplateStringsArray, ...valores: any[]) => {
     const sql = fragmentos.join('?');
+    // Numeracion correlativa de documentos (INSERT ... ON CONFLICT DO UPDATE).
+    if (/contadores_documento/.test(sql)) {
+      const clave = valores[0];
+      let fila = db.contadores.find((c) => c.clave === clave);
+      if (!fila) {
+        fila = { clave, ultimo: 0 };
+        db.contadores.push(fila);
+      }
+      fila.ultimo += 1;
+      return [{ ultimo: fila.ultimo }];
+    }
     if (/stockActual"\s*<=\s*"stockMinimo/.test(sql)) {
       return db.materiales
         .filter(
