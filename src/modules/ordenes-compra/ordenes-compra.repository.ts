@@ -206,7 +206,7 @@ export class OrdenesCompraRepository {
       for (const renglon of orden.renglones) {
         // Lock de la fila del material antes de leer su stock.
         const filas = await tx.$queryRaw<{ stockActual: Prisma.Decimal }[]>`
-          SELECT "stockActual" FROM materiales WHERE id = ${renglon.materialId}::uuid FOR UPDATE
+          SELECT "stockActual" FROM materiales WHERE id = ${renglon.materialId} FOR UPDATE
         `;
         if (filas.length === 0) {
           throw new NotFoundException(`No existe el material con id ${renglon.materialId}`);

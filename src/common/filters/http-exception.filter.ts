@@ -41,6 +41,13 @@ export class FiltroExcepcionesHttp implements ExceptionFilter {
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       ({ statusCode, mensaje, error } = this.mapearErrorPrisma(exception));
+      // El mensaje que sale al cliente es deliberadamente generico (no exponemos
+      // detalles del esquema), pero el real SIEMPRE tiene que quedar en el log:
+      // sin esto, un error de SQL solo se veia como "P2010" y era imposible
+      // diagnosticarlo sin reproducirlo a mano.
+      this.logger.error(
+        `${request.method} ${request.url} -> Prisma ${exception.code}: ${exception.message}`,
+      );
     } else if (exception instanceof Error) {
       mensaje = exception.message;
     }
@@ -88,10 +95,13 @@ export class FiltroExcepcionesHttp implements ExceptionFilter {
           error: 'Not Found',
         };
       default:
+        // Un codigo que no mapeamos (P2010 = query cruda invalida, por ejemplo)
+        // es un problema NUESTRO, no del cliente: 500, no 400. Devolverlo como
+        // 400 hacia parecer que el usuario habia mandado algo mal.
         return {
-          statusCode: HttpStatus.BAD_REQUEST,
-          mensaje: `Error de base de datos (${e.code}).`,
-          error: 'Bad Request',
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          mensaje: `Error de base de datos (${e.code}). Quedó registrado en el servidor.`,
+          error: 'Internal Server Error',
         };
     }
   }

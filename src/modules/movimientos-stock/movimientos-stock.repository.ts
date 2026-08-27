@@ -53,13 +53,17 @@ export class MovimientosStockRepository implements RepositorioMovimientos {
    * Sin este lock, dos movimientos concurrentes sobre el mismo material leen ambos
    * el stock viejo y el segundo pisa al primero (lost update): dos SALIDAS de 10
    * sobre un stock de 100 dejaban 90 en vez de 80.
+   *
+   * OJO: el id NO se castea a ::uuid. `String @id @default(uuid())` de Prisma
+   * mapea a una columna TEXT, y Postgres no tiene operador `text = uuid`:
+   * el cast hacia fallar la query entera con 42883.
    */
   private async leerStockConLock(
     tx: Prisma.TransactionClient,
     materialId: string,
   ): Promise<Decimal> {
     const filas = await tx.$queryRaw<{ stockActual: Prisma.Decimal }[]>`
-      SELECT "stockActual" FROM materiales WHERE id = ${materialId}::uuid FOR UPDATE
+      SELECT "stockActual" FROM materiales WHERE id = ${materialId} FOR UPDATE
     `;
     if (filas.length === 0) {
       throw new NotFoundException(`No existe el material con id ${materialId}`);

@@ -97,6 +97,28 @@ describe('MovimientosStockRepository', () => {
       expect(fragmentos.join('')).toMatch(/FOR UPDATE/);
     });
 
+    it('REGRESION: el id NO se castea a ::uuid', async () => {
+      // `String @id @default(uuid())` mapea a una columna TEXT, y Postgres no
+      // tiene operador `text = uuid`. Con el cast, la query fallaba entera con
+      // 42883 y era imposible cargar un movimiento de stock.
+      // El fake no valida SQL, asi que este chequeo es la unica red que queda.
+      const { prisma, tx } = crearPrismaFalso({ stockInicial: 10 });
+      const repo = new MovimientosStockRepository(prisma);
+
+      await repo.crearConActualizacionDeStock(
+        {
+          materialId: 'mat-1',
+          tipo: TipoMovimiento.ENTRADA,
+          motivo: 'COMPRA',
+          cantidad: aDecimal(1),
+        } as any,
+        (stock) => stock.plus(1),
+      );
+
+      const sql = ((tx.$queryRaw as jest.Mock).mock.calls[0][0] as string[]).join('?');
+      expect(sql).not.toMatch(/::uuid/);
+    });
+
     it('persiste el movimiento y el nuevo stock en la misma transaccion', async () => {
       const { prisma, tx, material } = crearPrismaFalso({ stockInicial: 100 });
       const repo = new MovimientosStockRepository(prisma);
