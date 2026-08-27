@@ -67,7 +67,6 @@ export class OrdenesCompraService {
 
     const creada = await this.repo.crear({
       proveedorId: dto.proveedorId,
-      fechaEntregaEstimada: dto.fechaEntregaEstimada ? new Date(dto.fechaEntregaEstimada) : null,
       observaciones: dto.observaciones ?? null,
       creadoPorId: usuarioActual?.id ?? null,
       renglones: this.aDatosRenglones(dto.renglones),
@@ -126,9 +125,6 @@ export class OrdenesCompraService {
 
     const actualizada = await this.repo.actualizar(id, {
       proveedorId: dto.proveedorId,
-      fechaEntregaEstimada: dto.fechaEntregaEstimada
-        ? new Date(dto.fechaEntregaEstimada)
-        : undefined,
       observaciones: dto.observaciones,
       renglones: dto.renglones ? this.aDatosRenglones(dto.renglones) : undefined,
     });

@@ -56,7 +56,6 @@ export class OrdenRespuestaDto {
   @ApiPropertyOptional({ nullable: true }) proveedorCuit!: string | null;
 
   @ApiProperty() fecha!: Date;
-  @ApiPropertyOptional({ nullable: true }) fechaEntregaEstimada!: Date | null;
   @ApiPropertyOptional({ nullable: true }) observaciones!: string | null;
 
   @ApiPropertyOptional({ nullable: true }) creadoPorNombre!: string | null;
@@ -94,7 +93,6 @@ export class OrdenRespuestaDto {
       proveedorNombre: o.proveedor?.nombre ?? null,
       proveedorCuit: o.proveedor?.cuit ?? null,
       fecha: o.fecha,
-      fechaEntregaEstimada: o.fechaEntregaEstimada,
       observaciones: o.observaciones,
       creadoPorNombre: o.creadoPor?.nombre ?? null,
       emitidaEn: o.emitidaEn,

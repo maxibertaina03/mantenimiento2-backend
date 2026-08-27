@@ -3,7 +3,6 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
-  IsISO8601,
   IsNumber,
   IsOptional,
   IsPositive,
@@ -42,11 +41,6 @@ export class CrearOrdenDto {
   @ApiProperty({ description: 'Proveedor al que se le compra', format: 'uuid' })
   @IsUUID()
   proveedorId!: string;
-
-  @ApiPropertyOptional({ description: 'Fecha de entrega estimada (ISO 8601)' })
-  @IsOptional()
-  @IsISO8601()
-  fechaEntregaEstimada?: string;
 
   @ApiPropertyOptional({ description: 'Observaciones que salen impresas en la orden' })
   @IsOptional()

@@ -21,7 +21,6 @@ export interface DatosRenglon {
 
 export interface DatosCrearOrden {
   proveedorId: string;
-  fechaEntregaEstimada?: Date | null;
   observaciones?: string | null;
   creadoPorId?: string | null;
   renglones: DatosRenglon[];
@@ -93,7 +92,6 @@ export class OrdenesCompraRepository {
         data: {
           numero,
           proveedorId: datos.proveedorId,
-          fechaEntregaEstimada: datos.fechaEntregaEstimada,
           observaciones: datos.observaciones,
           creadoPorId: datos.creadoPorId,
           renglones: {
@@ -160,7 +158,6 @@ export class OrdenesCompraRepository {
         where: { id },
         data: {
           proveedorId: datos.proveedorId,
-          fechaEntregaEstimada: datos.fechaEntregaEstimada,
           observaciones: datos.observaciones,
         },
         include: this.relaciones,
