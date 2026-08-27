@@ -24,3 +24,6 @@ prisma/*.db
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Reportes de cobertura de tests
+/coverage

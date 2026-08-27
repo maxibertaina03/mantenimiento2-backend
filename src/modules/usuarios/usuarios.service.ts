@@ -38,15 +38,9 @@ export class UsuariosService {
       return porIdExterno;
     }
 
-    const porEmail = await this.repo.buscarPorEmail(datos.email);
-    if (porEmail) {
-      return this.repo.actualizar(porEmail.id, {
-        idExterno: datos.idExterno,
-        nombre: datos.nombre,
-      });
-    }
-
-    return this.repo.crear({
+    // Upsert atomico por email: cubre tanto el caso "ya existe con ese email pero
+    // sin idExterno" (lo vincula) como el alta nueva, sin race entre ambos.
+    return this.repo.upsertPorEmail({
       idExterno: datos.idExterno,
       email: datos.email,
       nombre: datos.nombre,

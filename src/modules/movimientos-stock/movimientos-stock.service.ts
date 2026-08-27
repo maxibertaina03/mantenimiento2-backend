@@ -1,17 +1,24 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MotivoMovimiento, Prisma, RolUsuario, TipoMovimiento, Usuario } from '@prisma/client';
+import { MotivoMovimiento, RolUsuario, TipoMovimiento, Usuario } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
+import { Decimal, aDecimal, aNumero } from '../../common/dominio/decimal';
+import { finDelDia, inicioDelDia } from '../../common/dominio/fechas';
 import { ActualizarMovimientoDto } from './dto/actualizar-movimiento.dto';
 import { CrearMovimientoDto } from './dto/crear-movimiento.dto';
 import { EdicionRespuestaDto } from './dto/edicion-respuesta.dto';
 import { FiltrarMovimientosDto } from './dto/filtrar-movimientos.dto';
 import { MovimientoRespuestaDto } from './dto/movimiento-respuesta.dto';
-import { MovimientosStockRepository } from './movimientos-stock.repository';
+import {
+  FiltroMovimientos,
+  REPOSITORIO_MOVIMIENTOS,
+  RepositorioMovimientos,
+} from './movimientos-stock.puerto';
 
 /**
  * Motivos válidos según el tipo de movimiento.
@@ -31,41 +38,51 @@ export const MOTIVOS_POR_TIPO: Record<TipoMovimiento, MotivoMovimiento[]> = {
 
 @Injectable()
 export class MovimientosStockService {
-  constructor(private readonly repo: MovimientosStockRepository) {}
+  constructor(@Inject(REPOSITORIO_MOVIMIENTOS) private readonly repo: RepositorioMovimientos) {}
 
-  async crear(dto: CrearMovimientoDto, usuarioIdActual?: string): Promise<MovimientoRespuestaDto> {
-    // Regla: ENTRADA/SALIDA deben mover una cantidad > 0 (no tendría sentido 0).
-    if (dto.tipo !== TipoMovimiento.AJUSTE && dto.cantidad <= 0) {
-      throw new BadRequestException('La cantidad debe ser mayor a 0 para ENTRADA y SALIDA.');
-    }
-
-    // Regla: el motivo tiene que ser coherente con el tipo de movimiento.
-    const motivosValidos = MOTIVOS_POR_TIPO[dto.tipo];
-    if (!motivosValidos.includes(dto.motivo)) {
+  /** Invariante compartida por alta y edición: el motivo debe encajar con el tipo. */
+  private validarTipoYMotivo(tipo: TipoMovimiento, motivo: MotivoMovimiento): void {
+    const motivosValidos = MOTIVOS_POR_TIPO[tipo];
+    if (!motivosValidos.includes(motivo)) {
       throw new BadRequestException(
-        `El motivo ${dto.motivo} no corresponde a un movimiento de tipo ${dto.tipo}. ` +
+        `El motivo ${motivo} no corresponde a un movimiento de tipo ${tipo}. ` +
           `Motivos válidos: ${motivosValidos.join(', ')}.`,
       );
     }
+  }
+
+  /** ENTRADA/SALIDA deben mover una cantidad > 0 (no tendría sentido 0). */
+  private validarCantidad(tipo: TipoMovimiento, cantidad: Decimal): void {
+    if (tipo !== TipoMovimiento.AJUSTE && cantidad.lessThanOrEqualTo(0)) {
+      throw new BadRequestException('La cantidad debe ser mayor a 0 para ENTRADA y SALIDA.');
+    }
+  }
+
+  async crear(dto: CrearMovimientoDto, usuarioIdActual?: string): Promise<MovimientoRespuestaDto> {
+    const cantidad = aDecimal(dto.cantidad);
+
+    this.validarCantidad(dto.tipo, cantidad);
+    this.validarTipoYMotivo(dto.tipo, dto.motivo);
 
     // Regla de negocio: cómo cambia el stock según el tipo de movimiento.
-    const calcularNuevoStock = (stockActual: number): number => {
+    // Toda la aritmética es Decimal para no arrastrar error de punto flotante.
+    const calcularNuevoStock = (stockActual: Decimal): Decimal => {
       switch (dto.tipo) {
         case TipoMovimiento.ENTRADA:
-          return stockActual + dto.cantidad;
+          return stockActual.plus(cantidad);
         case TipoMovimiento.SALIDA: {
-          const resultado = stockActual - dto.cantidad;
-          if (resultado < 0) {
+          const resultado = stockActual.minus(cantidad);
+          if (resultado.isNegative()) {
             throw new BadRequestException(
-              `Stock insuficiente: hay ${stockActual} y se intentan retirar ${dto.cantidad}. ` +
-                `Usá un movimiento de tipo AJUSTE si necesitás corregir el stock.`,
+              `Stock insuficiente: hay ${stockActual.toString()} y se intentan retirar ` +
+                `${cantidad.toString()}. Usá un movimiento de tipo AJUSTE si necesitás corregir el stock.`,
             );
           }
           return resultado;
         }
         case TipoMovimiento.AJUSTE:
-          // El AJUSTE fija el stock al valor absoluto de `cantidad` (>= 0 por validación del DTO).
-          return dto.cantidad;
+          // El AJUSTE fija el stock al valor absoluto de `cantidad` (>= 0 por el DTO).
+          return cantidad;
         default:
           throw new BadRequestException('Tipo de movimiento no soportado.');
       }
@@ -76,7 +93,7 @@ export class MovimientosStockService {
         materialId: dto.materialId,
         tipo: dto.tipo,
         motivo: dto.motivo,
-        cantidad: dto.cantidad,
+        cantidad,
         fecha: dto.fecha ? new Date(dto.fecha) : undefined,
         proveedorId: dto.proveedorId,
         usuarioId: usuarioIdActual ?? dto.usuarioId,
@@ -90,23 +107,20 @@ export class MovimientosStockService {
   }
 
   async listar(filtros: FiltrarMovimientosDto): Promise<RespuestaPaginada<MovimientoRespuestaDto>> {
-    const where: Prisma.MovimientoStockWhereInput = {
-      ...(filtros.materialId ? { materialId: filtros.materialId } : {}),
-      ...(filtros.tipo ? { tipo: filtros.tipo } : {}),
-      ...(filtros.motivo ? { motivo: filtros.motivo } : {}),
-      ...(filtros.fechaDesde || filtros.fechaHasta
-        ? {
-            fecha: {
-              ...(filtros.fechaDesde ? { gte: new Date(filtros.fechaDesde) } : {}),
-              ...(filtros.fechaHasta ? { lte: new Date(filtros.fechaHasta) } : {}),
-            },
-          }
-        : {}),
+    // `fechaDesde`/`fechaHasta` son inclusivas y pueden venir como YYYY-MM-DD.
+    // Se expanden a [00:00:00.000, 23:59:59.999] para no perder los movimientos
+    // cargados durante el propio día del extremo del rango.
+    const filtro: FiltroMovimientos = {
+      materialId: filtros.materialId,
+      tipo: filtros.tipo,
+      motivo: filtros.motivo,
+      fechaDesde: filtros.fechaDesde ? inicioDelDia(filtros.fechaDesde) : undefined,
+      fechaHasta: filtros.fechaHasta ? finDelDia(filtros.fechaHasta) : undefined,
     };
 
     const [items, total] = await Promise.all([
-      this.repo.buscarConFiltros(where, filtros.skip, filtros.limite),
-      this.repo.contar(where),
+      this.repo.buscarConFiltros(filtro, filtros.skip, filtros.limite),
+      this.repo.contar(filtro),
     ]);
 
     return {
@@ -144,14 +158,16 @@ export class MovimientosStockService {
       const esCreador = actual.usuarioId === usuarioActual.id;
       const esAdmin = usuarioActual.rol === RolUsuario.ADMIN;
       if (!esCreador && !esAdmin) {
-        throw new ForbiddenException('Solo quien registró el movimiento (o un admin) puede editarlo.');
+        throw new ForbiddenException(
+          'Solo quien registró el movimiento (o un admin) puede editarlo.',
+        );
       }
     }
 
     // Valores nuevos = lo enviado sobre lo actual.
     const tipo = dto.tipo ?? actual.tipo;
     const motivo = dto.motivo ?? actual.motivo;
-    const cantidad = dto.cantidad ?? Number(actual.cantidad);
+    const cantidad = aDecimal(dto.cantidad ?? actual.cantidad);
     const fecha = dto.fecha ? new Date(dto.fecha) : actual.fecha;
     const proveedorId = dto.proveedorId !== undefined ? dto.proveedorId : actual.proveedorId;
     const referenciaTrabajo =
@@ -159,22 +175,14 @@ export class MovimientosStockService {
     const notas = dto.notas !== undefined ? dto.notas : actual.notas;
 
     // Validaciones de negocio (mismas reglas que al crear).
-    if (tipo !== TipoMovimiento.AJUSTE && cantidad <= 0) {
-      throw new BadRequestException('La cantidad debe ser mayor a 0 para ENTRADA y SALIDA.');
-    }
-    const motivosValidos = MOTIVOS_POR_TIPO[tipo];
-    if (!motivosValidos.includes(motivo)) {
-      throw new BadRequestException(
-        `El motivo ${motivo} no corresponde a un movimiento de tipo ${tipo}. ` +
-          `Motivos válidos: ${motivosValidos.join(', ')}.`,
-      );
-    }
+    this.validarCantidad(tipo, cantidad);
+    this.validarTipoYMotivo(tipo, motivo);
 
     // Snapshot antes/después (valores serializables para la auditoría).
     const antes = {
       tipo: actual.tipo,
       motivo: actual.motivo,
-      cantidad: Number(actual.cantidad),
+      cantidad: aNumero(actual.cantidad),
       fecha: actual.fecha.toISOString(),
       proveedorId: actual.proveedorId,
       referenciaTrabajo: actual.referenciaTrabajo,
@@ -183,7 +191,7 @@ export class MovimientosStockService {
     const despues = {
       tipo,
       motivo,
-      cantidad,
+      cantidad: aNumero(cantidad),
       fecha: fecha.toISOString(),
       proveedorId,
       referenciaTrabajo,
@@ -198,6 +206,16 @@ export class MovimientosStockService {
         usuarioId: usuarioActual?.id ?? null,
         motivo: dto.motivoEdicion,
         cambios: { antes, despues },
+      },
+      // Misma invariante que en el alta: el historial no puede dejar stock negativo.
+      // Si falla, la transacción se revierte entera.
+      validarStock: (stockRecalculado) => {
+        if (stockRecalculado.isNegative()) {
+          throw new BadRequestException(
+            `Esta edición dejaría el stock del material en ${stockRecalculado.toString()}. ` +
+              `Revisá el historial de movimientos antes de corregir.`,
+          );
+        }
       },
     });
 

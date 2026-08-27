@@ -118,6 +118,8 @@ model MovimientoStock {
   ediciones EdicionMovimiento[]
 
   @@index([materialId])
+  // Cubre exactamente el orden que pide recalcularStock (historial de un material).
+  @@index([materialId, fecha, creadoEn])
   @@index([tipo])
   @@index([motivo])
   @@index([fecha])

@@ -1,15 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MotivoMovimiento, TipoMovimiento } from '@prisma/client';
 import { Type } from 'class-transformer';
-import {
-  IsEnum,
-  IsISO8601,
-  IsNumber,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Min,
-} from 'class-validator';
+import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CrearMovimientoDto {
   @ApiProperty({ description: 'Material afectado', format: 'uuid' })

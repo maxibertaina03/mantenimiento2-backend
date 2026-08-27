@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, Usuario } from '@prisma/client';
+import { Prisma, RolUsuario, Usuario } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 @Injectable()
@@ -8,6 +8,26 @@ export class UsuariosRepository {
 
   crear(data: Prisma.UsuarioCreateInput): Promise<Usuario> {
     return this.prisma.usuario.create({ data });
+  }
+
+  /**
+   * Alta/actualizacion atomica por email (provisioning desde Clerk).
+   *
+   * Evita la race de "buscar y despues crear": dos requests simultaneos del mismo
+   * usuario nuevo pasaban ambos por el findUnique -> null y ambos llamaban create,
+   * y el segundo reventaba con violacion de unique en email (500).
+   */
+  upsertPorEmail(data: {
+    email: string;
+    nombre: string;
+    idExterno: string;
+    rol: RolUsuario;
+  }): Promise<Usuario> {
+    return this.prisma.usuario.upsert({
+      where: { email: data.email },
+      update: { nombre: data.nombre, idExterno: data.idExterno },
+      create: data,
+    });
   }
 
   buscarTodos(skip: number, take: number): Promise<Usuario[]> {

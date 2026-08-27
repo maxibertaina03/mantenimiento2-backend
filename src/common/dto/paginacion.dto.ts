@@ -13,7 +13,12 @@ export class PaginacionDto {
   @Min(1)
   pagina: number = 1;
 
-  @ApiPropertyOptional({ description: 'Elementos por página', default: 20, minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({
+    description: 'Elementos por página',
+    default: 20,
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

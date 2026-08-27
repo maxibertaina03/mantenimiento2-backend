@@ -1,73 +1,26 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MotivoMovimiento, MovimientoStock, Prisma, TipoMovimiento } from '@prisma/client';
+import { Prisma, TipoMovimiento } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { Decimal, aDecimal } from '../../common/dominio/decimal';
+import { MovimientoConRelaciones } from './dto/movimiento-respuesta.dto';
+import {
+  DatosCrearMovimiento,
+  DatosEditarMovimiento,
+  EdicionConUsuario,
+  FiltroMovimientos,
+  RepositorioMovimientos,
+} from './movimientos-stock.puerto';
 
-export interface DatosCrearMovimiento {
-  materialId: string;
-  tipo: TipoMovimiento;
-  motivo: MotivoMovimiento;
-  cantidad: number;
-  fecha?: Date;
-  proveedorId?: string | null;
-  usuarioId?: string | null;
-  referenciaTrabajo?: string | null;
-  notas?: string | null;
-}
+// Re-export por compatibilidad con importadores previos.
+export type { DatosCrearMovimiento, DatosEditarMovimiento };
 
-export interface DatosEditarMovimiento {
-  tipo: TipoMovimiento;
-  motivo: MotivoMovimiento;
-  cantidad: number;
-  fecha: Date;
-  proveedorId: string | null;
-  referenciaTrabajo: string | null;
-  notas: string | null;
-}
-
+/**
+ * Adaptador Prisma del puerto `RepositorioMovimientos`.
+ * Es el único lugar del módulo que habla el lenguaje de Prisma.
+ */
 @Injectable()
-export class MovimientosStockRepository {
+export class MovimientosStockRepository implements RepositorioMovimientos {
   constructor(private readonly prisma: PrismaService) {}
-
-  /**
-   * Crea el movimiento y actualiza el stockActual del material en UNA transacción.
-   * - Lee el stock vigente dentro de la transacción (consistencia).
-   * - `calcularNuevoStock` (definido por el service) aplica la regla de negocio
-   *   y puede lanzar si el resultado es inválido (p. ej. stock negativo).
-   */
-  async crearConActualizacionDeStock(
-    data: DatosCrearMovimiento,
-    calcularNuevoStock: (stockActual: number) => number,
-  ): Promise<MovimientoStock> {
-    return this.prisma.$transaction(async (tx) => {
-      const material = await tx.material.findUnique({ where: { id: data.materialId } });
-      if (!material) {
-        throw new NotFoundException(`No existe el material con id ${data.materialId}`);
-      }
-
-      const nuevoStock = calcularNuevoStock(Number(material.stockActual));
-
-      const movimiento = await tx.movimientoStock.create({
-        data: {
-          materialId: data.materialId,
-          tipo: data.tipo,
-          motivo: data.motivo,
-          cantidad: new Prisma.Decimal(data.cantidad),
-          fecha: data.fecha,
-          proveedorId: data.proveedorId ?? null,
-          usuarioId: data.usuarioId ?? null,
-          referenciaTrabajo: data.referenciaTrabajo ?? null,
-          notas: data.notas ?? null,
-        },
-      });
-
-      await tx.material.update({
-        where: { id: data.materialId },
-        data: { stockActual: new Prisma.Decimal(nuevoStock) },
-      });
-
-      return movimiento;
-    });
-  }
 
   // Incluye los nombres de material/proveedor/usuario y si tuvo ediciones.
   private readonly relaciones = {
@@ -77,44 +30,120 @@ export class MovimientosStockRepository {
     _count: { select: { ediciones: true } },
   };
 
-  /** Recalcula el stock del material reproduciendo todos sus movimientos en orden. */
-  private async recalcularStock(tx: Prisma.TransactionClient, materialId: string): Promise<void> {
+  /** Traduce el filtro de dominio al `where` de Prisma. */
+  private aWhere(filtro: FiltroMovimientos): Prisma.MovimientoStockWhereInput {
+    return {
+      ...(filtro.materialId ? { materialId: filtro.materialId } : {}),
+      ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
+      ...(filtro.motivo ? { motivo: filtro.motivo } : {}),
+      ...(filtro.fechaDesde || filtro.fechaHasta
+        ? {
+            fecha: {
+              ...(filtro.fechaDesde ? { gte: filtro.fechaDesde } : {}),
+              ...(filtro.fechaHasta ? { lte: filtro.fechaHasta } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+
+  /**
+   * Lee el stock del material tomando LOCK EXCLUSIVO de la fila (SELECT ... FOR UPDATE).
+   *
+   * Sin este lock, dos movimientos concurrentes sobre el mismo material leen ambos
+   * el stock viejo y el segundo pisa al primero (lost update): dos SALIDAS de 10
+   * sobre un stock de 100 dejaban 90 en vez de 80.
+   */
+  private async leerStockConLock(
+    tx: Prisma.TransactionClient,
+    materialId: string,
+  ): Promise<Decimal> {
+    const filas = await tx.$queryRaw<{ stockActual: Prisma.Decimal }[]>`
+      SELECT "stockActual" FROM materiales WHERE id = ${materialId}::uuid FOR UPDATE
+    `;
+    if (filas.length === 0) {
+      throw new NotFoundException(`No existe el material con id ${materialId}`);
+    }
+    return aDecimal(filas[0].stockActual);
+  }
+
+  async crearConActualizacionDeStock(
+    data: DatosCrearMovimiento,
+    calcularNuevoStock: (stockActual: Decimal) => Decimal,
+  ): Promise<MovimientoConRelaciones> {
+    return this.prisma.$transaction(async (tx) => {
+      const stockActual = await this.leerStockConLock(tx, data.materialId);
+
+      // Regla de negocio del service; puede lanzar (p. ej. stock insuficiente).
+      const nuevoStock = calcularNuevoStock(stockActual);
+
+      const movimiento = await tx.movimientoStock.create({
+        data: {
+          materialId: data.materialId,
+          tipo: data.tipo,
+          motivo: data.motivo,
+          cantidad: aDecimal(data.cantidad),
+          fecha: data.fecha,
+          proveedorId: data.proveedorId ?? null,
+          usuarioId: data.usuarioId ?? null,
+          referenciaTrabajo: data.referenciaTrabajo ?? null,
+          notas: data.notas ?? null,
+        },
+        include: this.relaciones,
+      });
+
+      await tx.material.update({
+        where: { id: data.materialId },
+        data: { stockActual: aDecimal(nuevoStock) },
+      });
+
+      return movimiento;
+    });
+  }
+
+  /**
+   * Recalcula el stock del material reproduciendo todos sus movimientos en orden.
+   * Devuelve el stock resultante SIN persistirlo, para que el llamador pueda validarlo.
+   */
+  private async recalcularStock(
+    tx: Prisma.TransactionClient,
+    materialId: string,
+  ): Promise<Decimal> {
     const movs = await tx.movimientoStock.findMany({
       where: { materialId },
       orderBy: [{ fecha: 'asc' }, { creadoEn: 'asc' }],
       select: { tipo: true, cantidad: true },
     });
-    let stock = 0;
+
+    let stock = aDecimal(0);
     for (const m of movs) {
-      const c = Number(m.cantidad);
-      if (m.tipo === 'ENTRADA') stock += c;
-      else if (m.tipo === 'SALIDA') stock -= c;
-      else stock = c; // AJUSTE fija el valor absoluto
+      const cantidad = aDecimal(m.cantidad);
+      if (m.tipo === TipoMovimiento.ENTRADA) stock = stock.plus(cantidad);
+      else if (m.tipo === TipoMovimiento.SALIDA) stock = stock.minus(cantidad);
+      else stock = cantidad; // AJUSTE fija el valor absoluto
     }
-    await tx.material.update({
-      where: { id: materialId },
-      data: { stockActual: new Prisma.Decimal(stock) },
-    });
+    return aDecimal(stock);
   }
 
-  /**
-   * Edita un movimiento, recalcula el stock del material y deja el registro de
-   * auditoría (motivo + antes/después), todo en una transacción.
-   */
   async editarConAuditoria(params: {
     id: string;
     materialId: string;
     datos: DatosEditarMovimiento;
-    edicion: { usuarioId: string | null; motivo: string; cambios: Prisma.InputJsonValue };
-  }) {
-    const { id, materialId, datos, edicion } = params;
+    edicion: { usuarioId: string | null; motivo: string; cambios: unknown };
+    validarStock: (stockRecalculado: Decimal) => void;
+  }): Promise<MovimientoConRelaciones> {
+    const { id, materialId, datos, edicion, validarStock } = params;
+
     return this.prisma.$transaction(async (tx) => {
+      // Lock del material: la edición también recalcula stock y compite con las altas.
+      await this.leerStockConLock(tx, materialId);
+
       await tx.movimientoStock.update({
         where: { id },
         data: {
           tipo: datos.tipo,
           motivo: datos.motivo,
-          cantidad: new Prisma.Decimal(datos.cantidad),
+          cantidad: aDecimal(datos.cantidad),
           fecha: datos.fecha,
           proveedorId: datos.proveedorId,
           referenciaTrabajo: datos.referenciaTrabajo,
@@ -122,14 +151,23 @@ export class MovimientosStockRepository {
         },
       });
 
-      await this.recalcularStock(tx, materialId);
+      const nuevoStock = await this.recalcularStock(tx, materialId);
+
+      // Si el recálculo deja el stock inválido (negativo), la transacción se aborta
+      // entera: ni la edición ni la auditoría quedan persistidas.
+      validarStock(nuevoStock);
+
+      await tx.material.update({
+        where: { id: materialId },
+        data: { stockActual: nuevoStock },
+      });
 
       await tx.edicionMovimiento.create({
         data: {
           movimientoId: id,
           usuarioId: edicion.usuarioId,
           motivo: edicion.motivo,
-          cambios: edicion.cambios,
+          cambios: edicion.cambios as Prisma.InputJsonValue,
         },
       });
 
@@ -137,7 +175,7 @@ export class MovimientosStockRepository {
     });
   }
 
-  listarEdiciones(movimientoId: string) {
+  listarEdiciones(movimientoId: string): Promise<EdicionConUsuario[]> {
     return this.prisma.edicionMovimiento.findMany({
       where: { movimientoId },
       orderBy: { creadoEn: 'desc' },
@@ -145,9 +183,13 @@ export class MovimientosStockRepository {
     });
   }
 
-  buscarConFiltros(where: Prisma.MovimientoStockWhereInput, skip: number, take: number) {
+  buscarConFiltros(
+    filtro: FiltroMovimientos,
+    skip: number,
+    take: number,
+  ): Promise<MovimientoConRelaciones[]> {
     return this.prisma.movimientoStock.findMany({
-      where,
+      where: this.aWhere(filtro),
       skip,
       take,
       orderBy: { fecha: 'desc' },
@@ -155,11 +197,11 @@ export class MovimientosStockRepository {
     });
   }
 
-  contar(where: Prisma.MovimientoStockWhereInput): Promise<number> {
-    return this.prisma.movimientoStock.count({ where });
+  contar(filtro: FiltroMovimientos): Promise<number> {
+    return this.prisma.movimientoStock.count({ where: this.aWhere(filtro) });
   }
 
-  buscarPorId(id: string) {
+  buscarPorId(id: string): Promise<MovimientoConRelaciones | null> {
     return this.prisma.movimientoStock.findUnique({
       where: { id },
       include: this.relaciones,

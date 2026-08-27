@@ -11,6 +11,7 @@ import { Reflector } from '@nestjs/core';
 import { verifyToken, type ClerkClient } from '@clerk/backend';
 import type { Request } from 'express';
 import { UsuariosService } from '../../../modules/usuarios/usuarios.service';
+import { CacheUsuarios } from '../cache-usuarios';
 import { CLERK_CLIENT } from '../clerk.provider';
 import { CLAVE_PUBLICO } from '../decorators/public.decorator';
 
@@ -34,6 +35,7 @@ export class GuardAutenticacion implements CanActivate {
     private readonly config: ConfigService,
     private readonly usuarios: UsuariosService,
     @Inject(CLERK_CLIENT) private readonly clerk: ClerkClient | null,
+    private readonly cache: CacheUsuarios,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -66,6 +68,14 @@ export class GuardAutenticacion implements CanActivate {
       throw new UnauthorizedException('Token inválido o expirado.');
     }
 
+    // Cache por token: evita el roundtrip a Clerk y las queries de provisioning
+    // en cada request. Si esta cacheado, resolvemos aca y salimos.
+    const cacheado = this.cache.obtener(clerkUserId);
+    if (cacheado) {
+      (request as Request & { usuario?: unknown }).usuario = cacheado;
+      return true;
+    }
+
     // Provisionamiento just-in-time: aseguramos la fila en nuestra tabla usuarios.
     const clerkUser = await this.clerk.users.getUser(clerkUserId);
     const email =
@@ -77,7 +87,10 @@ export class GuardAutenticacion implements CanActivate {
     }
 
     // Preferimos el username; si no hay, nombre y apellido; y como último recurso, el email.
-    const nombreCompleto = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim();
+    const nombreCompleto = [clerkUser.firstName, clerkUser.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     const nombre = clerkUser.username?.trim() || nombreCompleto || email;
 
     const usuario = await this.usuarios.buscarOCrearPorClerk({
@@ -85,6 +98,8 @@ export class GuardAutenticacion implements CanActivate {
       email,
       nombre,
     });
+
+    this.cache.guardar(clerkUserId, usuario);
 
     // Disponible para los controllers vía el decorador @UsuarioActual().
     (request as Request & { usuario?: unknown }).usuario = usuario;

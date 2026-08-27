@@ -1,7 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EdicionMovimiento } from '@prisma/client';
-
-type EdicionConUsuario = EdicionMovimiento & { usuario?: { nombre: string } | null };
+import type { EdicionConUsuario } from '../movimientos-stock.puerto';
 
 /** Registro de auditoría de una edición de movimiento. */
 export class EdicionRespuestaDto {
