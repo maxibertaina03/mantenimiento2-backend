@@ -34,6 +34,11 @@ export class UsuariosRepository {
     return this.prisma.usuario.findMany({ skip, take, orderBy: { nombre: 'asc' } });
   }
 
+  /** Cuántos usuarios tienen ese rol. Se usa para no quedarse sin ADMIN. */
+  contarPorRol(rol: RolUsuario): Promise<number> {
+    return this.prisma.usuario.count({ where: { rol } });
+  }
+
   contar(): Promise<number> {
     return this.prisma.usuario.count();
   }

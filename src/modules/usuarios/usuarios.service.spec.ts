@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RolUsuario } from '@prisma/client';
 import { UsuariosService } from './usuarios.service';
 import { UsuariosRepository } from './usuarios.repository';
@@ -23,6 +23,7 @@ function armar() {
     buscarPorIdExterno: jest.fn<Promise<any>, any[]>(async () => null),
     buscarPorEmail: jest.fn<Promise<any>, any[]>(async () => null),
     actualizar: jest.fn<Promise<any>, any[]>(async () => usuario),
+    contarPorRol: jest.fn<Promise<any>, any[]>(async () => 2),
     eliminar: jest.fn<Promise<any>, any[]>(async () => usuario),
   };
 
@@ -123,6 +124,63 @@ describe('UsuariosService - CRUD', () => {
     repo.buscarPorId.mockResolvedValue(null);
     await expect(service.eliminar('nope')).rejects.toBeInstanceOf(NotFoundException);
     expect(repo.eliminar).not.toHaveBeenCalled();
+  });
+
+  it('REGRESION: no se puede quitar el rol al ultimo administrador', async () => {
+    // Sin esto, el unico ADMIN podia quitarse el rol desde la pantalla de
+    // usuarios y nadie quedaba con permiso para devolverselo.
+    const { repo, service } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.ADMIN });
+    repo.contarPorRol.mockResolvedValue(1);
+
+    await expect(
+      service.actualizar('u-1', { rol: RolUsuario.OPERARIO } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.actualizar).not.toHaveBeenCalled();
+  });
+
+  it('si hay mas de un administrador, si se puede degradar a uno', async () => {
+    const { repo, service } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.ADMIN });
+    repo.contarPorRol.mockResolvedValue(2);
+
+    await service.actualizar('u-1', { rol: RolUsuario.OPERARIO } as any);
+    expect(repo.actualizar).toHaveBeenCalled();
+  });
+
+  it('promover a ADMIN nunca se bloquea', async () => {
+    const { repo, service } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.OPERARIO });
+    repo.contarPorRol.mockResolvedValue(1);
+
+    await service.actualizar('u-1', { rol: RolUsuario.ADMIN } as any);
+    expect(repo.actualizar).toHaveBeenCalled();
+  });
+
+  it('cambiar el nombre de un admin no dispara la validacion', async () => {
+    const { repo, service } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.ADMIN });
+    repo.contarPorRol.mockResolvedValue(1);
+
+    await service.actualizar('u-1', { nombre: 'Otro nombre' } as any);
+    expect(repo.actualizar).toHaveBeenCalled();
+  });
+
+  it('REGRESION: tampoco se elimina al ultimo administrador', async () => {
+    const { repo, service } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.ADMIN });
+    repo.contarPorRol.mockResolvedValue(1);
+
+    await expect(service.eliminar('u-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.eliminar).not.toHaveBeenCalled();
+  });
+
+  it('eliminar un operario no toca la validacion de admins', async () => {
+    const { repo, service } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.OPERARIO });
+
+    await service.eliminar('u-1');
+    expect(repo.eliminar).toHaveBeenCalledWith('u-1');
   });
 
   it('listar() devuelve la forma paginada', async () => {

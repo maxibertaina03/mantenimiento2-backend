@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { RolUsuario, Usuario } from '@prisma/client';
 import { PaginacionDto, RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
@@ -74,14 +74,39 @@ export class UsuariosService {
     return UsuarioRespuestaDto.desde(usuario);
   }
 
+  /**
+   * Impide dejar el sistema sin administradores.
+   *
+   * Sin esto, el único ADMIN podía quitarse el rol a sí mismo desde la pantalla
+   * de usuarios y nadie quedaba con permiso para devolvérselo: el sistema se
+   * cerraba solo y había que arreglarlo por SQL.
+   */
+  private async validarQueQuedeUnAdmin(usuarioId: string, rolActual: RolUsuario): Promise<void> {
+    if (rolActual !== RolUsuario.ADMIN) return;
+    const admins = await this.repo.contarPorRol(RolUsuario.ADMIN);
+    if (admins <= 1) {
+      throw new BadRequestException(
+        'Es el único administrador del sistema. Nombrá a otro antes de quitarle el rol.',
+      );
+    }
+    void usuarioId;
+  }
+
   async actualizar(id: string, dto: ActualizarUsuarioDto): Promise<UsuarioRespuestaDto> {
-    await this.obtener(id);
+    const actual = await this.obtener(id);
+
+    // Solo si REALMENTE se le está quitando el rol de administrador.
+    if (dto.rol && dto.rol !== RolUsuario.ADMIN) {
+      await this.validarQueQuedeUnAdmin(id, actual.rol);
+    }
+
     const actualizado = await this.repo.actualizar(id, dto);
     return UsuarioRespuestaDto.desde(actualizado);
   }
 
   async eliminar(id: string): Promise<void> {
-    await this.obtener(id);
+    const actual = await this.obtener(id);
+    await this.validarQueQuedeUnAdmin(id, actual.rol);
     await this.repo.eliminar(id);
   }
 }

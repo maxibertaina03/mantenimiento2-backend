@@ -12,7 +12,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RolUsuario } from '@prisma/client';
 import type { Usuario } from '@prisma/client';
+import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decorator';
 import { PaginacionDto } from '../../common/dto/paginacion.dto';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
@@ -20,19 +22,30 @@ import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { UsuarioRespuestaDto } from './dto/usuario-respuesta.dto';
 import { UsuariosService } from './usuarios.service';
 
+/**
+ * Los endpoints van marcados uno por uno y NO a nivel de clase, porque `me`
+ * tiene que quedar abierto: cualquier usuario autenticado necesita saber quién
+ * es y qué rol tiene.
+ *
+ * Antes estos endpoints estaban SIN restricción: cualquier operario podía
+ * cambiarle el rol a cualquiera, incluido hacerse administrador a sí mismo.
+ */
 @ApiTags('Usuarios')
+@ApiBearerAuth()
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private readonly service: UsuariosService) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear un usuario' })
+  @Roles(RolUsuario.ADMIN)
   crear(@Body() dto: CrearUsuarioDto) {
     return this.service.crear(dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Listar usuarios (paginado)' })
+  @Roles(RolUsuario.ADMIN)
   listar(@Query() paginacion: PaginacionDto) {
     return this.service.listar(paginacion);
   }
@@ -46,12 +59,14 @@ export class UsuariosController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un usuario por id' })
+  @Roles(RolUsuario.ADMIN)
   obtener(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.obtener(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar un usuario' })
+  @Roles(RolUsuario.ADMIN)
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarUsuarioDto) {
     return this.service.actualizar(id, dto);
   }
@@ -59,6 +74,7 @@ export class UsuariosController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar un usuario' })
+  @Roles(RolUsuario.ADMIN)
   eliminar(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.eliminar(id);
   }
