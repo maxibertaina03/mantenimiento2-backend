@@ -11,7 +11,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RolUsuario } from '@prisma/client';
 import type { Usuario } from '@prisma/client';
+import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decorator';
 import { ActualizarEquipoDto } from './dto/actualizar-equipo.dto';
 import { AsignarEquipoDto } from './dto/asignar-equipo.dto';
@@ -21,6 +23,8 @@ import { EquiposItService } from './equipos-it.service';
 
 @ApiTags('Equipos IT')
 @ApiBearerAuth()
+// El inventario informatico lo administra solo el area de sistemas.
+@Roles(RolUsuario.ADMIN)
 @Controller('equipos-it')
 export class EquiposItController {
   constructor(private readonly service: EquiposItService) {}
