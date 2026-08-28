@@ -17,6 +17,8 @@ import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decor
 import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
+import { RolUsuario } from '@prisma/client';
+import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
 import { EnviarOrdenDto } from './dto/enviar-orden.dto';
 import { OrdenesCompraService } from './ordenes-compra.service';
@@ -70,6 +72,10 @@ export class OrdenesCompraController {
   }
 
   @Post(':id/enviar-correo')
+  // El envío automático está en prueba: por ahora solo admin. Ocultar el botón
+  // no alcanza —cualquiera con una sesión podría llamar al endpoint— y esto usa
+  // la casilla de la empresa para escribirle a terceros.
+  @Roles(RolUsuario.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Enviar la orden por correo al proveedor, con el PDF adjunto',
