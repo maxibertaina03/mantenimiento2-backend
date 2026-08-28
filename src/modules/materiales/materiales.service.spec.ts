@@ -2,14 +2,17 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MaterialesService } from './materiales.service';
 import { MaterialesRepository } from './materiales.repository';
 import { CategoriasMaterialService } from '../categorias-material/categorias-material.service';
+import { UnidadesMedidaService } from '../unidades-medida/unidades-medida.service';
 
 const categoria = { id: 'cat-1', nombre: 'Electricidad', descripcion: null };
+const unidadMetro = { id: 'uni-1', nombre: 'Metro', simbolo: 'm', orden: 90, activo: true };
 
 const material = {
   id: 'mat-1',
   nombre: 'Cable 2.5mm',
   categoriaId: 'cat-1',
-  unidad: 'm',
+  unidadId: 'uni-1',
+  unidad: unidadMetro,
   stockActual: 50,
   stockMinimo: 10,
   notas: null,
@@ -38,12 +41,18 @@ function armar() {
     obtener: jest.fn<Promise<any>, any[]>(async () => categoria),
   };
 
+  const unidades = {
+    obtener: jest.fn<Promise<any>, any[]>(async () => unidadMetro),
+  };
+
   return {
     repo,
     categorias,
+    unidades,
     service: new MaterialesService(
       repo as unknown as MaterialesRepository,
       categorias as unknown as CategoriasMaterialService,
+      unidades as unknown as UnidadesMedidaService,
     ),
   };
 }
@@ -52,7 +61,7 @@ describe('MaterialesService', () => {
   describe('crear()', () => {
     it('valida que la categoria exista antes de crear', async () => {
       const { service, categorias } = armar();
-      await service.crear({ nombre: 'X', unidad: 'u', categoriaId: 'cat-1' } as any);
+      await service.crear({ nombre: 'X', unidadId: 'uni-1', categoriaId: 'cat-1' } as any);
       expect(categorias.obtener).toHaveBeenCalledWith('cat-1');
     });
 
@@ -60,7 +69,7 @@ describe('MaterialesService', () => {
       const { service, categorias } = armar();
       categorias.obtener.mockRejectedValue(new NotFoundException('no existe'));
       await expect(
-        service.crear({ nombre: 'X', unidad: 'u', categoriaId: 'fantasma' } as any),
+        service.crear({ nombre: 'X', unidadId: 'uni-1', categoriaId: 'fantasma' } as any),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -68,7 +77,7 @@ describe('MaterialesService', () => {
       const { service, repo } = armar();
       await service.crear({
         nombre: 'X',
-        unidad: 'u',
+        unidadId: 'uni-1',
         categoriaId: 'cat-1',
         stockActual: 999,
       } as any);
@@ -77,7 +86,7 @@ describe('MaterialesService', () => {
 
     it('stockMinimo por defecto es 0', async () => {
       const { service, repo } = armar();
-      await service.crear({ nombre: 'X', unidad: 'u', categoriaId: 'cat-1' } as any);
+      await service.crear({ nombre: 'X', unidadId: 'uni-1', categoriaId: 'cat-1' } as any);
       expect(repo.crear.mock.calls[0][0].stockMinimo).toBe(0);
     });
   });

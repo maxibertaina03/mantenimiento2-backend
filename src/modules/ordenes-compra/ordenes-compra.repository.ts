@@ -36,7 +36,11 @@ export class OrdenesCompraRepository {
     creadoPor: { select: { nombre: true } },
     recibidaPor: { select: { nombre: true } },
     renglones: {
-      include: { material: { select: { nombre: true, unidad: true } } },
+      include: {
+        material: {
+          select: { nombre: true, unidad: { select: { simbolo: true } } },
+        },
+      },
       orderBy: { id: 'asc' as const },
     },
   };

@@ -11,6 +11,11 @@ import { crearPrismaEnMemoria } from './prisma-en-memoria';
  * de excepciones incluidos), con la persistencia sustituida por una en memoria.
  * La configuración del bootstrap replica la de `main.ts`.
  */
+// Unidades del catálogo que siembra el Prisma en memoria.
+const UNIDAD_UNIDAD = 'b0000001-0000-4000-8000-000000000001';
+const UNIDAD_METRO = 'b0000002-0000-4000-8000-000000000002';
+const UNIDAD_LITRO = 'b0000003-0000-4000-8000-000000000003';
+
 describe('API (e2e)', () => {
   let app: INestApplication;
   let memoria: ReturnType<typeof crearPrismaEnMemoria>;
@@ -74,7 +79,7 @@ describe('API (e2e)', () => {
     it('POST /api/materiales crea un material con stock 0', async () => {
       const res = await http
         .post('/api/materiales')
-        .send({ nombre: 'Cable 2.5mm', unidad: 'm', categoriaId, stockMinimo: 10 })
+        .send({ nombre: 'Cable 2.5mm', unidadId: UNIDAD_METRO, categoriaId, stockMinimo: 10 })
         .expect(201);
 
       expect(res.body).toMatchObject({ nombre: 'Cable 2.5mm', stockActual: 0 });
@@ -84,12 +89,12 @@ describe('API (e2e)', () => {
     it('rechaza propiedades no declaradas en el DTO (forbidNonWhitelisted)', async () => {
       await http
         .post('/api/materiales')
-        .send({ nombre: 'Valido', unidad: 'u', categoriaId, campoInventado: 'hack' })
+        .send({ nombre: 'Valido', unidadId: UNIDAD_UNIDAD, categoriaId, campoInventado: 'hack' })
         .expect(400);
     });
 
     it('rechaza un material sin nombre', async () => {
-      await http.post('/api/materiales').send({ unidad: 'u', categoriaId }).expect(400);
+      await http.post('/api/materiales').send({ unidadId: UNIDAD_UNIDAD, categoriaId }).expect(400);
     });
 
     it('rechaza una categoría inexistente con 404 (no con error de FK)', async () => {
@@ -97,7 +102,7 @@ describe('API (e2e)', () => {
         .post('/api/materiales')
         .send({
           nombre: 'Material huerfano',
-          unidad: 'u',
+          unidadId: UNIDAD_UNIDAD,
           categoriaId: '00000000-0000-4000-8000-00000000dead',
         })
         .expect(404);
@@ -201,7 +206,7 @@ describe('API (e2e)', () => {
     it('maneja cantidades decimales sin error de punto flotante', async () => {
       const res = await http
         .post('/api/materiales')
-        .send({ nombre: 'Pintura', unidad: 'lt', categoriaId })
+        .send({ nombre: 'Pintura', unidadId: UNIDAD_LITRO, categoriaId })
         .expect(201);
       const pinturaId = res.body.id;
 
@@ -276,7 +281,7 @@ describe('API (e2e)', () => {
     beforeAll(async () => {
       const res = await http
         .post('/api/materiales')
-        .send({ nombre: 'Tornillos', unidad: 'u', categoriaId })
+        .send({ nombre: 'Tornillos', unidadId: UNIDAD_UNIDAD, categoriaId })
         .expect(201);
       const tornillosId = res.body.id;
 
@@ -319,7 +324,7 @@ describe('API (e2e)', () => {
       // Material nuevo: entra 10, sale 10 -> stock 0.
       const mat = await http
         .post('/api/materiales')
-        .send({ nombre: 'Arandelas', unidad: 'u', categoriaId })
+        .send({ nombre: 'Arandelas', unidadId: UNIDAD_UNIDAD, categoriaId })
         .expect(201);
 
       const entrada = await http

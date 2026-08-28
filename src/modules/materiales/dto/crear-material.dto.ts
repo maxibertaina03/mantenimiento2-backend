@@ -13,10 +13,12 @@ export class CrearMaterialDto {
   @IsUUID()
   categoriaId!: string;
 
-  @ApiProperty({ description: 'Unidad de medida', example: 'u' })
-  @IsString()
-  @MaxLength(10)
-  unidad!: string;
+  // Obligatoria al crear, aunque en la base sea nullable: los materiales viejos
+  // se importaron sin unidad y no hay valor honesto para inventarles, pero todo
+  // lo que se cargue desde el sistema tiene que traerla.
+  @ApiProperty({ description: 'Id de la unidad de medida', format: 'uuid' })
+  @IsUUID()
+  unidadId!: string;
 
   @ApiPropertyOptional({ description: 'Umbral de alerta de stock', example: 100, default: 0 })
   @IsOptional()

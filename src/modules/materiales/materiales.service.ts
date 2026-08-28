@@ -8,24 +8,28 @@ import { ListarMaterialesDto } from './dto/listar-materiales.dto';
 import { MaterialRespuestaDto } from './dto/material-respuesta.dto';
 import { MaterialConHistorialDto } from './dto/material-con-historial.dto';
 import { MaterialesRepository } from './materiales.repository';
+import { UnidadesMedidaService } from '../unidades-medida/unidades-medida.service';
 
 @Injectable()
 export class MaterialesService {
   constructor(
     private readonly repo: MaterialesRepository,
     private readonly categorias: CategoriasMaterialService,
+    private readonly unidades: UnidadesMedidaService,
   ) {}
 
   async crear(dto: CrearMaterialDto): Promise<MaterialRespuestaDto> {
-    // Valida que la categoría exista con un error claro (en vez de un FK genérico).
+    // Valida que categoría y unidad existan, con un error claro en vez de un
+    // fallo de FK genérico.
     await this.categorias.obtener(dto.categoriaId);
+    await this.unidades.obtener(dto.unidadId);
 
     const creado = await this.repo.crear({
       nombre: dto.nombre,
-      unidad: dto.unidad,
       stockMinimo: dto.stockMinimo ?? 0,
       notas: dto.notas,
       categoria: { connect: { id: dto.categoriaId } },
+      unidad: { connect: { id: dto.unidadId } },
       // stockActual arranca en 0; solo cambia vía movimientos.
     });
     return MaterialRespuestaDto.desde(creado);
@@ -75,20 +79,18 @@ export class MaterialesService {
     if (dto.categoriaId) {
       await this.categorias.obtener(dto.categoriaId);
     }
+    if (dto.unidadId) {
+      await this.unidades.obtener(dto.unidadId);
+    }
 
     const actualizado = await this.repo.actualizar(id, {
       nombre: dto.nombre,
-      unidad: dto.unidad,
       stockMinimo: dto.stockMinimo,
       notas: dto.notas,
       ...(dto.categoriaId ? { categoria: { connect: { id: dto.categoriaId } } } : {}),
+      ...(dto.unidadId ? { unidad: { connect: { id: dto.unidadId } } } : {}),
     });
     return MaterialRespuestaDto.desde(actualizado);
-  }
-
-  /** Unidades ya usadas, para sugerirlas en el formulario. */
-  unidades(): Promise<string[]> {
-    return this.repo.unidadesUsadas();
   }
 
   async eliminar(id: string): Promise<void> {

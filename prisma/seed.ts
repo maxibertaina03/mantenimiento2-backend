@@ -57,12 +57,21 @@ async function main() {
     data: { nombre: 'Lubricantes', descripcion: 'Aceites, grasas y solventes' },
   });
 
+  // ── Unidades de medida ──
+  // La unidad es un catálogo, no texto libre: así "lt", "Lt" y "litros" no
+  // terminan siendo tres unidades distintas al analizar el stock.
+  const [unidadU, unidadM, unidadLt] = await Promise.all([
+    prisma.unidadMedida.create({ data: { nombre: 'Unidad', simbolo: 'u', orden: 10 } }),
+    prisma.unidadMedida.create({ data: { nombre: 'Metro', simbolo: 'm', orden: 90 } }),
+    prisma.unidadMedida.create({ data: { nombre: 'Litro', simbolo: 'lt', orden: 70 } }),
+  ]);
+
   // ── Materiales ──
   const tornillo = await prisma.material.create({
     data: {
       nombre: 'Tornillo autorroscante 6x40',
       categoriaId: catTornilleria.id,
-      unidad: 'u',
+      unidadId: unidadU.id,
       stockMinimo: 100,
       stockActual: 0,
     },
@@ -71,7 +80,7 @@ async function main() {
     data: {
       nombre: 'Cable unipolar 2.5mm²',
       categoriaId: catElectrico.id,
-      unidad: 'm',
+      unidadId: unidadM.id,
       stockMinimo: 50,
       stockActual: 0,
     },
@@ -80,7 +89,7 @@ async function main() {
     data: {
       nombre: 'Aceite hidráulico ISO 68',
       categoriaId: catLubricantes.id,
-      unidad: 'lt',
+      unidadId: unidadLt.id,
       stockMinimo: 20,
       stockActual: 0,
     },

@@ -42,6 +42,10 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
     await app?.close();
   });
 
+  // Del catálogo que siembra el Prisma en memoria, igual que en producción.
+  const UNIDAD_UNIDAD = 'b0000001-0000-4000-8000-000000000001';
+  const UNIDAD_METRO = 'b0000002-0000-4000-8000-000000000002';
+
   let categoriaId: string;
   let materialA: string;
   let materialB: string;
@@ -54,13 +58,13 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
 
     const mA = await http
       .post('/api/materiales')
-      .send({ nombre: 'Cable 2.5mm', unidad: 'm', categoriaId })
+      .send({ nombre: 'Cable 2.5mm', unidadId: UNIDAD_METRO, categoriaId })
       .expect(201);
     materialA = mA.body.id;
 
     const mB = await http
       .post('/api/materiales')
-      .send({ nombre: 'Tornillo 6x40', unidad: 'u', categoriaId })
+      .send({ nombre: 'Tornillo 6x40', unidadId: UNIDAD_UNIDAD, categoriaId })
       .expect(201);
     materialB = mB.body.id;
 
@@ -513,6 +517,72 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         })
         .expect(201);
       expect(res.body.garantiaVencida).toBe(true);
+    });
+  });
+  describe('Unidades de medida', () => {
+    it('lista el catálogo ordenado y con el uso de cada unidad', async () => {
+      const res = await http.get('/api/unidades-medida').expect(200);
+      expect(res.body.length).toBeGreaterThanOrEqual(3);
+      const metro = res.body.find((u: any) => u.simbolo === 'm');
+      // Lo usa el material que crea el beforeAll.
+      expect(metro.materiales).toBeGreaterThanOrEqual(1);
+    });
+
+    it('el material expone el símbolo de la unidad y su id', async () => {
+      const res = await http.get(`/api/materiales/${materialA}`).expect(200);
+      expect(res.body.unidad).toBe('m');
+      expect(res.body.unidadId).toBe(UNIDAD_METRO);
+      expect(res.body.unidadNombre).toBe('Metro');
+    });
+
+    it('REGRESION: no deja crear una unidad que ya existe con otras mayusculas', async () => {
+      // Es exactamente lo que el catálogo viene a impedir: con texto libre "Lt"
+      // y "lt" convivían y cualquier reporte por unidad daba mal.
+      await http.post('/api/unidades-medida').send({ nombre: 'METRO', simbolo: 'M' }).expect(400);
+    });
+
+    it('crea una unidad nueva y queda disponible para los materiales', async () => {
+      const nueva = await http
+        .post('/api/unidades-medida')
+        .send({ nombre: 'Rollo', simbolo: 'rollo', orden: 170 })
+        .expect(201);
+      expect(nueva.body.materiales).toBe(0);
+
+      const mat = await http
+        .post('/api/materiales')
+        .send({ nombre: 'Cinta aisladora', unidadId: nueva.body.id, categoriaId })
+        .expect(201);
+      expect(mat.body.unidad).toBe('rollo');
+    });
+
+    it('REGRESION: no borra una unidad en uso (dejaría materiales sin unidad)', async () => {
+      await http.delete(`/api/unidades-medida/${UNIDAD_METRO}`).expect(400);
+      // El material la conserva.
+      const res = await http.get(`/api/materiales/${materialA}`).expect(200);
+      expect(res.body.unidad).toBe('m');
+    });
+
+    it('una unidad sin uso sí se puede borrar', async () => {
+      const nueva = await http
+        .post('/api/unidades-medida')
+        .send({ nombre: 'Tambor', simbolo: 'tambor' })
+        .expect(201);
+      await http.delete(`/api/unidades-medida/${nueva.body.id}`).expect(204);
+    });
+
+    it('rechaza un material con una unidad inexistente con 404 (no con error de FK)', async () => {
+      await http
+        .post('/api/materiales')
+        .send({
+          nombre: 'Fantasma',
+          categoriaId,
+          unidadId: 'b0000099-0000-4000-8000-000000000099',
+        })
+        .expect(404);
+    });
+
+    it('el alta de material exige la unidad', async () => {
+      await http.post('/api/materiales').send({ nombre: 'Sin unidad', categoriaId }).expect(400);
     });
   });
 });

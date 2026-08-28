@@ -1,16 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { CategoriaMaterial, Material, MovimientoStock, Prisma } from '@prisma/client';
+import { CategoriaMaterial, Material, MovimientoStock, Prisma, UnidadMedida } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
-export type MaterialConCategoria = Material & { categoria: CategoriaMaterial };
+export type MaterialConCategoria = Material & {
+  categoria: CategoriaMaterial;
+  unidad: UnidadMedida | null;
+};
 export type MaterialConHistorial = MaterialConCategoria & { movimientos: MovimientoStock[] };
 
 @Injectable()
 export class MaterialesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** La unidad viene del catálogo; el DTO expone su símbolo junto a la cantidad. */
+  private readonly relaciones = { categoria: true, unidad: true } as const;
+
   crear(data: Prisma.MaterialCreateInput): Promise<MaterialConCategoria> {
-    return this.prisma.material.create({ data, include: { categoria: true } });
+    return this.prisma.material.create({ data, include: this.relaciones });
   }
 
   buscarTodos(
@@ -22,7 +28,7 @@ export class MaterialesRepository {
       where,
       skip,
       take,
-      include: { categoria: true },
+      include: this.relaciones,
       orderBy: { nombre: 'asc' },
     });
   }
@@ -32,7 +38,7 @@ export class MaterialesRepository {
   }
 
   buscarPorId(id: string): Promise<MaterialConCategoria | null> {
-    return this.prisma.material.findUnique({ where: { id }, include: { categoria: true } });
+    return this.prisma.material.findUnique({ where: { id }, include: this.relaciones });
   }
 
   /** Material con su historial completo de movimientos (más recientes primero). */
@@ -40,7 +46,7 @@ export class MaterialesRepository {
     return this.prisma.material.findUnique({
       where: { id },
       include: {
-        categoria: true,
+        ...this.relaciones,
         movimientos: { orderBy: { fecha: 'desc' } },
       },
     });
@@ -57,32 +63,17 @@ export class MaterialesRepository {
     if (ids.length === 0) return [];
     return this.prisma.material.findMany({
       where: { id: { in: ids.map((r) => r.id) } },
-      include: { categoria: true },
+      include: this.relaciones,
       orderBy: { nombre: 'asc' },
     });
   }
 
   actualizar(id: string, data: Prisma.MaterialUpdateInput): Promise<MaterialConCategoria> {
-    return this.prisma.material.update({ where: { id }, data, include: { categoria: true } });
+    return this.prisma.material.update({ where: { id }, data, include: this.relaciones });
   }
 
   eliminar(id: string): Promise<Material> {
     return this.prisma.material.delete({ where: { id } });
-  }
-
-  /**
-   * Unidades ya usadas, para sugerirlas al cargar un material. La unidad sigue
-   * siendo texto libre: esto solo evita que cada uno escriba la suya ("lt",
-   * "Lt", "litros") y terminen siendo tres unidades distintas.
-   */
-  async unidadesUsadas(): Promise<string[]> {
-    const filas = await this.prisma.material.findMany({
-      where: { unidad: { not: '' } },
-      select: { unidad: true },
-      distinct: ['unidad'],
-      orderBy: { unidad: 'asc' },
-    });
-    return filas.map((f) => f.unidad).filter((u) => u.trim() !== '');
   }
 
   contarMovimientos(id: string): Promise<number> {

@@ -3,7 +3,7 @@ import { EstadoOrdenCompra, OrdenCompra, RenglonOrdenCompra } from '@prisma/clie
 import { aNumero } from '../../../common/dominio/decimal';
 
 export type RenglonConRelaciones = RenglonOrdenCompra & {
-  material?: { nombre: string; unidad: string } | null;
+  material?: { nombre: string; unidad?: { simbolo: string } | null } | null;
 };
 
 export type OrdenConRelaciones = OrdenCompra & {
@@ -41,7 +41,7 @@ export class RenglonRespuestaDto {
       id: r.id,
       materialId: r.materialId,
       materialNombre: r.material?.nombre ?? null,
-      unidad: r.material?.unidad ?? null,
+      unidad: r.material?.unidad?.simbolo ?? null,
       cantidad,
       precioUnitario,
       subtotal: precioUnitario === null ? null : Number((cantidad * precioUnitario).toFixed(2)),

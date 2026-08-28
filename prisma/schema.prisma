@@ -63,13 +63,46 @@ model CategoriaMaterial {
   @@map("categorias_material")
 }
 
+/// Catálogo de unidades de medida.
+///
+/// Antes la unidad era texto libre en el material, y eso hacía que "lt", "Lt" y
+/// "litros" fueran tres unidades distintas: cualquier reporte que agrupe por
+/// unidad daba números que no cierran. Como catálogo, la unidad es un dato
+/// analizable.
+model UnidadMedida {
+  id String @id @default(uuid())
+
+  /// Nombre completo, el que se lee en los desplegables. Ej: "Litro".
+  nombre String @unique
+
+  /// Abreviatura que se muestra al lado de las cantidades. Ej: "lt".
+  simbolo String @unique
+
+  /// Orden en que se listan. Con el mismo valor, se ordena por nombre.
+  orden Int @default(0)
+
+  /// Las unidades en desuso se ocultan en vez de borrarse, para no perder la
+  /// referencia de los materiales que ya las usan.
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  materiales Material[]
+
+  @@map("unidades_medida")
+}
+
 model Material {
   id          String @id @default(uuid())
   nombre      String
   categoriaId String
 
-  // Unidad de medida (u, kg, m, lt, etc.)
-  unidad String
+  /// Unidad de medida. Es opcional porque los 831 materiales importados desde
+  /// los listados viejos vinieron sin unidad: forzarla habría obligado a
+  /// inventar un valor. Al crear un material desde el sistema sí es obligatoria
+  /// (lo valida el DTO), así el hueco se achica en vez de crecer.
+  unidadId String?
 
   // stockActual: cantidad actual, DERIVADA de los movimientos.
   // Se recalcula en transacción cada vez que se registra un movimiento.
@@ -83,10 +116,12 @@ model Material {
   actualizadoEn DateTime @updatedAt
 
   categoria        CategoriaMaterial    @relation(fields: [categoriaId], references: [id])
+  unidad           UnidadMedida?        @relation(fields: [unidadId], references: [id])
   movimientos      MovimientoStock[]
   renglonesOrdenes RenglonOrdenCompra[]
 
   @@index([categoriaId])
+  @@index([unidadId])
   @@map("materiales")
 }
 

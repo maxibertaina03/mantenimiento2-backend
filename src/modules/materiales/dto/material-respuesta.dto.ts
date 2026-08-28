@@ -1,7 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CategoriaMaterial, Material } from '@prisma/client';
+import { CategoriaMaterial, Material, UnidadMedida } from '@prisma/client';
 
-type MaterialConCategoria = Material & { categoria?: CategoriaMaterial | null };
+type MaterialConRelaciones = Material & {
+  categoria?: CategoriaMaterial | null;
+  unidad?: UnidadMedida | null;
+};
 
 /**
  * DTO de salida del material. Convierte los Decimal de Prisma a number
@@ -20,7 +23,16 @@ export class MaterialRespuestaDto {
   @ApiPropertyOptional({ description: 'Nombre de la categoría', nullable: true })
   categoriaNombre!: string | null;
 
-  @ApiProperty({ example: 'u' })
+  @ApiPropertyOptional({ description: 'Id de la unidad de medida', nullable: true })
+  unidadId!: string | null;
+
+  @ApiPropertyOptional({ description: 'Nombre de la unidad', example: 'Unidad', nullable: true })
+  unidadNombre!: string | null;
+
+  // Se sigue exponiendo un `unidad` plano con el símbolo: es lo que se muestra
+  // al lado de cada cantidad en las pantallas, el PDF y los mensajes. Ahora sale
+  // del catálogo en vez de ser texto libre.
+  @ApiProperty({ description: 'Símbolo de la unidad, o "" si no tiene', example: 'u' })
   unidad!: string;
 
   @ApiProperty({ example: 450 })
@@ -41,7 +53,7 @@ export class MaterialRespuestaDto {
   @ApiProperty()
   actualizadoEn!: Date;
 
-  static desde(m: MaterialConCategoria): MaterialRespuestaDto {
+  static desde(m: MaterialConRelaciones): MaterialRespuestaDto {
     const stockActual = Number(m.stockActual);
     const stockMinimo = Number(m.stockMinimo);
     return {
@@ -49,7 +61,9 @@ export class MaterialRespuestaDto {
       nombre: m.nombre,
       categoriaId: m.categoriaId,
       categoriaNombre: m.categoria?.nombre ?? null,
-      unidad: m.unidad,
+      unidadId: m.unidadId,
+      unidadNombre: m.unidad?.nombre ?? null,
+      unidad: m.unidad?.simbolo ?? '',
       stockActual,
       stockMinimo,
       // Solo se marca bajo stock si hay un mínimo definido (> 0).

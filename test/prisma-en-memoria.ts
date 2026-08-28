@@ -20,6 +20,30 @@ export function crearPrismaEnMemoria() {
     ordenes: [] as any[],
     renglones: [] as any[],
     contadores: [] as any[],
+    unidadesMedida: [
+      // Ids con forma de UUID porque los DTO validan @IsUUID().
+      {
+        id: 'b0000001-0000-4000-8000-000000000001',
+        nombre: 'Unidad',
+        simbolo: 'u',
+        orden: 10,
+        activo: true,
+      },
+      {
+        id: 'b0000002-0000-4000-8000-000000000002',
+        nombre: 'Metro',
+        simbolo: 'm',
+        orden: 90,
+        activo: true,
+      },
+      {
+        id: 'b0000003-0000-4000-8000-000000000003',
+        nombre: 'Litro',
+        simbolo: 'lt',
+        orden: 70,
+        activo: true,
+      },
+    ] as any[],
     tiposEquipo: [
       // Mismo catálogo que dejó la migración. Los ids tienen forma de UUID
       // porque los DTO validan @IsUUID().
@@ -165,9 +189,13 @@ export function crearPrismaEnMemoria() {
     if (include.categoria) {
       salida.categoria = db.categorias.find((c) => c.id === fila.categoriaId) ?? null;
     }
+    if (include.unidad) {
+      salida.unidad = db.unidadesMedida.find((u) => u.id === fila.unidadId) ?? null;
+    }
     if (include.material) {
       const m = db.materiales.find((x) => x.id === fila.materialId);
-      salida.material = m ? { nombre: m.nombre, unidad: m.unidad } : null;
+      const u = m ? db.unidadesMedida.find((x) => x.id === m.unidadId) : null;
+      salida.material = m ? { nombre: m.nombre, unidad: u ? { simbolo: u.simbolo } : null } : null;
     }
     if (include.proveedor) {
       const p = db.proveedores.find((x) => x.id === fila.proveedorId);
@@ -193,6 +221,9 @@ export function crearPrismaEnMemoria() {
     if (include.tipo) {
       const t = db.tiposEquipo.find((x) => x.id === fila.tipoId);
       salida.tipo = t ? { nombre: t.nombre, llevaEspecificaciones: t.llevaEspecificaciones } : null;
+    }
+    if (include._count?.select?.materiales) {
+      salida._count = { materiales: db.materiales.filter((m) => m.unidadId === fila.id).length };
     }
     if (include._count?.select?.equipos) {
       salida._count = { equipos: db.equiposIt.filter((e) => e.tipoId === fila.id).length };
@@ -378,6 +409,7 @@ export function crearPrismaEnMemoria() {
       stockActual: aDecimal(0),
       stockMinimo: aDecimal(0),
       notas: null,
+      unidadId: null,
     })),
     categoriaMaterial: delegate(db.categorias, () => ({ descripcion: null })),
     proveedor: delegate(db.proveedores, () => ({
@@ -393,6 +425,7 @@ export function crearPrismaEnMemoria() {
       referenciaTrabajo: null,
       notas: null,
     })),
+    unidadMedida: delegate(db.unidadesMedida, () => ({ orden: 0, activo: true })),
     tipoEquipo: delegate(db.tiposEquipo, () => ({
       alias: null,
       llevaEspecificaciones: true,
