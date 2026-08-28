@@ -74,6 +74,24 @@ export class UsuariosService {
     return UsuarioRespuestaDto.desde(usuario);
   }
 
+  /** Busca a una persona por nombre. Devuelve null si no existe. */
+  buscarPorNombre(nombre: string): Promise<Usuario | null> {
+    return this.repo.buscarPorNombre(nombre);
+  }
+
+  /**
+   * Da de alta a una persona que NO usa el sistema (personal al que se le
+   * asignan equipos). Sin `idExterno` no puede iniciar sesión, y entra como
+   * OPERARIO: nunca como administrador.
+   */
+  crearSinAcceso(datos: { nombre: string; email: string }): Promise<Usuario> {
+    return this.repo.crear({
+      nombre: datos.nombre,
+      email: datos.email,
+      rol: RolUsuario.OPERARIO,
+    });
+  }
+
   /**
    * Impide dejar el sistema sin administradores.
    *

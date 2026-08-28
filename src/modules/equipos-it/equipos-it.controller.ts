@@ -18,8 +18,10 @@ import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decor
 import { ActualizarEquipoDto } from './dto/actualizar-equipo.dto';
 import { AsignarEquipoDto } from './dto/asignar-equipo.dto';
 import { CrearEquipoDto } from './dto/crear-equipo.dto';
+import { ImportarEquiposDto } from './dto/importar-equipos.dto';
 import { ListarEquiposDto } from './dto/listar-equipos.dto';
 import { EquiposItService } from './equipos-it.service';
+import { ImportarEquiposService } from './importacion/importar-equipos.service';
 
 @ApiTags('Equipos IT')
 @ApiBearerAuth()
@@ -27,12 +29,23 @@ import { EquiposItService } from './equipos-it.service';
 @Roles(RolUsuario.ADMIN)
 @Controller('equipos-it')
 export class EquiposItController {
-  constructor(private readonly service: EquiposItService) {}
+  constructor(
+    private readonly service: EquiposItService,
+    private readonly importacion: ImportarEquiposService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Registrar un equipo informático' })
   crear(@Body() dto: CrearEquipoDto) {
     return this.service.crear(dto);
+  }
+
+  @Post('importar')
+  @ApiOperation({
+    summary: 'Importar el inventario desde una planilla (idempotente por código interno)',
+  })
+  importar(@Body() dto: ImportarEquiposDto) {
+    return this.importacion.importar(dto);
   }
 
   @Get()

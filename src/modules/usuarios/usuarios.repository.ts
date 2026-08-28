@@ -34,6 +34,13 @@ export class UsuariosRepository {
     return this.prisma.usuario.findMany({ skip, take, orderBy: { nombre: 'asc' } });
   }
 
+  /** Busca por nombre exacto, sin distinguir mayúsculas. Lo usa la importación. */
+  buscarPorNombre(nombre: string): Promise<Usuario | null> {
+    return this.prisma.usuario.findFirst({
+      where: { nombre: { equals: nombre, mode: 'insensitive' } },
+    });
+  }
+
   /** Cuántos usuarios tienen ese rol. Se usa para no quedarse sin ADMIN. */
   contarPorRol(rol: RolUsuario): Promise<number> {
     return this.prisma.usuario.count({ where: { rol } });
