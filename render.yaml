@@ -35,7 +35,7 @@ services:
       - key: SMTP_PASS
         sync: false
       - key: MAIL_FROM
-        value: mantenimiento.lastres@gmail.com
+        value: mantenimiento@lacteoslastres.com.ar
       - key: MAIL_ADMINISTRACION
         value: administracion@lacteoslastres.com.ar
       - key: DIRECT_URL
