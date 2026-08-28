@@ -1,6 +1,12 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { EstadoOrdenCompra, Usuario } from '@prisma/client';
 import { OrdenesCompraService } from './ordenes-compra.service';
+import { ConfigService } from '@nestjs/config';
+import { CorreoService } from '../../common/correo/correo.service';
 import { OrdenesCompraRepository } from './ordenes-compra.repository';
 import { ProveedoresService } from '../proveedores/proveedores.service';
 import { MaterialesService } from '../materiales/materiales.service';
@@ -54,15 +60,28 @@ function armar(orden: any = ordenBase) {
   };
   const proveedores = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'prov-1' })) };
   const materiales = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'mat-1' })) };
+  const correo = {
+    estaConfigurado: jest.fn(() => true),
+    enviar: jest.fn<Promise<any>, any[]>(async () => undefined),
+  };
+  const config = {
+    get: jest.fn((clave: string) =>
+      clave === 'MAIL_ADMINISTRACION' ? 'administracion@lacteoslastres.com.ar' : undefined,
+    ),
+  };
 
   return {
     repo,
     proveedores,
     materiales,
+    correo,
+    config,
     service: new OrdenesCompraService(
       repo as unknown as OrdenesCompraRepository,
       proveedores as unknown as ProveedoresService,
       materiales as unknown as MaterialesService,
+      correo as unknown as CorreoService,
+      config as unknown as ConfigService,
     ),
   };
 }
@@ -293,5 +312,123 @@ describe('OrdenesCompraService - listado', () => {
     const { service } = armar();
     const res = await service.listar({ pagina: 1, limite: 20, skip: 0 } as any);
     expect(res).toMatchObject({ total: 1, pagina: 1, limite: 20 });
+  });
+});
+
+describe('OrdenesCompraService - enviarPorCorreo()', () => {
+  const PDF = Buffer.from('%PDF-1.4 contenido de prueba').toString('base64');
+  const conProveedor = (email: string | null, telefono: string | null = null) => ({
+    ...ordenBase,
+    proveedor: { nombre: 'Ferreteria Central', cuit: '30-1', email, telefono },
+  });
+
+  it('manda al proveedor con administracion en copia', async () => {
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+
+    const res = await service.enviarPorCorreo('oc-1', { pdfBase64: PDF });
+
+    expect(res.para).toEqual(['ventas@ferreteria.com.ar']);
+    expect(res.copia).toEqual(['administracion@lacteoslastres.com.ar']);
+    expect(correo.enviar).toHaveBeenCalledTimes(1);
+  });
+
+  it('REGRESION: sin correo del proveedor, la orden va igual a administracion', async () => {
+    // Si no, el envio se perderia del todo y no quedaria constancia interna.
+    const { service, repo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor(null));
+
+    const res = await service.enviarPorCorreo('oc-1', { pdfBase64: PDF });
+
+    expect(res.para).toEqual(['administracion@lacteoslastres.com.ar']);
+    expect(res.copia).toEqual([]);
+  });
+
+  it('un correo invalido del proveedor se trata como si no hubiera', async () => {
+    const { service, repo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('no-es-un-mail'));
+
+    const res = await service.enviarPorCorreo('oc-1', { pdfBase64: PDF });
+    expect(res.para).toEqual(['administracion@lacteoslastres.com.ar']);
+  });
+
+  it('el correo del usuario va en Reply-To, no como remitente', async () => {
+    // El remitente es la casilla del sistema; el proveedor le contesta a la
+    // persona que hizo la orden.
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+
+    await service.enviarPorCorreo('oc-1', { pdfBase64: PDF }, {
+      nombre: 'Maxi',
+      email: 'mantenimiento@lacteoslastres.com.ar',
+    } as any);
+
+    const enviado = correo.enviar.mock.calls[0][0];
+    expect(enviado.responderA).toBe('mantenimiento@lacteoslastres.com.ar');
+    expect(enviado.nombreRemitente).toContain('Maxi');
+  });
+
+  it('sin usuario, no se inventa un Reply-To', async () => {
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+
+    await service.enviarPorCorreo('oc-1', { pdfBase64: PDF });
+    expect(correo.enviar.mock.calls[0][0].responderA).toBeUndefined();
+  });
+
+  it('adjunta el PDF con el numero de orden como nombre', async () => {
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+
+    await service.enviarPorCorreo('oc-1', { pdfBase64: PDF });
+
+    const [adjunto] = correo.enviar.mock.calls[0][0].adjuntos;
+    expect(adjunto.nombre).toBe('OC-2026-0001.pdf');
+    expect(adjunto.tipo).toBe('application/pdf');
+    expect(adjunto.contenido.toString()).toContain('%PDF-1.4');
+  });
+
+  it('el asunto y el cuerpo los arma el servidor con los datos de la orden', async () => {
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+
+    await service.enviarPorCorreo('oc-1', { pdfBase64: PDF });
+
+    const enviado = correo.enviar.mock.calls[0][0];
+    expect(enviado.asunto).toContain('OC-2026-0001');
+    expect(enviado.texto).toContain('Ferreteria Central');
+    expect(enviado.texto).toContain('adjunta');
+  });
+
+  it('REGRESION: si el SMTP no esta configurado avisa, no rompe', async () => {
+    // La app tiene que seguir andando con el envio manual.
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+    correo.estaConfigurado.mockReturnValue(false);
+
+    await expect(service.enviarPorCorreo('oc-1', { pdfBase64: PDF })).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(correo.enviar).not.toHaveBeenCalled();
+  });
+
+  it('404 si la orden no existe, sin mandar nada', async () => {
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(null);
+
+    await expect(service.enviarPorCorreo('fantasma', { pdfBase64: PDF })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(correo.enviar).not.toHaveBeenCalled();
+  });
+
+  it('REGRESION: rechaza un PDF vacio en vez de mandar un adjunto de 0 bytes', async () => {
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+
+    await expect(service.enviarPorCorreo('oc-1', { pdfBase64: '!!!!' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(correo.enviar).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { EstadoOrdenCompra, Usuario } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { aDecimal } from '../../common/dominio/decimal';
@@ -11,6 +16,10 @@ import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
 import { OrdenRespuestaDto } from './dto/orden-respuesta.dto';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
 import { FiltroOrdenes, OrdenesCompraRepository } from './ordenes-compra.repository';
+import { ConfigService } from '@nestjs/config';
+import { CorreoService } from '../../common/correo/correo.service';
+import { EnviarOrdenDto, ResultadoEnvioDto } from './dto/enviar-orden.dto';
+import { armarMensaje, destinatarios, esEmailValido } from './envio/mensaje-orden';
 
 /**
  * Transiciones de estado permitidas.
@@ -30,7 +39,59 @@ export class OrdenesCompraService {
     private readonly repo: OrdenesCompraRepository,
     private readonly proveedores: ProveedoresService,
     private readonly materiales: MaterialesService,
+    private readonly correo: CorreoService,
+    private readonly config: ConfigService,
   ) {}
+
+  /**
+   * Manda la orden por correo, con el PDF adjunto.
+   *
+   * El cliente aporta SOLO el PDF: el texto y los destinatarios se arman acá
+   * con los datos de la base. Si el cliente pudiera elegir a quién se le manda,
+   * cualquiera con una sesión podría usar la casilla de la empresa para
+   * escribirle a quien quisiera.
+   */
+  async enviarPorCorreo(
+    id: string,
+    dto: EnviarOrdenDto,
+    usuario?: Usuario,
+  ): Promise<ResultadoEnvioDto> {
+    if (!this.correo.estaConfigurado()) {
+      throw new ServiceUnavailableException(
+        'El envío automático de correo no está configurado. ' +
+          'Podés enviar la orden manualmente desde el sistema.',
+      );
+    }
+
+    const orden = await this.obtener(id);
+    const mailAdministracion =
+      this.config.get<string>('MAIL_ADMINISTRACION') ?? 'administracion@lacteoslastres.com.ar';
+    const { para, copia } = destinatarios(orden, mailAdministracion);
+    const { asunto, cuerpo } = armarMensaje(orden);
+
+    // El correo del usuario va en Reply-To: el remitente es la casilla del
+    // sistema, pero el proveedor le contesta a la persona que hizo la orden.
+    const responderA = esEmailValido(usuario?.email) ? usuario!.email : undefined;
+
+    const pdf = Buffer.from(dto.pdfBase64, 'base64');
+    if (pdf.length === 0) {
+      throw new BadRequestException('El PDF adjunto vino vacío.');
+    }
+
+    await this.correo.enviar({
+      para,
+      copia,
+      responderA,
+      nombreRemitente: usuario?.nombre
+        ? `${usuario.nombre} · Lácteos Las Tres S.R.L.`
+        : 'Lácteos Las Tres S.R.L.',
+      asunto,
+      texto: cuerpo,
+      adjuntos: [{ nombre: `${orden.numero}.pdf`, contenido: pdf, tipo: 'application/pdf' }],
+    });
+
+    return { para, copia, responderA: responderA ?? null };
+  }
 
   /** Valida que existan el proveedor y todos los materiales del detalle. */
   private async validarReferencias(

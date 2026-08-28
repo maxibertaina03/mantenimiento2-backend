@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -17,6 +18,7 @@ import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
+import { EnviarOrdenDto } from './dto/enviar-orden.dto';
 import { OrdenesCompraService } from './ordenes-compra.service';
 
 @ApiTags('Órdenes de compra')
@@ -65,6 +67,23 @@ export class OrdenesCompraController {
     @UsuarioActual() usuario?: Usuario,
   ) {
     return this.service.recibir(id, dto, usuario);
+  }
+
+  @Post(':id/enviar-correo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Enviar la orden por correo al proveedor, con el PDF adjunto',
+    description:
+      'El cuerpo lleva SOLO el PDF. Los destinatarios y el texto los arma el servidor ' +
+      'con los datos de la orden, para que no se pueda usar la casilla de la empresa ' +
+      'para escribirle a cualquiera.',
+  })
+  enviarCorreo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: EnviarOrdenDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.service.enviarPorCorreo(id, dto, usuario);
   }
 
   @Patch(':id/anular')

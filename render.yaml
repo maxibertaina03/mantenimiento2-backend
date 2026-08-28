@@ -17,6 +17,23 @@ services:
         value: "false"
       - key: DATABASE_URL
         sync: false
+      # ── Envío automático de órdenes por correo ──
+      # Si faltan, el envío automático queda apagado y el sistema sigue
+      # ofreciendo el envío manual.
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: mantenimiento.lastres@gmail.com
+      # Contraseña de aplicación de Gmail (16 caracteres). Se carga en el
+      # dashboard de Render, nunca acá.
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        value: mantenimiento.lastres@gmail.com
+      - key: MAIL_ADMINISTRACION
+        value: administracion@lacteoslastres.com.ar
       - key: DIRECT_URL
         sync: false
       - key: CLERK_SECRET_KEY

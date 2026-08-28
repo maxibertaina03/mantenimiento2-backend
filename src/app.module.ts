@@ -6,6 +6,7 @@ import { validarEntorno } from './config/env.validation';
 import { ProveedoresModule } from './modules/proveedores/proveedores.module';
 import { CategoriasMaterialModule } from './modules/categorias-material/categorias-material.module';
 import { EquiposItModule } from './modules/equipos-it/equipos-it.module';
+import { CorreoModule } from './common/correo/correo.module';
 import { TiposEquipoModule } from './modules/tipos-equipo/tipos-equipo.module';
 import { UnidadesMedidaModule } from './modules/unidades-medida/unidades-medida.module';
 import { MaterialesModule } from './modules/materiales/materiales.module';
@@ -29,6 +30,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     MovimientosStockModule,
     OrdenesCompraModule,
     EquiposItModule,
+    CorreoModule,
     TiposEquipoModule,
     UnidadesMedidaModule,
     UsuariosModule,
