@@ -410,6 +410,62 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
       await http.patch(`/api/equipos-it/${equipo.body.id}/asignar`).send({ usuarioId }).expect(400);
     });
 
+    it('IMPORTACION: la ruta existe y carga el inventario', async () => {
+      // Este test existe porque la ruta puede compilar bien y aun asi no quedar
+      // registrada (orden de decoradores, provider sin declarar en el modulo).
+      // Un 404 aca es "Cannot POST /api/equipos-it/importar" en produccion.
+      const res = await http
+        .post('/api/equipos-it/importar')
+        .send({
+          filas: [
+            {
+              nombreEquipo: 'IMP-PC1',
+              tipo: 'PC Escritorio',
+              modelo: 'INTEL',
+              estado: 'En uso',
+              ubicacion: 'Contaduria',
+              asignadoA: 'Luis Rodriguez',
+              accesoRemotoId: '737 214 468',
+            },
+          ],
+        })
+        .expect(201);
+
+      expect(res.body).toMatchObject({ creados: 1, conError: 0 });
+      expect(res.body.usuariosCreados).toEqual(['Luis Rodriguez']);
+    });
+
+    it('IMPORTACION: el equipo importado queda consultable', async () => {
+      const res = await http.get('/api/equipos-it?buscar=IMP-PC1').expect(200);
+      expect(res.body.datos).toHaveLength(1);
+      expect(res.body.datos[0]).toMatchObject({
+        codigoInterno: 'IMP-PC1',
+        tipo: 'PC',
+        marca: 'Intel',
+        accesoRemotoId: '737214468',
+      });
+    });
+
+    it('IMPORTACION: reimportar actualiza y no duplica', async () => {
+      await http
+        .post('/api/equipos-it/importar')
+        .send({
+          filas: [
+            { nombreEquipo: 'IMP-PC1', tipo: 'Notebook', modelo: 'HP', estado: 'Disponible' },
+          ],
+        })
+        .expect(201)
+        .expect((r) => expect(r.body).toMatchObject({ creados: 0, actualizados: 1 }));
+
+      const res = await http.get('/api/equipos-it?buscar=IMP-PC1').expect(200);
+      expect(res.body.datos).toHaveLength(1);
+      expect(res.body.datos[0].tipo).toBe('NOTEBOOK');
+    });
+
+    it('IMPORTACION: rechaza un cuerpo sin filas', async () => {
+      await http.post('/api/equipos-it/importar').send({ filas: [] }).expect(400);
+    });
+
     it('marca la garantía vencida', async () => {
       const res = await http
         .post('/api/equipos-it')

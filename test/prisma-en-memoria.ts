@@ -42,6 +42,11 @@ export function crearPrismaEnMemoria() {
           ? texto.toLowerCase().includes(buscado.toLowerCase())
           : texto.includes(buscado);
       }
+      if ('equals' in cond) {
+        const a = String(valor ?? '');
+        const b = String(cond.equals);
+        return cond.mode === 'insensitive' ? a.toLowerCase() === b.toLowerCase() : a === b;
+      }
       if ('in' in cond) return cond.in.includes(valor);
       if ('gte' in cond || 'lte' in cond) {
         const t = new Date(valor).getTime();
@@ -199,6 +204,13 @@ export function crearPrismaEnMemoria() {
       findUnique: async ({ where, include }: any) => {
         const fila = coleccion.find((f) => Object.entries(where).every(([k, v]) => f[k] === v));
         return fila ? hidratar(fila, include) : null;
+      },
+      findFirst: async ({ where, include, orderBy }: any = {}) => {
+        const candidatos = ordenar(
+          coleccion.filter((f) => coincide(f, where)),
+          orderBy,
+        );
+        return candidatos.length > 0 ? hidratar(candidatos[0], include) : null;
       },
       findUniqueOrThrow: async ({ where, include }: any) => {
         const fila = coleccion.find((f) => Object.entries(where).every(([k, v]) => f[k] === v));
