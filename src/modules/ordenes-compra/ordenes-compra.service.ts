@@ -18,7 +18,7 @@ import { OrdenRespuestaDto } from './dto/orden-respuesta.dto';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
 import { FiltroOrdenes, OrdenesCompraRepository } from './ordenes-compra.repository';
 import { ConfigService } from '@nestjs/config';
-import { CorreoService } from '../../common/correo/correo.service';
+import { CorreoService, explicarErrorSmtp } from '../../common/correo/correo.service';
 import { EnviarOrdenDto, ResultadoEnvioDto } from './dto/enviar-orden.dto';
 import { armarMensaje, destinatarios, esEmailValido } from './envio/mensaje-orden';
 
@@ -96,12 +96,11 @@ export class OrdenesCompraService {
       // envíos) se pierde si esto sale como un 500 genérico, y es justo lo que
       // hace falta para saber qué corregir. No expone credenciales: el mensaje
       // de SMTP no las incluye.
-      const detalle = error instanceof Error ? error.message : String(error);
       // 502 y no 503: el 503 lo reserva el sistema para "el correo no está
       // configurado", que es lo único que justifica caer al envío manual.
       throw new BadGatewayException(
-        `No se pudo enviar el correo: ${detalle}. La orden no cambió de estado; ` +
-          'podés reintentar o mandarla a mano.',
+        `No se pudo enviar el correo: ${explicarErrorSmtp(error)} ` +
+          'La orden no cambió de estado; podés reintentar o mandarla a mano.',
       );
     }
 

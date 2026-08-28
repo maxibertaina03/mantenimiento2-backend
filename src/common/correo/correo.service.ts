@@ -10,6 +10,41 @@ export interface AdjuntoCorreo {
   tipo: string;
 }
 
+/**
+ * Traduce el error crudo de SMTP a algo accionable.
+ *
+ * Los códigos de nodemailer no le dicen nada a quien está usando el sistema, y
+ * cada uno se arregla de una forma distinta: no es lo mismo una contraseña mal
+ * copiada que un puerto bloqueado por el hosting.
+ */
+export function explicarErrorSmtp(error: unknown): string {
+  const e = error as { code?: string; responseCode?: number; message?: string };
+  const codigo = e?.code ?? '';
+  const mensaje = e?.message ?? String(error);
+
+  if (codigo === 'ETIMEDOUT' || codigo === 'ECONNECTION' || codigo === 'ESOCKET') {
+    return (
+      'no se pudo conectar con el servidor de Gmail. Suele ser que el hosting ' +
+      'bloquea el puerto SMTP saliente. Probá cambiando SMTP_PORT a 465; si sigue ' +
+      `igual, hay que enviar por API HTTP en vez de SMTP. (${codigo}: ${mensaje})`
+    );
+  }
+  if (codigo === 'EAUTH' || e?.responseCode === 535) {
+    return (
+      'Gmail rechazó las credenciales. Revisá que SMTP_PASS sea la contraseña de ' +
+      'aplicación de 16 caracteres (sin espacios) y no la clave de la cuenta, y que ' +
+      `SMTP_USER sea la casilla que la generó. (${mensaje})`
+    );
+  }
+  if (codigo === 'EENVELOPE') {
+    return `alguna dirección de correo es inválida. (${mensaje})`;
+  }
+  if (e?.responseCode === 550 || e?.responseCode === 552) {
+    return `Gmail rechazó el mensaje, puede ser por el tamaño del adjunto. (${mensaje})`;
+  }
+  return mensaje;
+}
+
 export interface MensajeCorreo {
   para: string[];
   copia?: string[];
@@ -62,6 +97,15 @@ export class CorreoService {
       port: puerto,
       secure: puerto === 465,
       auth: { user: usuario, pass: clave },
+
+      // Timeouts cortos y explícitos. Los de nodemailer son de 2 minutos para
+      // conectar y 10 para el socket: si el hosting bloquea el puerto SMTP
+      // saliente, la request queda colgada tanto tiempo que el usuario no ve
+      // ni un error, solo una pantalla congelada. Prefiero fallar en 15s con
+      // un motivo que decir la verdad tarde.
+      connectionTimeout: 15_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 30_000,
     });
   }
 
@@ -81,7 +125,7 @@ export class CorreoService {
       await this.transporte.verify();
       return { ok: true, detalle: `Conectado como ${this.remitente}` };
     } catch (error) {
-      const detalle = error instanceof Error ? error.message : String(error);
+      const detalle = explicarErrorSmtp(error);
       this.logger.error(`SMTP no responde: ${detalle}`);
       return { ok: false, detalle };
     }
