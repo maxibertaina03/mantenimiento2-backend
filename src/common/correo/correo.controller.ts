@@ -24,13 +24,14 @@ export class CorreoController {
     if (!this.correo.estaConfigurado()) {
       return {
         configurado: false,
+        via: 'ninguna',
         conecta: false,
         detalle:
-          'Faltan las variables SMTP_HOST, SMTP_USER o SMTP_PASS. ' +
+          'Falta BREVO_API_KEY (envío por API HTTP) o SMTP_HOST/SMTP_USER/SMTP_PASS. ' +
           'El sistema sigue ofreciendo el envío manual.',
       };
     }
     const { ok, detalle } = await this.correo.verificar();
-    return { configurado: true, conecta: ok, detalle };
+    return { configurado: true, via: this.correo.viaDeEnvio(), conecta: ok, detalle };
   }
 }

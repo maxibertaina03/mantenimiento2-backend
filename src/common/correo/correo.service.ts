@@ -11,7 +11,7 @@ export interface AdjuntoCorreo {
 }
 
 /**
- * Traduce el error crudo de SMTP a algo accionable.
+ * Traduce el error crudo del envío a algo accionable.
  *
  * Los códigos de nodemailer no le dicen nada a quien está usando el sistema, y
  * cada uno se arregla de una forma distinta: no es lo mismo una contraseña mal
@@ -24,9 +24,9 @@ export function explicarErrorSmtp(error: unknown): string {
 
   if (codigo === 'ETIMEDOUT' || codigo === 'ECONNECTION' || codigo === 'ESOCKET') {
     return (
-      'no se pudo conectar con el servidor de Gmail. Suele ser que el hosting ' +
-      'bloquea el puerto SMTP saliente. Probá cambiando SMTP_PORT a 465; si sigue ' +
-      `igual, hay que enviar por API HTTP en vez de SMTP. (${codigo}: ${mensaje})`
+      'no se pudo conectar con el servidor de correo. El hosting bloquea el ' +
+      'puerto SMTP saliente, así que hay que enviar por API HTTP: configurá ' +
+      `BREVO_API_KEY. (${codigo}: ${mensaje})`
     );
   }
   if (codigo === 'EAUTH' || e?.responseCode === 535) {
@@ -40,7 +40,7 @@ export function explicarErrorSmtp(error: unknown): string {
     return `alguna dirección de correo es inválida. (${mensaje})`;
   }
   if (e?.responseCode === 550 || e?.responseCode === 552) {
-    return `Gmail rechazó el mensaje, puede ser por el tamaño del adjunto. (${mensaje})`;
+    return `el servidor rechazó el mensaje, puede ser por el tamaño del adjunto. (${mensaje})`;
   }
   return mensaje;
 }
@@ -57,90 +57,176 @@ export interface MensajeCorreo {
   adjuntos?: AdjuntoCorreo[];
 }
 
+/** Cómo se está mandando el correo. */
+export type ViaEnvio = 'brevo' | 'smtp' | 'ninguna';
+
 /**
- * Envío de correo por SMTP (Gmail).
+ * Envío de correo, por API HTTP (Brevo) o por SMTP.
  *
- * Todas las órdenes salen de UNA casilla (SMTP_USER). Que salgan de la casilla
- * de cada usuario requeriría la API de Gmail con OAuth y que cada uno autorice,
- * así que en su lugar el correo del usuario va en `Reply-To`: el proveedor le
- * contesta a la persona, aunque el remitente sea la casilla del sistema.
+ * La vía HTTP existe porque **Render bloquea los puertos SMTP salientes**: con
+ * SMTP la conexión se queda esperando hasta el timeout y no sale ningún correo.
+ * Una API sobre HTTPS no se puede bloquear sin romper todo lo demás.
  *
- * Si no hay SMTP configurado el servicio no falla al arrancar: queda apagado y
- * `estaConfigurado()` devuelve false, para que la app siga funcionando con el
- * envío manual.
+ * Se elige por variables de entorno, sin tocar código: si hay BREVO_API_KEY va
+ * por HTTP; si no, cae a SMTP (que sirve en local, donde nada está bloqueado).
+ * Si no hay ninguna, el servicio queda apagado y la app sigue funcionando con
+ * el envío manual.
+ *
+ * Todas las órdenes salen de UNA casilla (MAIL_FROM). El correo del usuario va
+ * en `Reply-To`: el proveedor le contesta a la persona, aunque el remitente sea
+ * la casilla del sistema.
  */
 @Injectable()
 export class CorreoService {
   private readonly logger = new Logger(CorreoService.name);
-  private transporte: Transporter | null = null;
+  private readonly via: ViaEnvio;
   private readonly remitente: string;
+  private readonly claveBrevo: string | undefined;
+  private transporte: Transporter | null = null;
+
+  /** Si Brevo no contesta en este tiempo, se corta con un error claro. */
+  private static readonly TIMEOUT_HTTP_MS = 20_000;
 
   constructor(private readonly config: ConfigService) {
+    this.claveBrevo = this.config.get<string>('BREVO_API_KEY');
     const host = this.config.get<string>('SMTP_HOST');
     const usuario = this.config.get<string>('SMTP_USER');
     const clave = this.config.get<string>('SMTP_PASS');
     this.remitente = this.config.get<string>('MAIL_FROM') ?? usuario ?? '';
 
-    if (!host || !usuario || !clave) {
-      this.logger.warn(
-        'SMTP no configurado (faltan SMTP_HOST/SMTP_USER/SMTP_PASS). ' +
-          'El envío automático de órdenes queda deshabilitado; el sistema sigue ' +
-          'ofreciendo el envío manual.',
-      );
+    if (this.claveBrevo) {
+      this.via = 'brevo';
+      this.logger.log(`Correo por API de Brevo, desde ${this.remitente}`);
       return;
     }
 
-    // 587 con STARTTLS es lo que usa Gmail. `secure` solo va en el 465.
-    const puerto = Number(this.config.get<string>('SMTP_PORT') ?? 587);
-    this.transporte = nodemailer.createTransport({
-      host,
-      port: puerto,
-      secure: puerto === 465,
-      auth: { user: usuario, pass: clave },
+    if (host && usuario && clave) {
+      this.via = 'smtp';
+      // 587 con STARTTLS es lo que usa Gmail. `secure` solo va en el 465.
+      const puerto = Number(this.config.get<string>('SMTP_PORT') ?? 587);
+      this.transporte = nodemailer.createTransport({
+        host,
+        port: puerto,
+        secure: puerto === 465,
+        auth: { user: usuario, pass: clave },
 
-      // Timeouts cortos y explícitos. Los de nodemailer son de 2 minutos para
-      // conectar y 10 para el socket: si el hosting bloquea el puerto SMTP
-      // saliente, la request queda colgada tanto tiempo que el usuario no ve
-      // ni un error, solo una pantalla congelada. Prefiero fallar en 15s con
-      // un motivo que decir la verdad tarde.
-      connectionTimeout: 15_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 30_000,
-    });
+        // Timeouts cortos y explícitos. Los de nodemailer son de 2 minutos para
+        // conectar: con el puerto bloqueado, la pantalla queda congelada todo
+        // ese rato sin mostrar ni un error.
+        connectionTimeout: 15_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 30_000,
+      });
+      this.logger.log(`Correo por SMTP (${host}:${puerto}), desde ${this.remitente}`);
+      return;
+    }
+
+    this.via = 'ninguna';
+    this.logger.warn(
+      'Correo no configurado (falta BREVO_API_KEY, o SMTP_HOST/SMTP_USER/SMTP_PASS). ' +
+        'El envío automático de órdenes queda deshabilitado; el sistema sigue ' +
+        'ofreciendo el envío manual.',
+    );
   }
 
   estaConfigurado(): boolean {
-    return this.transporte !== null;
+    return this.via !== 'ninguna';
+  }
+
+  viaDeEnvio(): ViaEnvio {
+    return this.via;
   }
 
   /**
-   * Comprueba que las credenciales sirvan y que el puerto no esté bloqueado.
+   * Comprueba que las credenciales sirvan y que se pueda salir a la red.
    *
-   * Vale la pena por separado: algunos hostings bloquean los puertos SMTP
-   * salientes, y sin esto el problema recién aparecería al intentar enviar.
+   * Vale la pena por separado: el hosting puede bloquear la salida, y sin esto
+   * el problema recién aparecería al intentar mandar una orden real.
    */
   async verificar(): Promise<{ ok: boolean; detalle: string }> {
-    if (!this.transporte) return { ok: false, detalle: 'SMTP no configurado' };
+    if (this.via === 'ninguna') return { ok: false, detalle: 'Correo no configurado' };
+
     try {
-      await this.transporte.verify();
-      return { ok: true, detalle: `Conectado como ${this.remitente}` };
+      if (this.via === 'brevo') {
+        // /account es de solo lectura: valida la clave sin mandar nada.
+        const respuesta = await this.pedirABrevo('https://api.brevo.com/v3/account', 'GET');
+        if (!respuesta.ok) {
+          return { ok: false, detalle: `Brevo respondió ${respuesta.status}: ${respuesta.cuerpo}` };
+        }
+        return { ok: true, detalle: `Brevo conectado, enviando desde ${this.remitente}` };
+      }
+
+      await this.transporte!.verify();
+      return { ok: true, detalle: `SMTP conectado como ${this.remitente}` };
     } catch (error) {
       const detalle = explicarErrorSmtp(error);
-      this.logger.error(`SMTP no responde: ${detalle}`);
+      this.logger.error(`El correo no responde: ${detalle}`);
       return { ok: false, detalle };
     }
   }
 
   async enviar(mensaje: MensajeCorreo): Promise<void> {
-    if (!this.transporte) {
-      throw new Error('SMTP no configurado');
-    }
+    if (this.via === 'ninguna') throw new Error('Correo no configurado');
+    if (this.via === 'brevo') return this.enviarPorBrevo(mensaje);
+    return this.enviarPorSmtp(mensaje);
+  }
 
+  /** Llamada a Brevo con timeout: sin él, una API colgada cuelga la pantalla. */
+  private async pedirABrevo(
+    url: string,
+    metodo: 'GET' | 'POST',
+    cuerpo?: unknown,
+  ): Promise<{ ok: boolean; status: number; cuerpo: string }> {
+    const corte = AbortSignal.timeout(CorreoService.TIMEOUT_HTTP_MS);
+    const respuesta = await fetch(url, {
+      method: metodo,
+      headers: {
+        'api-key': this.claveBrevo!,
+        accept: 'application/json',
+        ...(cuerpo ? { 'content-type': 'application/json' } : {}),
+      },
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+      signal: corte,
+    });
+    return { ok: respuesta.ok, status: respuesta.status, cuerpo: await respuesta.text() };
+  }
+
+  private async enviarPorBrevo(mensaje: MensajeCorreo): Promise<void> {
+    const cuerpo = {
+      sender: {
+        email: this.remitente,
+        ...(mensaje.nombreRemitente ? { name: mensaje.nombreRemitente } : {}),
+      },
+      to: mensaje.para.map((email) => ({ email })),
+      ...(mensaje.copia?.length ? { cc: mensaje.copia.map((email) => ({ email })) } : {}),
+      ...(mensaje.responderA ? { replyTo: { email: mensaje.responderA } } : {}),
+      subject: mensaje.asunto,
+      textContent: mensaje.texto,
+      ...(mensaje.adjuntos?.length
+        ? {
+            attachment: mensaje.adjuntos.map((a) => ({
+              name: a.nombre,
+              content: a.contenido.toString('base64'),
+            })),
+          }
+        : {}),
+    };
+
+    const respuesta = await this.pedirABrevo('https://api.brevo.com/v3/smtp/email', 'POST', cuerpo);
+    if (!respuesta.ok) {
+      // El cuerpo del error de Brevo dice exactamente qué está mal (remitente
+      // sin verificar, clave inválida, cuota agotada), y es justo lo que hace
+      // falta para arreglarlo.
+      throw new Error(`Brevo respondió ${respuesta.status}: ${respuesta.cuerpo}`);
+    }
+  }
+
+  private async enviarPorSmtp(mensaje: MensajeCorreo): Promise<void> {
     const from = mensaje.nombreRemitente
       ? `"${mensaje.nombreRemitente}" <${this.remitente}>`
       : this.remitente;
 
-    await this.transporte.sendMail({
+    await this.transporte!.sendMail({
       from,
       to: mensaje.para,
       cc: mensaje.copia?.length ? mensaje.copia : undefined,

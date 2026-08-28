@@ -18,6 +18,10 @@ services:
       - key: DATABASE_URL
         sync: false
       # ── Envío automático de órdenes por correo ──
+      # Render BLOQUEA los puertos SMTP salientes: el envío va por la API HTTP
+      # de Brevo. Las SMTP_* quedan para desarrollo local.
+      - key: BREVO_API_KEY
+        sync: false
       # Si faltan, el envío automático queda apagado y el sistema sigue
       # ofreciendo el envío manual.
       - key: SMTP_HOST

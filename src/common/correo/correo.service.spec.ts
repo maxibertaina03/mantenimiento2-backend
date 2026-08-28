@@ -6,10 +6,12 @@ import { explicarErrorSmtp } from './correo.service';
  * diga QUE hacer, no solo que fallo.
  */
 describe('explicarErrorSmtp', () => {
-  it('un puerto bloqueado sugiere probar el 465', () => {
+  it('un puerto bloqueado manda a configurar el envio por API HTTP', () => {
+    // Render bloquea SMTP en 587 y en 465: el consejo util es cambiar de via,
+    // no de puerto.
     const texto = explicarErrorSmtp({ code: 'ETIMEDOUT', message: 'connect ETIMEDOUT' });
     expect(texto).toMatch(/bloquea el puerto SMTP/i);
-    expect(texto).toMatch(/465/);
+    expect(texto).toMatch(/BREVO_API_KEY/);
   });
 
   it.each(['ECONNECTION', 'ESOCKET'])('%s tambien se lee como problema de red', (code) => {
