@@ -171,7 +171,14 @@ export function crearPrismaEnMemoria() {
     }
     if (include.proveedor) {
       const p = db.proveedores.find((x) => x.id === fila.proveedorId);
-      salida.proveedor = p ? { nombre: p.nombre, cuit: p.cuit ?? null } : null;
+      salida.proveedor = p
+        ? {
+            nombre: p.nombre,
+            cuit: p.cuit ?? null,
+            email: p.email ?? null,
+            telefono: p.telefono ?? null,
+          }
+        : null;
     }
     if (include.usuario) {
       const u = db.usuarios.find((x) => x.id === fila.usuarioId);

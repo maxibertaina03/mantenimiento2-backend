@@ -70,6 +70,21 @@ export class MaterialesRepository {
     return this.prisma.material.delete({ where: { id } });
   }
 
+  /**
+   * Unidades ya usadas, para sugerirlas al cargar un material. La unidad sigue
+   * siendo texto libre: esto solo evita que cada uno escriba la suya ("lt",
+   * "Lt", "litros") y terminen siendo tres unidades distintas.
+   */
+  async unidadesUsadas(): Promise<string[]> {
+    const filas = await this.prisma.material.findMany({
+      where: { unidad: { not: '' } },
+      select: { unidad: true },
+      distinct: ['unidad'],
+      orderBy: { unidad: 'asc' },
+    });
+    return filas.map((f) => f.unidad).filter((u) => u.trim() !== '');
+  }
+
   contarMovimientos(id: string): Promise<number> {
     return this.prisma.movimientoStock.count({ where: { materialId: id } });
   }

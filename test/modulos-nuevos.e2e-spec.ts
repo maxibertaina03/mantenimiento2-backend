@@ -107,6 +107,13 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
       expect(res.body.proveedorCuit).toBe('30-12345678-9');
     });
 
+    it('la orden trae el contacto del proveedor (para enviarla)', async () => {
+      const res = await http.get(`/api/ordenes-compra/${ordenId}`).expect(200);
+      // Sin estos datos la UI no puede ofrecer mail ni WhatsApp.
+      expect(res.body).toHaveProperty('proveedorEmail');
+      expect(res.body).toHaveProperty('proveedorTelefono');
+    });
+
     it('calcula subtotales y total', async () => {
       const res = await http.get(`/api/ordenes-compra/${ordenId}`).expect(200);
       // 100 × 1250.50 = 125050 ; 500 × 12.75 = 6375

@@ -31,7 +31,8 @@ export class OrdenesCompraRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly relaciones = {
-    proveedor: { select: { nombre: true, cuit: true } },
+    // email y teléfono: la UI ofrece enviar la orden por correo o WhatsApp.
+    proveedor: { select: { nombre: true, cuit: true, email: true, telefono: true } },
     creadoPor: { select: { nombre: true } },
     recibidaPor: { select: { nombre: true } },
     renglones: {

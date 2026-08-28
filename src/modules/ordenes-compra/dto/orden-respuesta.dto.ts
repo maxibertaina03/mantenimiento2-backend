@@ -7,7 +7,12 @@ export type RenglonConRelaciones = RenglonOrdenCompra & {
 };
 
 export type OrdenConRelaciones = OrdenCompra & {
-  proveedor?: { nombre: string; cuit: string | null } | null;
+  proveedor?: {
+    nombre: string;
+    cuit: string | null;
+    email: string | null;
+    telefono: string | null;
+  } | null;
   creadoPor?: { nombre: string } | null;
   recibidaPor?: { nombre: string } | null;
   renglones?: RenglonConRelaciones[];
@@ -54,6 +59,10 @@ export class OrdenRespuestaDto {
   @ApiProperty() proveedorId!: string;
   @ApiPropertyOptional({ nullable: true }) proveedorNombre!: string | null;
   @ApiPropertyOptional({ nullable: true }) proveedorCuit!: string | null;
+  @ApiPropertyOptional({ description: 'Para enviarle la orden', nullable: true })
+  proveedorEmail!: string | null;
+  @ApiPropertyOptional({ description: 'Para enviarle la orden por WhatsApp', nullable: true })
+  proveedorTelefono!: string | null;
 
   @ApiProperty() fecha!: Date;
   @ApiPropertyOptional({ nullable: true }) observaciones!: string | null;
@@ -92,6 +101,8 @@ export class OrdenRespuestaDto {
       proveedorId: o.proveedorId,
       proveedorNombre: o.proveedor?.nombre ?? null,
       proveedorCuit: o.proveedor?.cuit ?? null,
+      proveedorEmail: o.proveedor?.email ?? null,
+      proveedorTelefono: o.proveedor?.telefono ?? null,
       fecha: o.fecha,
       observaciones: o.observaciones,
       creadoPorNombre: o.creadoPor?.nombre ?? null,

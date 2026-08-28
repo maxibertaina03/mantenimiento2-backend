@@ -86,6 +86,11 @@ export class MaterialesService {
     return MaterialRespuestaDto.desde(actualizado);
   }
 
+  /** Unidades ya usadas, para sugerirlas en el formulario. */
+  unidades(): Promise<string[]> {
+    return this.repo.unidadesUsadas();
+  }
+
   async eliminar(id: string): Promise<void> {
     await this.obtener(id);
     const movimientos = await this.repo.contarMovimientos(id);

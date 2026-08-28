@@ -34,6 +34,12 @@ export class MaterialesController {
     return this.service.listar(query);
   }
 
+  @Get('unidades')
+  @ApiOperation({ summary: 'Unidades ya usadas, para sugerirlas al cargar un material' })
+  unidades() {
+    return this.service.unidades();
+  }
+
   @Get('bajo-stock')
   @ApiOperation({ summary: 'Materiales con stock por debajo (o igual) del mínimo' })
   bajoStock() {
