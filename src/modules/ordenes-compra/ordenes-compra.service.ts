@@ -78,17 +78,29 @@ export class OrdenesCompraService {
       throw new BadRequestException('El PDF adjunto vino vacío.');
     }
 
-    await this.correo.enviar({
-      para,
-      copia,
-      responderA,
-      nombreRemitente: usuario?.nombre
-        ? `${usuario.nombre} · Lácteos Las Tres S.R.L.`
-        : 'Lácteos Las Tres S.R.L.',
-      asunto,
-      texto: cuerpo,
-      adjuntos: [{ nombre: `${orden.numero}.pdf`, contenido: pdf, tipo: 'application/pdf' }],
-    });
+    try {
+      await this.correo.enviar({
+        para,
+        copia,
+        responderA,
+        nombreRemitente: usuario?.nombre
+          ? `${usuario.nombre} · Lácteos Las Tres S.R.L.`
+          : 'Lácteos Las Tres S.R.L.',
+        asunto,
+        texto: cuerpo,
+        adjuntos: [{ nombre: `${orden.numero}.pdf`, contenido: pdf, tipo: 'application/pdf' }],
+      });
+    } catch (error) {
+      // El motivo real (credenciales rechazadas, puerto bloqueado, límite de
+      // envíos) se pierde si esto sale como un 500 genérico, y es justo lo que
+      // hace falta para saber qué corregir. No expone credenciales: el mensaje
+      // de SMTP no las incluye.
+      const detalle = error instanceof Error ? error.message : String(error);
+      throw new ServiceUnavailableException(
+        `No se pudo enviar el correo: ${detalle}. La orden no cambió de estado; ` +
+          'podés reintentar o mandarla a mano.',
+      );
+    }
 
     return { para, copia, responderA: responderA ?? null };
   }

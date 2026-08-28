@@ -412,6 +412,20 @@ describe('OrdenesCompraService - enviarPorCorreo()', () => {
     expect(correo.enviar).not.toHaveBeenCalled();
   });
 
+  it('REGRESION: si Gmail rechaza el envio, el motivo real llega al usuario', async () => {
+    // Con un 500 generico no se sabria si son las credenciales, el puerto
+    // bloqueado o el limite de envios: justo lo que hace falta para arreglarlo.
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+    correo.enviar.mockRejectedValue(
+      new Error('Invalid login: 535-5.7.8 Username and Password not accepted'),
+    );
+
+    await expect(service.enviarPorCorreo('oc-1', { pdfBase64: PDF })).rejects.toThrow(
+      /535-5\.7\.8/,
+    );
+  });
+
   it('404 si la orden no existe, sin mandar nada', async () => {
     const { service, repo, correo } = armar();
     repo.buscarPorId.mockResolvedValue(null);
