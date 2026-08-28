@@ -1,4 +1,4 @@
-import { EstadoEquipoIT, TipoEquipoIT } from '@prisma/client';
+import { EstadoEquipoIT } from '@prisma/client';
 
 /**
  * Traducción de una planilla de inventario (Notion, Excel) a los datos que
@@ -18,34 +18,6 @@ export function normalizarTexto(valor: string): string {
       .toLowerCase()
   );
 }
-
-/**
- * Tipos de equipo. Las claves están normalizadas (sin acentos, minúsculas).
- * Se aceptan las variantes que aparecen en la planilla real.
- */
-const TIPOS: Record<string, TipoEquipoIT> = {
-  'pc escritorio': TipoEquipoIT.PC,
-  pc: TipoEquipoIT.PC,
-  notebook: TipoEquipoIT.NOTEBOOK,
-  laptop: TipoEquipoIT.NOTEBOOK,
-  servidor: TipoEquipoIT.SERVIDOR,
-  impresora: TipoEquipoIT.IMPRESORA,
-  'camara de seguridad': TipoEquipoIT.CAMARA_SEGURIDAD,
-  camara: TipoEquipoIT.CAMARA_SEGURIDAD,
-  telefonos: TipoEquipoIT.CELULAR,
-  telefono: TipoEquipoIT.CELULAR,
-  celular: TipoEquipoIT.CELULAR,
-  tablet: TipoEquipoIT.TABLET,
-  monitor: TipoEquipoIT.MONITOR,
-  'router/switch': TipoEquipoIT.EQUIPO_RED,
-  router: TipoEquipoIT.EQUIPO_RED,
-  switch: TipoEquipoIT.EQUIPO_RED,
-  // ISP y cargadores no tienen un tipo propio: entran como OTRO y quedan
-  // igualmente inventariados.
-  isp: TipoEquipoIT.OTRO,
-  'cargadores telefonos': TipoEquipoIT.OTRO,
-  cargador: TipoEquipoIT.OTRO,
-};
 
 const ESTADOS: Record<string, EstadoEquipoIT> = {
   'en uso': EstadoEquipoIT.EN_USO,
@@ -125,19 +97,46 @@ export function separarMarcaYModelo(valor: string | undefined): MarcaYModelo {
   return { marca: MARCA_POR_DEFECTO, modelo: texto, dudoso: true };
 }
 
-export function normalizarTipo(valor: string | undefined): TipoEquipoIT | null {
+/** Lo mínimo que necesita el matcheo: el catálogo real trae más campos. */
+export interface TipoBuscable {
+  id: string;
+  nombre: string;
+  alias?: string | null;
+}
+
+/**
+ * Resuelve el tipo de la planilla contra el CATÁLOGO, no contra una lista fija:
+ * si mañana se agrega un tipo desde la pantalla, la importación lo reconoce sin
+ * tocar código.
+ *
+ * Cada tipo aporta su nombre y sus alias como patrones. Se prueba primero la
+ * coincidencia exacta y después la parcial, del patrón MÁS LARGO al más corto:
+ * gana el más específico. Sin ese orden, "Cargadores Teléfonos Only Turbo"
+ * matcheaba "telefonos" y un cargador entraba como celular.
+ */
+export function normalizarTipo<T extends TipoBuscable>(
+  valor: string | undefined,
+  catalogo: T[],
+): T | null {
   const clave = normalizarTexto(valor ?? '');
   if (!clave) return null;
-  if (TIPOS[clave]) return TIPOS[clave];
 
-  // Coincidencia parcial, del patron MAS LARGO al mas corto: gana el mas
-  // especifico. Sin ordenar, "Cargadores Telefonos Only Turbo" matcheaba
-  // "telefonos" y un cargador entraba como celular.
-  const patrones = Object.entries(TIPOS).sort(([a], [b]) => b.length - a.length);
-  for (const [patron, tipo] of patrones) {
-    if (clave.includes(patron)) return tipo;
+  // [patrón, tipo] con el nombre y todos los alias de cada tipo.
+  const patrones: [string, T][] = [];
+  for (const tipo of catalogo) {
+    patrones.push([normalizarTexto(tipo.nombre), tipo]);
+    for (const alias of (tipo.alias ?? '').split(',')) {
+      const a = normalizarTexto(alias);
+      if (a) patrones.push([a, tipo]);
+    }
   }
-  return null;
+
+  const exacto = patrones.find(([p]) => p === clave);
+  if (exacto) return exacto[1];
+
+  const porLargo = [...patrones].sort(([a], [b]) => b.length - a.length);
+  const parcial = porLargo.find(([p]) => clave.includes(p));
+  return parcial ? parcial[1] : null;
 }
 
 export function normalizarEstado(valor: string | undefined): EstadoEquipoIT {

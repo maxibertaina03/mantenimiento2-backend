@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { EstadoEquipoIT, TipoEquipoIT, Usuario } from '@prisma/client';
+import { EstadoEquipoIT, Usuario } from '@prisma/client';
 import { EquiposItService } from './equipos-it.service';
 import { EquiposItRepository } from './equipos-it.repository';
 import { UsuariosService } from '../usuarios/usuarios.service';
@@ -7,7 +7,8 @@ import { UsuariosService } from '../usuarios/usuarios.service';
 const equipoBase = {
   id: 'eq-1',
   codigoInterno: 'IT-0042',
-  tipo: TipoEquipoIT.NOTEBOOK,
+  tipoId: 'tipo-notebook',
+  tipo: { nombre: 'Notebook', llevaEspecificaciones: true },
   estado: EstadoEquipoIT.EN_DEPOSITO,
   marca: 'Dell',
   modelo: 'Latitude 5420',
@@ -59,7 +60,7 @@ function armar(equipo: any = equipoBase) {
   };
 }
 
-const dtoBase = { tipo: TipoEquipoIT.NOTEBOOK, marca: 'Dell', modelo: 'Latitude 5420' };
+const dtoBase = { tipoId: 'tipo-notebook', marca: 'Dell', modelo: 'Latitude 5420' };
 
 describe('EquiposItService - alta', () => {
   it('un equipo sin asignar nace EN_DEPOSITO', async () => {
@@ -116,20 +117,12 @@ describe('EquiposItService - alta', () => {
     const { service } = armar();
     await expect(
       service.crear({
-        tipo: TipoEquipoIT.CAMARA_SEGURIDAD,
+        tipoId: 'tipo-camara',
         marca: 'Hikvision',
         modelo: 'DS-2CD1043',
         direccionIp: '192.168.1.90',
       } as any),
     ).resolves.toBeDefined();
-  });
-
-  it('sabe que una camara no lleva especificaciones de PC', () => {
-    expect(EquiposItService.requiereEspecificacionesDePc(TipoEquipoIT.CAMARA_SEGURIDAD)).toBe(
-      false,
-    );
-    expect(EquiposItService.requiereEspecificacionesDePc(TipoEquipoIT.NOTEBOOK)).toBe(true);
-    expect(EquiposItService.requiereEspecificacionesDePc(TipoEquipoIT.SERVIDOR)).toBe(true);
   });
 });
 
@@ -203,12 +196,12 @@ describe('EquiposItService - listado y consultas', () => {
       pagina: 1,
       limite: 20,
       skip: 0,
-      tipo: TipoEquipoIT.SERVIDOR,
+      tipoId: 'tipo-servidor',
       estado: EstadoEquipoIT.EN_USO,
       buscar: 'dell',
     } as any);
     expect(repo.buscarConFiltros.mock.calls[0][0]).toMatchObject({
-      tipo: TipoEquipoIT.SERVIDOR,
+      tipoId: 'tipo-servidor',
       estado: EstadoEquipoIT.EN_USO,
       buscar: 'dell',
     });

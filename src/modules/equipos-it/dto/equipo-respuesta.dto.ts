@@ -5,10 +5,10 @@ import {
   EstadoEquipoIT,
   TipoAccesoRemoto,
   TipoDisco,
-  TipoEquipoIT,
 } from '@prisma/client';
 
 export type EquipoConRelaciones = EquipoIT & {
+  tipo?: { nombre: string; llevaEspecificaciones: boolean } | null;
   proveedor?: { nombre: string } | null;
   asignadoA?: { nombre: string } | null;
 };
@@ -21,7 +21,10 @@ export type AsignacionConRelaciones = AsignacionEquipoIT & {
 export class EquipoRespuestaDto {
   @ApiProperty() id!: string;
   @ApiPropertyOptional({ nullable: true }) codigoInterno!: string | null;
-  @ApiProperty({ enum: TipoEquipoIT }) tipo!: TipoEquipoIT;
+  @ApiProperty() tipoId!: string;
+  @ApiPropertyOptional({ nullable: true }) tipoNombre!: string | null;
+  @ApiProperty({ description: 'Si el formulario debe pedir procesador, RAM y disco' })
+  llevaEspecificaciones!: boolean;
   @ApiProperty({ enum: EstadoEquipoIT }) estado!: EstadoEquipoIT;
 
   @ApiProperty() marca!: string;
@@ -61,7 +64,9 @@ export class EquipoRespuestaDto {
     return {
       id: e.id,
       codigoInterno: e.codigoInterno,
-      tipo: e.tipo,
+      tipoId: e.tipoId,
+      tipoNombre: e.tipo?.nombre ?? null,
+      llevaEspecificaciones: e.tipo?.llevaEspecificaciones ?? true,
       estado: e.estado,
       marca: e.marca,
       modelo: e.modelo,

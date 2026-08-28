@@ -177,19 +177,6 @@ model Usuario {
 // su propia identidad y su historial), a diferencia de los materiales, que son
 // consumibles fungibles con un stock agregado.
 
-enum TipoEquipoIT {
-  PC
-  NOTEBOOK
-  SERVIDOR
-  CELULAR
-  CAMARA_SEGURIDAD
-  TABLET
-  IMPRESORA
-  MONITOR
-  EQUIPO_RED // router, switch, access point
-  OTRO
-}
-
 enum EstadoEquipoIT {
   EN_USO
   EN_DEPOSITO
@@ -214,12 +201,42 @@ enum TipoAccesoRemoto {
   OTRO
 }
 
+/// Catálogo de tipos de equipo. Antes era un enum, pero agregar un tipo obligaba
+/// a tocar el código y migrar: ahora se administran desde el sistema.
+model TipoEquipo {
+  id     String @id @default(uuid())
+  nombre String @unique
+
+  /// Términos que la importación reconoce para este tipo, separados por coma.
+  /// Ej: "pc escritorio,pc,computadora".
+  alias String?
+
+  /// Si el formulario debe pedir procesador, RAM y disco. Una cámara o una
+  /// impresora no los llevan.
+  llevaEspecificaciones Boolean @default(true)
+
+  /// Orden en que se listan. Con el mismo valor, se ordena por nombre.
+  orden Int @default(0)
+
+  /// Los tipos en desuso se ocultan en vez de borrarse, para no perder la
+  /// referencia de los equipos que ya los usan.
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  equipos EquipoIT[]
+
+  @@index([activo, orden])
+  @@map("tipos_equipo")
+}
+
 model EquipoIT {
   id String @id @default(uuid())
 
   // Etiqueta de inventario que se le pega al equipo. Único cuando está cargado.
   codigoInterno String?        @unique
-  tipo          TipoEquipoIT
+  tipoId        String
   estado        EstadoEquipoIT @default(EN_DEPOSITO)
 
   marca       String
@@ -261,11 +278,11 @@ model EquipoIT {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
+  tipo         TipoEquipo           @relation(fields: [tipoId], references: [id])
   proveedor    Proveedor?           @relation(fields: [proveedorId], references: [id])
   asignadoA    Usuario?             @relation("EquiposAsignados", fields: [asignadoAId], references: [id])
   asignaciones AsignacionEquipoIT[]
-
-  @@index([tipo])
+  @@index([tipoId])
   @@index([estado])
   @@index([asignadoAId])
   @@index([ordenClave])

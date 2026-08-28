@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EstadoEquipoIT, TipoAccesoRemoto, TipoDisco, TipoEquipoIT } from '@prisma/client';
+import { EstadoEquipoIT, TipoAccesoRemoto, TipoDisco } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
@@ -29,9 +29,9 @@ export class CrearEquipoDto {
   @MaxLength(40)
   codigoInterno?: string;
 
-  @ApiProperty({ enum: TipoEquipoIT })
-  @IsEnum(TipoEquipoIT)
-  tipo!: TipoEquipoIT;
+  @ApiProperty({ description: 'Tipo de equipo del catálogo', format: 'uuid' })
+  @IsUUID()
+  tipoId!: string;
 
   @ApiPropertyOptional({ enum: EstadoEquipoIT, default: EstadoEquipoIT.EN_DEPOSITO })
   @IsOptional()

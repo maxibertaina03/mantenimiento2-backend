@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { EstadoEquipoIT, TipoEquipoIT } from '@prisma/client';
+import { EstadoEquipoIT } from '@prisma/client';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginacionDto } from '../../../common/dto/paginacion.dto';
 
@@ -10,10 +10,10 @@ export class ListarEquiposDto extends PaginacionDto {
   @IsString()
   buscar?: string;
 
-  @ApiPropertyOptional({ enum: TipoEquipoIT })
+  @ApiPropertyOptional({ description: 'Filtrar por tipo del catálogo', format: 'uuid' })
   @IsOptional()
-  @IsEnum(TipoEquipoIT)
-  tipo?: TipoEquipoIT;
+  @IsUUID()
+  tipoId?: string;
 
   @ApiPropertyOptional({ enum: EstadoEquipoIT })
   @IsOptional()

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Usuario } from '@prisma/client';
+import { TipoEquipo, Usuario } from '@prisma/client';
+import { TiposEquipoRepository } from '../../tipos-equipo/tipos-equipo.repository';
 import { UsuariosService } from '../../usuarios/usuarios.service';
 import {
   FilaImportacionDto,
@@ -40,6 +41,7 @@ export class ImportarEquiposService {
   constructor(
     private readonly repo: EquiposItRepository,
     private readonly usuarios: UsuariosService,
+    private readonly tipos: TiposEquipoRepository,
   ) {}
 
   /**
@@ -88,6 +90,9 @@ export class ImportarEquiposService {
     // Evita ir a la base una vez por fila para la misma persona.
     const personas = new Map<string, Usuario>();
 
+    // El catálogo se lee una sola vez: es el mismo para todas las filas.
+    const catalogo = await this.tipos.buscarTodos();
+
     for (const [indice, fila] of dto.filas.entries()) {
       // +2: la fila 1 del archivo es el encabezado, y las planillas se cuentan
       // desde 1. Así el número que se informa coincide con lo que ve el usuario.
@@ -95,7 +100,7 @@ export class ImportarEquiposService {
       const identificador = fila.nombreEquipo?.trim() || `(fila ${numeroFila})`;
 
       try {
-        await this.importarFila(fila, identificador, personas, resultado);
+        await this.importarFila(fila, identificador, personas, catalogo, resultado);
       } catch (error) {
         resultado.conError += 1;
         const motivo = error instanceof Error ? error.message : 'Error desconocido';
@@ -111,12 +116,14 @@ export class ImportarEquiposService {
     fila: FilaImportacionDto,
     identificador: string,
     personas: Map<string, Usuario>,
+    catalogo: TipoEquipo[],
     resultado: ResultadoImportacionDto,
   ): Promise<void> {
-    const tipo = normalizarTipo(fila.tipo);
+    const tipo = normalizarTipo(fila.tipo, catalogo);
     if (!tipo) {
       throw new Error(
-        `No se reconoce el tipo de equipo "${fila.tipo ?? ''}". Revisá esa celda en la planilla.`,
+        `No se reconoce el tipo de equipo "${fila.tipo ?? ''}". ` +
+          'Agregalo en Tipos de equipo o corregí esa celda en la planilla.',
       );
     }
 
@@ -133,7 +140,7 @@ export class ImportarEquiposService {
 
     const datos = {
       codigoInterno: fila.nombreEquipo?.trim() || null,
-      tipo,
+      tipo: { connect: { id: tipo.id } },
       // Un equipo dado de baja no puede quedar asignado: si viene con persona,
       // manda el estado de la planilla igual, pero sin asignación.
       estado: normalizarEstado(fila.estado),

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoEquipoIT, TipoEquipoIT, Usuario } from '@prisma/client';
+import { EstadoEquipoIT, Usuario } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { ActualizarEquipoDto } from './dto/actualizar-equipo.dto';
@@ -8,17 +8,6 @@ import { CrearEquipoDto } from './dto/crear-equipo.dto';
 import { AsignacionRespuestaDto, EquipoRespuestaDto } from './dto/equipo-respuesta.dto';
 import { ListarEquiposDto } from './dto/listar-equipos.dto';
 import { EquiposItRepository, FiltroEquipos } from './equipos-it.repository';
-
-/**
- * Tipos de equipo que NO son computadoras: no tiene sentido pedirles
- * procesador, RAM ni disco, pero sí IP y ubicación.
- */
-const SIN_ESPECIFICACIONES_DE_PC: TipoEquipoIT[] = [
-  TipoEquipoIT.CAMARA_SEGURIDAD,
-  TipoEquipoIT.MONITOR,
-  TipoEquipoIT.IMPRESORA,
-  TipoEquipoIT.EQUIPO_RED,
-];
 
 @Injectable()
 export class EquiposItService {
@@ -61,7 +50,7 @@ export class EquiposItService {
 
     const creado = await this.repo.crear({
       codigoInterno: dto.codigoInterno,
-      tipo: dto.tipo,
+      tipo: { connect: { id: dto.tipoId } },
       estado,
       marca: dto.marca,
       modelo: dto.modelo,
@@ -102,7 +91,7 @@ export class EquiposItService {
   async listar(query: ListarEquiposDto): Promise<RespuestaPaginada<EquipoRespuestaDto>> {
     const filtro: FiltroEquipos = {
       buscar: query.buscar,
-      tipo: query.tipo,
+      tipoId: query.tipoId,
       estado: query.estado,
       asignadoAId: query.asignadoAId,
     };
@@ -141,7 +130,7 @@ export class EquiposItService {
 
     const actualizado = await this.repo.actualizar(id, {
       codigoInterno: dto.codigoInterno,
-      tipo: dto.tipo,
+      tipo: { connect: { id: dto.tipoId } },
       estado: dto.estado,
       marca: dto.marca,
       modelo: dto.modelo,
@@ -237,10 +226,5 @@ export class EquiposItService {
       );
     }
     await this.repo.eliminar(id);
-  }
-
-  /** Expuesto para la UI: qué campos tiene sentido pedir según el tipo. */
-  static requiereEspecificacionesDePc(tipo: TipoEquipoIT): boolean {
-    return !SIN_ESPECIFICACIONES_DE_PC.includes(tipo);
   }
 }

@@ -20,6 +20,90 @@ export function crearPrismaEnMemoria() {
     ordenes: [] as any[],
     renglones: [] as any[],
     contadores: [] as any[],
+    tiposEquipo: [
+      // Mismo catálogo que dejó la migración. Los ids tienen forma de UUID
+      // porque los DTO validan @IsUUID().
+      {
+        id: 'a0000001-0000-4000-8000-000000000001',
+        nombre: 'PC de escritorio',
+        alias: 'pc escritorio,pc',
+        llevaEspecificaciones: true,
+        orden: 10,
+        activo: true,
+      },
+      {
+        id: 'a0000002-0000-4000-8000-000000000002',
+        nombre: 'Notebook',
+        alias: 'notebook',
+        llevaEspecificaciones: true,
+        orden: 20,
+        activo: true,
+      },
+      {
+        id: 'a0000003-0000-4000-8000-000000000003',
+        nombre: 'Servidor',
+        alias: 'servidor',
+        llevaEspecificaciones: true,
+        orden: 30,
+        activo: true,
+      },
+      {
+        id: 'a0000004-0000-4000-8000-000000000004',
+        nombre: 'Celular',
+        alias: 'telefonos,telefono',
+        llevaEspecificaciones: true,
+        orden: 40,
+        activo: true,
+      },
+      {
+        id: 'a0000005-0000-4000-8000-000000000005',
+        nombre: 'Cámara de seguridad',
+        alias: 'camara de seguridad,camara',
+        llevaEspecificaciones: false,
+        orden: 60,
+        activo: true,
+      },
+      {
+        id: 'a0000006-0000-4000-8000-000000000006',
+        nombre: 'Impresora',
+        alias: 'impresora',
+        llevaEspecificaciones: false,
+        orden: 70,
+        activo: true,
+      },
+      {
+        id: 'a0000007-0000-4000-8000-000000000007',
+        nombre: 'Equipo de red',
+        alias: 'router/switch,router',
+        llevaEspecificaciones: false,
+        orden: 90,
+        activo: true,
+      },
+      {
+        id: 'a0000008-0000-4000-8000-000000000008',
+        nombre: 'ISP',
+        alias: 'isp',
+        llevaEspecificaciones: false,
+        orden: 100,
+        activo: true,
+      },
+      {
+        id: 'a0000009-0000-4000-8000-000000000009',
+        nombre: 'Cargador',
+        alias: 'cargadores telefonos,cargador',
+        llevaEspecificaciones: false,
+        orden: 110,
+        activo: true,
+      },
+      {
+        id: 'a0000010-0000-4000-8000-000000000010',
+        nombre: 'Otro',
+        alias: 'otro',
+        llevaEspecificaciones: false,
+        orden: 999,
+        activo: true,
+      },
+    ] as any[],
   };
 
   // Los DTO validan @IsUUID(), asi que los ids generados deben tener forma de
@@ -98,6 +182,13 @@ export function crearPrismaEnMemoria() {
         db.movimientos.filter((m) => m.materialId === fila.id),
         include.movimientos.orderBy,
       );
+    }
+    if (include.tipo) {
+      const t = db.tiposEquipo.find((x) => x.id === fila.tipoId);
+      salida.tipo = t ? { nombre: t.nombre, llevaEspecificaciones: t.llevaEspecificaciones } : null;
+    }
+    if (include._count?.select?.equipos) {
+      salida._count = { equipos: db.equiposIt.filter((e) => e.tipoId === fila.id).length };
     }
     if (include.asignadoA) {
       const u = db.usuarios.find((x) => x.id === fila.asignadoAId);
@@ -295,11 +386,18 @@ export function crearPrismaEnMemoria() {
       referenciaTrabajo: null,
       notas: null,
     })),
+    tipoEquipo: delegate(db.tiposEquipo, () => ({
+      alias: null,
+      llevaEspecificaciones: true,
+      orden: 0,
+      activo: true,
+    })),
     usuario: delegate(db.usuarios, () => ({ idExterno: null, rol: 'OPERARIO' })),
     edicionMovimiento: delegate(db.ediciones, () => ({ usuarioId: null })),
 
     equipoIT: delegate(db.equiposIt, () => ({
       codigoInterno: null,
+      ordenClave: null,
       estado: 'EN_DEPOSITO',
       numeroSerie: null,
       procesador: null,

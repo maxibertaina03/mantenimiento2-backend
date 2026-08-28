@@ -1,7 +1,8 @@
-import { EstadoEquipoIT, TipoEquipoIT } from '@prisma/client';
+import { EstadoEquipoIT } from '@prisma/client';
 import { ImportarEquiposService } from './importar-equipos.service';
 import { EquiposItRepository } from '../equipos-it.repository';
 import { UsuariosService } from '../../usuarios/usuarios.service';
+import { TiposEquipoRepository } from '../../tipos-equipo/tipos-equipo.repository';
 
 /**
  * Las filas de estos tests son las del inventario real que se va a importar.
@@ -35,12 +36,28 @@ function armar(opciones: { existentes?: Record<string, any> } = {}) {
     }),
   };
 
+  // Catálogo como el que quedó en la base tras la migración.
+  const catalogo = [
+    { id: 'pc', nombre: 'PC de escritorio', alias: 'pc escritorio,pc' },
+    { id: 'nb', nombre: 'Notebook', alias: 'notebook' },
+    { id: 'srv', nombre: 'Servidor', alias: 'servidor' },
+    { id: 'cel', nombre: 'Celular', alias: 'telefonos,telefono' },
+    { id: 'cam', nombre: 'Cámara de seguridad', alias: 'camara de seguridad,camara' },
+    { id: 'imp', nombre: 'Impresora', alias: 'impresora' },
+    { id: 'red', nombre: 'Equipo de red', alias: 'router/switch,router' },
+    { id: 'isp', nombre: 'ISP', alias: 'isp' },
+    { id: 'car', nombre: 'Cargador', alias: 'cargadores telefonos,cargador' },
+  ];
+  const tipos = { buscarTodos: jest.fn<Promise<any>, any[]>(async () => catalogo) };
+
   return {
     repo,
     usuarios,
+    tipos,
     service: new ImportarEquiposService(
       repo as unknown as EquiposItRepository,
       usuarios as unknown as UsuariosService,
+      tipos as unknown as TiposEquipoRepository,
     ),
   };
 }
@@ -67,7 +84,7 @@ describe('ImportarEquiposService', () => {
     const datos = repo.crear.mock.calls[0][0];
     expect(datos).toMatchObject({
       codigoInterno: 'PC1',
-      tipo: TipoEquipoIT.PC,
+      tipo: { connect: { id: 'pc' } },
       estado: EstadoEquipoIT.EN_USO,
       marca: 'Intel',
       ubicacion: 'Contaduria',
@@ -223,14 +240,15 @@ describe('ImportarEquiposService', () => {
 
     expect(r.creados).toBe(5);
     expect(r.conError).toBe(0);
-    const tipos = repo.crear.mock.calls.map((c) => c[0].tipo);
+    const tipos = repo.crear.mock.calls.map((c) => c[0].tipo.connect.id);
     expect(tipos).toEqual([
-      TipoEquipoIT.SERVIDOR,
-      TipoEquipoIT.CELULAR,
-      TipoEquipoIT.EQUIPO_RED,
-      TipoEquipoIT.OTRO,
+      'srv',
+      'cel',
+      'red',
+      // ISP y Cargador ya son tipos propios: no caen en "Otro".
+      'isp',
       // Un cargador NO es un celular, aunque la celda diga "Teléfonos".
-      TipoEquipoIT.OTRO,
+      'car',
     ]);
   });
 });

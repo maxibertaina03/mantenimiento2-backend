@@ -1,4 +1,4 @@
-import { EstadoEquipoIT, TipoEquipoIT } from '@prisma/client';
+import { EstadoEquipoIT } from '@prisma/client';
 import {
   MARCA_POR_DEFECTO,
   normalizarEstado,
@@ -23,34 +23,63 @@ describe('normalizarTexto', () => {
   });
 });
 
+/** Catálogo como el que quedó en la base tras la migración. */
+const CATALOGO = [
+  { id: 'pc', nombre: 'PC de escritorio', alias: 'pc escritorio,pc,computadora' },
+  { id: 'nb', nombre: 'Notebook', alias: 'notebook,laptop' },
+  { id: 'srv', nombre: 'Servidor', alias: 'servidor' },
+  { id: 'cel', nombre: 'Celular', alias: 'telefonos,telefono,celular' },
+  { id: 'cam', nombre: 'Cámara de seguridad', alias: 'camara de seguridad,camara' },
+  { id: 'imp', nombre: 'Impresora', alias: 'impresora' },
+  { id: 'red', nombre: 'Equipo de red', alias: 'router/switch,router,switch' },
+  { id: 'isp', nombre: 'ISP', alias: 'isp,starlink,cooperativa' },
+  { id: 'car', nombre: 'Cargador', alias: 'cargadores telefonos,cargador' },
+  { id: 'otro', nombre: 'Otro', alias: 'otro' },
+];
+
 describe('normalizarTipo', () => {
   it.each([
-    ['PC Escritorio', TipoEquipoIT.PC],
-    ['Notebook', TipoEquipoIT.NOTEBOOK],
-    ['Servidor', TipoEquipoIT.SERVIDOR],
-    ['Impresora', TipoEquipoIT.IMPRESORA],
-    ['Cámara de Seguridad', TipoEquipoIT.CAMARA_SEGURIDAD],
-    ['Router/Switch', TipoEquipoIT.EQUIPO_RED],
-    ['Teléfonos', TipoEquipoIT.CELULAR],
-    ['ISP', TipoEquipoIT.OTRO],
-    ['Cargadores Teléfonos', TipoEquipoIT.OTRO],
+    ['PC Escritorio', 'pc'],
+    ['Notebook', 'nb'],
+    ['Servidor', 'srv'],
+    ['Impresora', 'imp'],
+    ['Cámara de Seguridad', 'cam'],
+    ['Router/Switch', 'red'],
+    ['Teléfonos', 'cel'],
+    // ISP y Cargador ya son tipos propios del catálogo, no caen en "Otro".
+    ['ISP', 'isp'],
+    ['Cargadores Teléfonos', 'car'],
   ])('mapea "%s"', (entrada, esperado) => {
-    expect(normalizarTipo(entrada)).toBe(esperado);
+    expect(normalizarTipo(entrada, CATALOGO)?.id).toBe(esperado);
+  });
+
+  it('REGRESION: reconoce un tipo agregado desde la pantalla', () => {
+    // El objetivo del catálogo: sumar un tipo sin tocar código.
+    const conNuevo = [...CATALOGO, { id: 'proy', nombre: 'Proyector', alias: 'proyector,cañon' }];
+    expect(normalizarTipo('Proyector', conNuevo)?.id).toBe('proy');
+    expect(normalizarTipo('Cañón', conNuevo)?.id).toBe('proy');
+  });
+
+  it('matchea por el nombre del tipo aunque no tenga alias', () => {
+    const sinAlias = [{ id: 'x', nombre: 'Scanner', alias: null }];
+    expect(normalizarTipo('scanner', sinAlias)?.id).toBe('x');
   });
 
   it('no distingue mayúsculas ni acentos', () => {
-    expect(normalizarTipo('CAMARA DE SEGURIDAD')).toBe(TipoEquipoIT.CAMARA_SEGURIDAD);
-    expect(normalizarTipo('pc escritorio')).toBe(TipoEquipoIT.PC);
+    expect(normalizarTipo('CAMARA DE SEGURIDAD', CATALOGO)?.id).toBe('cam');
+    expect(normalizarTipo('pc escritorio', CATALOGO)?.id).toBe('pc');
   });
 
-  it('reconoce el tipo aunque la celda traiga texto de más', () => {
-    expect(normalizarTipo('Cargadores Teléfonos Only Turbo')).toBe(TipoEquipoIT.OTRO);
+  it('REGRESION: un cargador NO entra como celular', () => {
+    // "Cargadores Telefonos Only Turbo" contiene "telefonos": sin ordenar los
+    // patrones por longitud, ganaba el match corto y quedaba mal clasificado.
+    expect(normalizarTipo('Cargadores Teléfonos Only Turbo', CATALOGO)?.id).toBe('car');
   });
 
   it('devuelve null si no reconoce el tipo (la fila se marca con error)', () => {
-    expect(normalizarTipo('Cafetera')).toBeNull();
-    expect(normalizarTipo('')).toBeNull();
-    expect(normalizarTipo(undefined)).toBeNull();
+    expect(normalizarTipo('Cafetera', CATALOGO)).toBeNull();
+    expect(normalizarTipo('', CATALOGO)).toBeNull();
+    expect(normalizarTipo(undefined, CATALOGO)).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EstadoEquipoIT, Prisma, TipoEquipoIT } from '@prisma/client';
+import { EstadoEquipoIT, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { claveDeOrden } from './clave-orden';
 import { AsignacionConRelaciones, EquipoConRelaciones } from './dto/equipo-respuesta.dto';
@@ -7,7 +7,7 @@ import { AsignacionConRelaciones, EquipoConRelaciones } from './dto/equipo-respu
 /** Filtro del listado, en lenguaje de dominio (sin tipos de Prisma). */
 export interface FiltroEquipos {
   buscar?: string;
-  tipo?: TipoEquipoIT;
+  tipoId?: string;
   estado?: EstadoEquipoIT;
   asignadoAId?: string;
 }
@@ -27,6 +27,7 @@ export class EquiposItRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly relaciones = {
+    tipo: { select: { nombre: true, llevaEspecificaciones: true } },
     proveedor: { select: { nombre: true } },
     asignadoA: { select: { nombre: true } },
   };
@@ -35,7 +36,7 @@ export class EquiposItRepository {
   private aWhere(filtro: FiltroEquipos): Prisma.EquipoITWhereInput {
     const texto = filtro.buscar?.trim();
     return {
-      ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
+      ...(filtro.tipoId ? { tipoId: filtro.tipoId } : {}),
       ...(filtro.estado ? { estado: filtro.estado } : {}),
       ...(filtro.asignadoAId ? { asignadoAId: filtro.asignadoAId } : {}),
       // Busca en todos los campos por los que alguien buscaría un equipo.
@@ -178,17 +179,24 @@ export class EquiposItRepository {
 
   /** Conteo por tipo y por estado, para el panel del módulo. */
   async resumen(): Promise<{
-    porTipo: { tipo: TipoEquipoIT; cantidad: number }[];
+    porTipo: { tipoId: string; nombre: string; cantidad: number }[];
     porEstado: { estado: EstadoEquipoIT; cantidad: number }[];
     total: number;
   }> {
-    const [porTipo, porEstado, total] = await Promise.all([
-      this.prisma.equipoIT.groupBy({ by: ['tipo'], _count: { _all: true } }),
+    // El conteo por tipo sale del catálogo para poder devolver el nombre; se
+    // incluyen solo los tipos que tienen equipos.
+    const [tipos, porEstado, total] = await Promise.all([
+      this.prisma.tipoEquipo.findMany({
+        orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+        include: { _count: { select: { equipos: true } } },
+      }),
       this.prisma.equipoIT.groupBy({ by: ['estado'], _count: { _all: true } }),
       this.prisma.equipoIT.count(),
     ]);
     return {
-      porTipo: porTipo.map((t) => ({ tipo: t.tipo, cantidad: t._count._all })),
+      porTipo: tipos
+        .filter((t) => t._count.equipos > 0)
+        .map((t) => ({ tipoId: t.id, nombre: t.nombre, cantidad: t._count.equipos })),
       porEstado: porEstado.map((e) => ({ estado: e.estado, cantidad: e._count._all })),
       total,
     };
