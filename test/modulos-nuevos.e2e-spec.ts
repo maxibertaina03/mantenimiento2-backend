@@ -584,5 +584,44 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
     it('el alta de material exige la unidad', async () => {
       await http.post('/api/materiales').send({ nombre: 'Sin unidad', categoriaId }).expect(400);
     });
+    it('CARGA MASIVA: completa los materiales sin unidad sin pisar los que ya tienen', async () => {
+      // Los 831 materiales importados vinieron sin unidad; asignarlas de a una
+      // no es viable, pero la carga masiva no puede borrar lo ya corregido.
+      // La API exige unidad al crear, asi que el material sin unidad se inserta
+      // directo: es la situacion que dejo la importacion de los listados viejos.
+      await memoria.prisma.material.create({
+        data: { nombre: 'Importado viejo', categoriaId, unidadId: null },
+      });
+
+      const antes = await http.get('/api/materiales/sin-unidad').expect(200);
+      expect(antes.body.sinUnidad).toBe(1);
+
+      const res = await http
+        .post('/api/materiales/asignar-unidad-masiva')
+        .send({ unidadId: UNIDAD_UNIDAD })
+        .expect(200);
+      expect(res.body).toHaveProperty('actualizados');
+      expect(res.body.sinUnidad).toBe(0);
+
+      // El material que ya tenia metro conserva su unidad.
+      const a = await http.get(`/api/materiales/${materialA}`).expect(200);
+      expect(a.body.unidad).toBe('m');
+    });
+
+    it('CARGA MASIVA: rechaza una unidad inexistente antes de tocar nada', async () => {
+      await http
+        .post('/api/materiales/asignar-unidad-masiva')
+        .send({ unidadId: 'b0000099-0000-4000-8000-000000000099' })
+        .expect(404);
+    });
+
+    it('CARGA MASIVA: con soloSinUnidad=false pisa todas', async () => {
+      await http
+        .post('/api/materiales/asignar-unidad-masiva')
+        .send({ unidadId: UNIDAD_UNIDAD, soloSinUnidad: false })
+        .expect(200);
+      const a = await http.get(`/api/materiales/${materialA}`).expect(200);
+      expect(a.body.unidad).toBe('u');
+    });
   });
 });

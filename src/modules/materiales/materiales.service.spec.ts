@@ -35,6 +35,8 @@ function armar() {
     actualizar: jest.fn<Promise<any>, any[]>(async () => material),
     eliminar: jest.fn<Promise<any>, any[]>(async () => material),
     contarMovimientos: jest.fn<Promise<any>, any[]>(async () => 0),
+    contarSinUnidad: jest.fn<Promise<any>, any[]>(async () => 0),
+    asignarUnidadMasiva: jest.fn<Promise<any>, any[]>(async () => 831),
   };
 
   const categorias = {
@@ -161,6 +163,39 @@ describe('MaterialesService', () => {
       const { service, repo } = armar();
       await service.actualizar('mat-1', { nombre: 'Nuevo' } as any);
       expect(repo.actualizar.mock.calls[0][1]).not.toHaveProperty('categoria');
+    });
+  });
+  describe('asignarUnidadMasiva()', () => {
+    it('por defecto solo completa los materiales SIN unidad', async () => {
+      // Pisar los que ya tienen borraria el trabajo hecho a mano.
+      const { service, repo } = armar();
+      await service.asignarUnidadMasiva({ unidadId: 'uni-1' });
+      expect(repo.asignarUnidadMasiva).toHaveBeenCalledWith('uni-1', true);
+    });
+
+    it('con soloSinUnidad=false pisa todas', async () => {
+      const { service, repo } = armar();
+      await service.asignarUnidadMasiva({ unidadId: 'uni-1', soloSinUnidad: false });
+      expect(repo.asignarUnidadMasiva).toHaveBeenCalledWith('uni-1', false);
+    });
+
+    it('REGRESION: valida la unidad ANTES de tocar ningun material', async () => {
+      // Sin esto el updateMany fallaria a mitad con un error de FK poco claro.
+      const { service, repo, unidades } = armar();
+      unidades.obtener.mockRejectedValue(new NotFoundException('no existe'));
+      await expect(service.asignarUnidadMasiva({ unidadId: 'fantasma' })).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(repo.asignarUnidadMasiva).not.toHaveBeenCalled();
+    });
+
+    it('informa cuantos actualizo y cuantos siguen sin unidad', async () => {
+      const { service, repo } = armar();
+      repo.contarSinUnidad.mockResolvedValue(3);
+      await expect(service.asignarUnidadMasiva({ unidadId: 'uni-1' })).resolves.toEqual({
+        actualizados: 831,
+        sinUnidad: 3,
+      });
     });
   });
 });

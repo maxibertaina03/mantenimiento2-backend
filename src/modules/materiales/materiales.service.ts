@@ -8,6 +8,7 @@ import { ListarMaterialesDto } from './dto/listar-materiales.dto';
 import { MaterialRespuestaDto } from './dto/material-respuesta.dto';
 import { MaterialConHistorialDto } from './dto/material-con-historial.dto';
 import { MaterialesRepository } from './materiales.repository';
+import { AsignarUnidadMasivaDto, ResultadoAsignacionDto } from './dto/asignar-unidad-masiva.dto';
 import { UnidadesMedidaService } from '../unidades-medida/unidades-medida.service';
 
 @Injectable()
@@ -91,6 +92,26 @@ export class MaterialesService {
       ...(dto.unidadId ? { unidad: { connect: { id: dto.unidadId } } } : {}),
     });
     return MaterialRespuestaDto.desde(actualizado);
+  }
+
+  /** Cuántos materiales siguen sin unidad: lo muestra la pantalla de unidades. */
+  async contarSinUnidad(): Promise<{ sinUnidad: number }> {
+    return { sinUnidad: await this.repo.contarSinUnidad() };
+  }
+
+  /**
+   * Pone una unidad por defecto a los materiales que no tienen.
+   *
+   * Valida la unidad antes de tocar nada: si no existiera, un updateMany
+   * fallaría a mitad de camino con un error de FK poco claro.
+   */
+  async asignarUnidadMasiva(dto: AsignarUnidadMasivaDto): Promise<ResultadoAsignacionDto> {
+    await this.unidades.obtener(dto.unidadId);
+    const actualizados = await this.repo.asignarUnidadMasiva(
+      dto.unidadId,
+      dto.soloSinUnidad ?? true,
+    );
+    return { actualizados, sinUnidad: await this.repo.contarSinUnidad() };
   }
 
   async eliminar(id: string): Promise<void> {

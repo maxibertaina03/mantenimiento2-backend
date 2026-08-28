@@ -12,6 +12,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RolUsuario } from '@prisma/client';
+import { Roles } from '../../common/auth/decorators/roles.decorator';
+import { AsignarUnidadMasivaDto } from './dto/asignar-unidad-masiva.dto';
 import { CrearMaterialDto } from './dto/crear-material.dto';
 import { ActualizarMaterialDto } from './dto/actualizar-material.dto';
 import { ListarMaterialesDto } from './dto/listar-materiales.dto';
@@ -38,6 +41,21 @@ export class MaterialesController {
   @ApiOperation({ summary: 'Materiales con stock por debajo (o igual) del mínimo' })
   bajoStock() {
     return this.service.listarBajoStock();
+  }
+
+  // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
+  @Get('sin-unidad')
+  @ApiOperation({ summary: 'Cuántos materiales todavía no tienen unidad cargada' })
+  sinUnidad() {
+    return this.service.contarSinUnidad();
+  }
+
+  @Post('asignar-unidad-masiva')
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Asignar una unidad por defecto a los materiales que no tienen' })
+  asignarUnidadMasiva(@Body() dto: AsignarUnidadMasivaDto) {
+    return this.service.asignarUnidadMasiva(dto);
   }
 
   @Get(':id')

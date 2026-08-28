@@ -141,7 +141,10 @@ export function crearPrismaEnMemoria() {
     return Object.entries(where).every(([campo, cond]: [string, any]) => {
       if (campo === 'OR') return (cond as any[]).some((c) => coincide(fila, c));
       const valor = fila[campo];
-      if (cond === null || cond === undefined) return true;
+      // `undefined` es "sin condición"; `null` explícito es IS NULL, igual que
+      // en Prisma. Confundirlos hacía que { unidadId: null } matcheara todo.
+      if (cond === undefined) return true;
+      if (cond === null) return valor === null || valor === undefined;
       if (typeof cond !== 'object') return valor === cond;
       if ('contains' in cond) {
         const texto = String(valor ?? '');

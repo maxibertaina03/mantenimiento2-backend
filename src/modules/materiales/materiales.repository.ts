@@ -76,6 +76,25 @@ export class MaterialesRepository {
     return this.prisma.material.delete({ where: { id } });
   }
 
+  /** Cuántos materiales todavía no tienen unidad cargada. */
+  contarSinUnidad(): Promise<number> {
+    return this.prisma.material.count({ where: { unidadId: null } });
+  }
+
+  /**
+   * Asigna una unidad a muchos materiales de una.
+   *
+   * `soloSinUnidad` es el modo normal: completa los huecos sin pisar lo que
+   * alguien ya corrigió a mano.
+   */
+  async asignarUnidadMasiva(unidadId: string, soloSinUnidad: boolean): Promise<number> {
+    const { count } = await this.prisma.material.updateMany({
+      where: soloSinUnidad ? { unidadId: null } : {},
+      data: { unidadId },
+    });
+    return count;
+  }
+
   contarMovimientos(id: string): Promise<number> {
     return this.prisma.movimientoStock.count({ where: { materialId: id } });
   }
