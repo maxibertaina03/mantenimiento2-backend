@@ -219,6 +219,12 @@ export class CorreoService {
       // falta para arreglarlo.
       throw new Error(`Brevo respondió ${respuesta.status}: ${respuesta.cuerpo}`);
     }
+
+    // Que Brevo acepte el mensaje NO es que haya llegado: puede quedar
+    // bloqueado o rebotar después. El messageId es lo que permite buscar ese
+    // envío puntual en los logs de Brevo y ver qué pasó realmente.
+    const id = (JSON.parse(respuesta.cuerpo || '{}') as { messageId?: string }).messageId;
+    this.logger.log(`Correo aceptado por Brevo para ${mensaje.para.join(', ')} — id ${id ?? '?'}`);
   }
 
   private async enviarPorSmtp(mensaje: MensajeCorreo): Promise<void> {
