@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EstadoEquipoIT, Prisma, TipoEquipoIT } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { claveDeOrden } from './clave-orden';
 import { AsignacionConRelaciones, EquipoConRelaciones } from './dto/equipo-respuesta.dto';
 
 /** Filtro del listado, en lenguaje de dominio (sin tipos de Prisma). */
@@ -54,8 +55,16 @@ export class EquiposItRepository {
     };
   }
 
+  /**
+   * La clave de orden se calcula acá y no en el service para que ningun camino
+   * de escritura pueda olvidarse de actualizarla (alta manual, edicion,
+   * importacion masiva).
+   */
   crear(data: Prisma.EquipoITCreateInput): Promise<EquipoConRelaciones> {
-    return this.prisma.equipoIT.create({ data, include: this.relaciones });
+    return this.prisma.equipoIT.create({
+      data: { ...data, ordenClave: claveDeOrden(data.codigoInterno) },
+      include: this.relaciones,
+    });
   }
 
   buscarConFiltros(
@@ -67,7 +76,13 @@ export class EquiposItRepository {
       where: this.aWhere(filtro),
       skip,
       take,
-      orderBy: [{ tipo: 'asc' }, { marca: 'asc' }, { modelo: 'asc' }],
+      // Por clave de orden: agrupa por prefijo y ordena el numero de verdad
+      // ("PC2" antes que "PC10"). Los equipos sin codigo van al final.
+      orderBy: [
+        { ordenClave: { sort: 'asc', nulls: 'last' } },
+        { marca: 'asc' },
+        { modelo: 'asc' },
+      ],
       include: this.relaciones,
     });
   }
@@ -88,7 +103,16 @@ export class EquiposItRepository {
   }
 
   actualizar(id: string, data: Prisma.EquipoITUpdateInput): Promise<EquipoConRelaciones> {
-    return this.prisma.equipoIT.update({ where: { id }, data, include: this.relaciones });
+    // Solo se recalcula si la edicion toca el codigo interno.
+    const conClave =
+      data.codigoInterno !== undefined
+        ? { ...data, ordenClave: claveDeOrden(data.codigoInterno as string | null) }
+        : data;
+    return this.prisma.equipoIT.update({
+      where: { id },
+      data: conClave,
+      include: this.relaciones,
+    });
   }
 
   eliminar(id: string): Promise<unknown> {
@@ -135,6 +159,21 @@ export class EquiposItRepository {
         registradoPor: { select: { nombre: true } },
       },
     });
+  }
+
+  /**
+   * Ubicaciones ya usadas, para sugerirlas al cargar un equipo. No es un
+   * catálogo cerrado: el campo sigue siendo texto libre y se puede escribir
+   * una ubicación nueva.
+   */
+  async ubicacionesUsadas(): Promise<string[]> {
+    const filas = await this.prisma.equipoIT.findMany({
+      where: { ubicacion: { not: null } },
+      select: { ubicacion: true },
+      distinct: ['ubicacion'],
+      orderBy: { ubicacion: 'asc' },
+    });
+    return filas.map((f) => f.ubicacion).filter((u): u is string => !!u && u.trim() !== '');
   }
 
   /** Conteo por tipo y por estado, para el panel del módulo. */

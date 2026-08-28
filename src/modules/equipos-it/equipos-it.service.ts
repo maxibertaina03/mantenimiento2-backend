@@ -221,6 +221,11 @@ export class EquiposItService {
     return this.repo.resumen();
   }
 
+  /** Ubicaciones ya usadas, para sugerirlas en el formulario. */
+  ubicaciones(): Promise<string[]> {
+    return this.repo.ubicacionesUsadas();
+  }
+
   async eliminar(id: string): Promise<void> {
     const equipo = await this.repo.buscarPorId(id);
     if (!equipo) {

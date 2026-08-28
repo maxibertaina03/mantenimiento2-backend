@@ -253,6 +253,11 @@ model EquipoIT {
   // Usuario que tiene el equipo AHORA. El histórico vive en asignaciones.
   asignadoAId String?
 
+  // Clave para ordenar como los nombra la gente: "PC2" antes que "PC10".
+  // Se calcula al guardar (ver clave-orden.ts) y se ordena por acá en la base,
+  // para que el orden sea correcto también entre páginas.
+  ordenClave String?
+
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
@@ -263,6 +268,7 @@ model EquipoIT {
   @@index([tipo])
   @@index([estado])
   @@index([asignadoAId])
+  @@index([ordenClave])
   @@map("equipos_it")
 }
 

@@ -54,6 +54,12 @@ export class EquiposItController {
     return this.service.listar(query);
   }
 
+  @Get('ubicaciones')
+  @ApiOperation({ summary: 'Ubicaciones ya usadas, para sugerirlas al cargar un equipo' })
+  ubicaciones() {
+    return this.service.ubicaciones();
+  }
+
   @Get('resumen')
   @ApiOperation({ summary: 'Conteo de equipos por tipo y por estado' })
   resumen() {
