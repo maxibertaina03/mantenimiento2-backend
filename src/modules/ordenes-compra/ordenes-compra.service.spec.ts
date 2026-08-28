@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   NotFoundException,
   ServiceUnavailableException,
@@ -423,6 +424,18 @@ describe('OrdenesCompraService - enviarPorCorreo()', () => {
 
     await expect(service.enviarPorCorreo('oc-1', { pdfBase64: PDF })).rejects.toThrow(
       /535-5\.7\.8/,
+    );
+  });
+
+  it('REGRESION: un fallo de envio es 502, no 503', async () => {
+    // El 503 queda reservado para "no configurado": es lo unico que justifica
+    // que la pantalla caiga al envio manual.
+    const { service, repo, correo } = armar();
+    repo.buscarPorId.mockResolvedValue(conProveedor('ventas@ferreteria.com.ar'));
+    correo.enviar.mockRejectedValue(new Error('Connection timeout'));
+
+    await expect(service.enviarPorCorreo('oc-1', { pdfBase64: PDF })).rejects.toBeInstanceOf(
+      BadGatewayException,
     );
   });
 

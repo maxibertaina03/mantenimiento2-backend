@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
   NotFoundException,
@@ -96,7 +97,9 @@ export class OrdenesCompraService {
       // hace falta para saber qué corregir. No expone credenciales: el mensaje
       // de SMTP no las incluye.
       const detalle = error instanceof Error ? error.message : String(error);
-      throw new ServiceUnavailableException(
+      // 502 y no 503: el 503 lo reserva el sistema para "el correo no está
+      // configurado", que es lo único que justifica caer al envío manual.
+      throw new BadGatewayException(
         `No se pudo enviar el correo: ${detalle}. La orden no cambió de estado; ` +
           'podés reintentar o mandarla a mano.',
       );
