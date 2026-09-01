@@ -5,68 +5,73 @@
 -- le fue enviada al proveedor y su registro es la constancia de eso. Este
 -- script es la salida para las órdenes de prueba, que no documentan nada.
 --
--- CÓMO USARLO: cambiá el número en la primera línea y pegalo en el SQL Editor
--- de Supabase. Va todo en una transacción: si algo falla, no se aplica nada.
+-- CÓMO USARLO: cambiá el número en la línea del `v_numero` y pegá TODO en el
+-- SQL Editor de Supabase.
 --
--- ⚠ NO borra una orden RECIBIDA que ya sumó stock. Eso dejaría movimientos
---   huérfanos: el stock quedaría con una entrada que no responde a ninguna
---   orden. El script se detiene solo si detecta ese caso.
+-- Va en un solo bloque DO a propósito. Postgres ejecuta un DO como una única
+-- sentencia, así que o pasa todo o no pasa nada, sin depender de que el editor
+-- respete un BEGIN/COMMIT escrito a mano ni de tablas temporales: el editor de
+-- Supabase usa conexiones agrupadas y una tabla temporal puede no existir en la
+-- sentencia siguiente.
+--
+-- ⚠ NO borra una orden que ya sumó stock. Eso dejaría movimientos huérfanos:
+--   el inventario tendría una entrada que no responde a ninguna orden. El
+--   script se detiene solo si detecta ese caso.
+--
+-- NO toca `materiales` ni `movimientos_stock`.
 -- ═══════════════════════════════════════════════════════════════════════════
 
-BEGIN;
-
--- ── El número de la orden a borrar ──────────────────────────────────────────
-CREATE TEMP TABLE objetivo ON COMMIT DROP AS
-SELECT id, numero, estado FROM ordenes_compra WHERE numero = 'OC-2026-0001';
-
--- ── Antes ───────────────────────────────────────────────────────────────────
-SELECT 'ANTES' AS momento, numero, estado,
-       (SELECT COUNT(*) FROM renglones_orden_compra r WHERE r."ordenId" = o.id) AS renglones
-FROM objetivo o;
-
--- ── Freno de seguridad ──────────────────────────────────────────────────────
--- Si algún renglón generó un movimiento de stock, la orden ya impactó en el
--- inventario y borrarla dejaría ese movimiento sin origen.
 DO $$
-DECLARE con_movimiento INT;
+DECLARE
+  -- ─────────── El número de la orden a borrar ───────────
+  v_numero        TEXT := 'OC-2026-0001';
+  -- ──────────────────────────────────────────────────────
+  v_id            TEXT;
+  v_estado        TEXT;
+  v_renglones     INT;
+  v_con_movimiento INT;
+  v_clave         TEXT;
 BEGIN
-  SELECT COUNT(*) INTO con_movimiento
-  FROM renglones_orden_compra r
-  JOIN objetivo o ON o.id = r."ordenId"
-  WHERE r."movimientoId" IS NOT NULL;
+  SELECT id, estado::text INTO v_id, v_estado
+  FROM ordenes_compra WHERE numero = v_numero;
 
-  IF con_movimiento > 0 THEN
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'No existe ninguna orden con el número %. Revisá el v_numero.', v_numero;
+  END IF;
+
+  SELECT COUNT(*), COUNT(*) FILTER (WHERE "movimientoId" IS NOT NULL)
+  INTO v_renglones, v_con_movimiento
+  FROM renglones_orden_compra WHERE "ordenId" = v_id;
+
+  RAISE NOTICE 'Orden % (%) con % renglón/es.', v_numero, v_estado, v_renglones;
+
+  -- Freno: si algún renglón generó un movimiento, la orden ya impactó en el
+  -- inventario y borrarla dejaría ese movimiento sin origen.
+  IF v_con_movimiento > 0 THEN
     RAISE EXCEPTION
       'La orden ya sumó stock (% renglón/es con movimiento). Borrarla dejaría movimientos huérfanos: anulala desde el sistema en vez de borrarla.',
-      con_movimiento;
+      v_con_movimiento;
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM objetivo) THEN
-    RAISE EXCEPTION 'No existe ninguna orden con ese número. Revisá el número al principio del script.';
-  END IF;
+  DELETE FROM renglones_orden_compra WHERE "ordenId" = v_id;
+  DELETE FROM ordenes_compra WHERE id = v_id;
+
+  -- La numeración vuelve al último número que siga existiendo. Bajarla más
+  -- haría que una orden futura repita un número ya usado.
+  v_clave := split_part(v_numero, '-', 1) || '-' || split_part(v_numero, '-', 2);
+  UPDATE contadores_documento
+  SET ultimo = COALESCE(
+        (SELECT MAX(SUBSTRING(numero FROM '\d+$')::int)
+         FROM ordenes_compra WHERE numero LIKE v_clave || '-%'), 0)
+  WHERE clave = v_clave;
+
+  RAISE NOTICE 'Listo: orden % borrada.', v_numero;
 END $$;
 
--- ── Borrado ─────────────────────────────────────────────────────────────────
-DELETE FROM renglones_orden_compra WHERE "ordenId" IN (SELECT id FROM objetivo);
-DELETE FROM ordenes_compra WHERE id IN (SELECT id FROM objetivo);
-
--- ── Numeración ──────────────────────────────────────────────────────────────
--- El contador se retrocede solo si la orden borrada era la última del año; si
--- no, bajarlo haría que la próxima orden repita un número ya usado.
-UPDATE contadores_documento c
-SET ultimo = GREATEST(
-      COALESCE((SELECT MAX(SUBSTRING(o.numero FROM '\d+$')::int)
-                FROM ordenes_compra o
-                WHERE o.numero LIKE c.clave || '-%'), 0),
-      0)
-WHERE c.clave = 'OC-2026';
-
--- ── Después ─────────────────────────────────────────────────────────────────
-SELECT 'DESPUES' AS momento,
-       (SELECT COUNT(*) FROM ordenes_compra)          AS ordenes,
-       (SELECT COUNT(*) FROM renglones_orden_compra)  AS renglones,
-       (SELECT COUNT(*) FROM movimientos_stock)       AS movimientos,
-       (SELECT ultimo FROM contadores_documento WHERE clave = 'OC-2026') AS proximo_numero;
-
--- Si los números cierran → COMMIT. Si no → ROLLBACK.
-COMMIT;
+-- Verificación: correr esto después y revisar que los números cierren.
+SELECT
+  (SELECT COUNT(*) FROM ordenes_compra)                              AS ordenes,
+  (SELECT COUNT(*) FROM renglones_orden_compra)                      AS renglones,
+  (SELECT COUNT(*) FROM movimientos_stock)                           AS movimientos_intactos,
+  (SELECT COUNT(*) FROM materiales)                                  AS materiales_intactos,
+  (SELECT ultimo FROM contadores_documento WHERE clave = 'OC-2026')  AS ultimo_numero_usado;
