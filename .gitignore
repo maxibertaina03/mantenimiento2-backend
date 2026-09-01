@@ -9,6 +9,9 @@
 .env
 .env.local
 .env.*.local
+# Credenciales de cada base: NUNCA al repositorio.
+.env.prueba
+.env.produccion
 
 # Logs
 *.log
