@@ -160,13 +160,47 @@ export function crearPrismaEnMemoria() {
       }
       if ('in' in cond) return cond.in.includes(valor);
       if ('gte' in cond || 'lte' in cond) {
-        const t = new Date(valor).getTime();
-        if ('gte' in cond && t < new Date(cond.gte).getTime()) return false;
-        if ('lte' in cond && t > new Date(cond.lte).getTime()) return false;
+        // Los rangos se usan para fechas (movimientos) y para números
+        // (stockActual, que es Decimal). Comparar un Decimal como fecha daba
+        // NaN y el filtro pasaba cualquier cosa.
+        const limite = cond.gte ?? cond.lte;
+        const esFecha = valor instanceof Date || limite instanceof Date;
+        const aNum = (v: any) => (esFecha ? new Date(v).getTime() : Number(v));
+        const t = aNum(valor);
+        if ('gte' in cond && t < aNum(cond.gte)) return false;
+        if ('lte' in cond && t > aNum(cond.lte)) return false;
         return true;
       }
       return valor === cond;
     });
+  }
+
+  /**
+   * Valor por el que se ordena. Resuelve tanto un campo propio como uno de una
+   * relación (`{ categoria: { nombre: 'asc' } }`), que es como se ordena el
+   * listado de materiales por categoría o por unidad.
+   */
+  function valorDeOrden(fila: any, campo: string, criterio: any): any {
+    const pedido = criterio[campo];
+    if (pedido !== null && typeof pedido === 'object') {
+      const [subcampo] = Object.keys(pedido);
+      const relacionada =
+        campo === 'categoria'
+          ? db.categorias.find((c) => c.id === fila.categoriaId)
+          : campo === 'unidad'
+            ? db.unidadesMedida.find((u) => u.id === fila.unidadId)
+            : null;
+      return relacionada?.[subcampo] ?? null;
+    }
+    return fila[campo];
+  }
+
+  /** Dirección del criterio, sea plano o anidado en una relación. */
+  function direccionDeOrden(criterio: any, campo: string): string {
+    const pedido = criterio[campo];
+    return pedido !== null && typeof pedido === 'object'
+      ? (Object.values(pedido)[0] as string)
+      : (pedido as string);
   }
 
   function ordenar(filas: any[], orderBy: any): any[] {
@@ -174,10 +208,19 @@ export function crearPrismaEnMemoria() {
     const criterios = Array.isArray(orderBy) ? orderBy : [orderBy];
     return [...filas].sort((a, b) => {
       for (const criterio of criterios) {
-        const [campo, dir] = Object.entries(criterio)[0] as [string, string];
-        const va = a[campo];
-        const vb = b[campo];
+        const campo = Object.keys(criterio)[0];
+        const dir = direccionDeOrden(criterio, campo);
+        let va = valorDeOrden(a, campo, criterio);
+        let vb = valorDeOrden(b, campo, criterio);
+        // Los Decimal de Prisma no se comparan bien con < entre objetos.
+        if (va !== null && vb !== null && !isNaN(Number(va)) && !isNaN(Number(vb))) {
+          va = Number(va);
+          vb = Number(vb);
+        }
         if (va === vb) continue;
+        // Los nulos al final: es lo que hace Postgres con ASC por defecto.
+        if (va === null) return 1;
+        if (vb === null) return -1;
         const menor = va < vb ? -1 : 1;
         return dir === 'desc' ? -menor : menor;
       }

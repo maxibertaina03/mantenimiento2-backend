@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
+import { aDecimal } from '../../common/dominio/decimal';
 import { CategoriasMaterialService } from '../categorias-material/categorias-material.service';
 import { CrearMaterialDto } from './dto/crear-material.dto';
 import { ActualizarMaterialDto } from './dto/actualizar-material.dto';
@@ -36,14 +37,64 @@ export class MaterialesService {
     return MaterialRespuestaDto.desde(creado);
   }
 
+  /** Traduce el filtro pedido a un `where` de Prisma. */
+  private async armarFiltro(query: ListarMaterialesDto): Promise<Prisma.MaterialWhereInput> {
+    const where: Prisma.MaterialWhereInput = {};
+
+    if (query.buscar) {
+      where.nombre = { contains: query.buscar, mode: 'insensitive' };
+    }
+    if (query.categoriaId) where.categoriaId = query.categoriaId;
+
+    // sinUnidad gana sobre unidadId: pedir las dos cosas es contradictorio, y
+    // dejar el `unidadId` filtraría por una unidad Y por no tener ninguna,
+    // devolviendo siempre vacío sin explicar por qué.
+    if (query.sinUnidad === 'true') where.unidadId = null;
+    else if (query.unidadId) where.unidadId = query.unidadId;
+
+    if (query.stockMin !== undefined || query.stockMax !== undefined) {
+      where.stockActual = {
+        ...(query.stockMin !== undefined ? { gte: aDecimal(query.stockMin) } : {}),
+        ...(query.stockMax !== undefined ? { lte: aDecimal(query.stockMax) } : {}),
+      };
+    }
+
+    if (query.bajoStock === 'true') {
+      // Compara columna contra columna, así que se resuelve aparte y se cruza
+      // por id con el resto de los filtros.
+      where.id = { in: await this.repo.idsBajoStock() };
+    }
+
+    return where;
+  }
+
+  /**
+   * Orden del listado.
+   *
+   * El nombre queda siempre como criterio final: con muchos materiales
+   * empatados —por ejemplo todos en stock 0— sin un desempate estable las
+   * páginas 1 y 2 podrían repetir o saltear filas.
+   */
+  private armarOrden(query: ListarMaterialesDto): Prisma.MaterialOrderByWithRelationInput[] {
+    const dir = query.direccion ?? 'asc';
+    switch (query.ordenarPor) {
+      case 'stock':
+        return [{ stockActual: dir }, { nombre: 'asc' }];
+      case 'categoria':
+        return [{ categoria: { nombre: dir } }, { nombre: 'asc' }];
+      case 'unidad':
+        return [{ unidad: { nombre: dir } }, { nombre: 'asc' }];
+      default:
+        return [{ nombre: dir }];
+    }
+  }
+
   async listar(query: ListarMaterialesDto): Promise<RespuestaPaginada<MaterialRespuestaDto>> {
-    // Filtro por nombre (contiene, sin distinguir mayúsculas/minúsculas).
-    const where: Prisma.MaterialWhereInput = query.buscar
-      ? { nombre: { contains: query.buscar, mode: 'insensitive' } }
-      : {};
+    const where = await this.armarFiltro(query);
+    const orderBy = this.armarOrden(query);
 
     const [items, total] = await Promise.all([
-      this.repo.buscarTodos(query.skip, query.limite, where),
+      this.repo.buscarTodosOrdenado(query.skip, query.limite, where, orderBy),
       this.repo.contar(where),
     ]);
     return {

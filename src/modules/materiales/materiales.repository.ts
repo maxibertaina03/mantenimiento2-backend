@@ -68,6 +68,35 @@ export class MaterialesRepository {
     });
   }
 
+  /**
+   * Ids de los materiales en (o por debajo de) su stock mínimo.
+   *
+   * Va en SQL crudo porque compara dos columnas entre sí, y Prisma no expresa
+   * `stockActual <= stockMinimo` en un `where`. Se devuelven solo los ids para
+   * poder combinar este filtro con los demás y con la paginación.
+   */
+  async idsBajoStock(): Promise<string[]> {
+    const filas = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM materiales WHERE "stockMinimo" > 0 AND "stockActual" <= "stockMinimo"
+    `;
+    return filas.map((f) => f.id);
+  }
+
+  buscarTodosOrdenado(
+    skip: number,
+    take: number,
+    where: Prisma.MaterialWhereInput,
+    orderBy: Prisma.MaterialOrderByWithRelationInput[],
+  ): Promise<MaterialConCategoria[]> {
+    return this.prisma.material.findMany({
+      where,
+      skip,
+      take,
+      include: this.relaciones,
+      orderBy,
+    });
+  }
+
   actualizar(id: string, data: Prisma.MaterialUpdateInput): Promise<MaterialConCategoria> {
     return this.prisma.material.update({ where: { id }, data, include: this.relaciones });
   }

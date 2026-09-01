@@ -624,4 +624,103 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
       expect(a.body.unidad).toBe('u');
     });
   });
+
+  describe('Filtros del listado de materiales', () => {
+    let catA: string;
+    let catB: string;
+
+    beforeAll(async () => {
+      catA = (await http.post('/api/categorias-material').send({ nombre: 'Filtros A' })).body.id;
+      catB = (await http.post('/api/categorias-material').send({ nombre: 'Filtros B' })).body.id;
+
+      // Tres materiales con stock distinto, cargado con movimientos de ENTRADA
+      // porque el stock no se puede setear desde el alta.
+      const alta = async (nombre: string, categoriaId: string, unidadId: string, stock: number) => {
+        const m = await http
+          .post('/api/materiales')
+          .send({ nombre, categoriaId, unidadId })
+          .expect(201);
+        if (stock > 0) {
+          await http
+            .post('/api/movimientos')
+            .send({ materialId: m.body.id, tipo: 'ENTRADA', motivo: 'COMPRA', cantidad: stock })
+            .expect(201);
+        }
+        return m.body.id;
+      };
+
+      await alta('Filtro alto', catA, UNIDAD_METRO, 100);
+      await alta('Filtro medio', catA, UNIDAD_UNIDAD, 10);
+      await alta('Filtro cero', catB, UNIDAD_UNIDAD, 0);
+    });
+
+    const nombres = (body: any) => body.datos.map((m: any) => m.nombre);
+
+    it('filtra por categoria', async () => {
+      const res = await http.get(`/api/materiales?categoriaId=${catB}&limite=100`).expect(200);
+      expect(nombres(res.body)).toEqual(['Filtro cero']);
+    });
+
+    it('filtra por unidad', async () => {
+      const res = await http.get(`/api/materiales?unidadId=${UNIDAD_METRO}&limite=100`).expect(200);
+      expect(nombres(res.body)).toContain('Filtro alto');
+      expect(nombres(res.body)).not.toContain('Filtro cero');
+    });
+
+    it('filtra por stock minimo', async () => {
+      const res = await http.get('/api/materiales?stockMin=10&limite=100').expect(200);
+      expect(nombres(res.body)).toEqual(expect.arrayContaining(['Filtro alto', 'Filtro medio']));
+      expect(nombres(res.body)).not.toContain('Filtro cero');
+    });
+
+    it('filtra por un rango de stock', async () => {
+      const res = await http.get('/api/materiales?stockMin=5&stockMax=50&limite=100').expect(200);
+      expect(nombres(res.body)).toContain('Filtro medio');
+      expect(nombres(res.body)).not.toContain('Filtro alto');
+      expect(nombres(res.body)).not.toContain('Filtro cero');
+    });
+
+    it('REGRESION: stockMax=0 devuelve los que estan en cero', async () => {
+      // Es el filtro mas util para ver que falta comprar, y el 0 es justo el
+      // valor que se pierde si se trata como "sin filtro".
+      const res = await http.get('/api/materiales?stockMax=0&limite=100').expect(200);
+      expect(nombres(res.body)).toContain('Filtro cero');
+      expect(nombres(res.body)).not.toContain('Filtro medio');
+    });
+
+    it('ordena por stock de mayor a menor', async () => {
+      const res = await http
+        .get(`/api/materiales?categoriaId=${catA}&ordenarPor=stock&direccion=desc&limite=100`)
+        .expect(200);
+      expect(nombres(res.body)).toEqual(['Filtro alto', 'Filtro medio']);
+    });
+
+    it('ordena por stock de menor a mayor', async () => {
+      const res = await http
+        .get(`/api/materiales?categoriaId=${catA}&ordenarPor=stock&direccion=asc&limite=100`)
+        .expect(200);
+      expect(nombres(res.body)).toEqual(['Filtro medio', 'Filtro alto']);
+    });
+
+    it('los filtros se combinan entre si', async () => {
+      const res = await http
+        .get(`/api/materiales?categoriaId=${catA}&stockMin=50&limite=100`)
+        .expect(200);
+      expect(nombres(res.body)).toEqual(['Filtro alto']);
+    });
+
+    it('REGRESION: el total refleja el filtro, no el catalogo entero', async () => {
+      // Si contara todo, la paginacion diria "1 de 831" filtrando por categoria.
+      const res = await http.get(`/api/materiales?categoriaId=${catB}&limite=100`).expect(200);
+      expect(res.body.total).toBe(res.body.datos.length);
+    });
+
+    it('rechaza un campo de orden inventado', async () => {
+      await http.get('/api/materiales?ordenarPor=loQueSea').expect(400);
+    });
+
+    it('rechaza un stockMin negativo', async () => {
+      await http.get('/api/materiales?stockMin=-5').expect(400);
+    });
+  });
 });
