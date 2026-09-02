@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 import { REPOSITORIO_EQUIPOS } from '../puertos/repositorio-equipos';
 import { RELOJ, RelojDelSistema } from '../puertos/reloj';
+import {
+  CatalogosEquipoService,
+  TiposEquipoPlantaController,
+  UbicacionesEquipoController,
+} from './catalogos.controller';
 import { EquiposController } from './equipos.controller';
 import { PrismaRepositorioEquipos } from './prisma-repositorio-equipos';
 
@@ -13,8 +18,9 @@ import { PrismaRepositorioEquipos } from './prisma-repositorio-equipos';
  * con las implementaciones en memoria sin cambiar una línea.
  */
 @Module({
-  controllers: [EquiposController],
+  controllers: [EquiposController, UbicacionesEquipoController, TiposEquipoPlantaController],
   providers: [
+    CatalogosEquipoService,
     { provide: REPOSITORIO_EQUIPOS, useClass: PrismaRepositorioEquipos },
     { provide: RELOJ, useClass: RelojDelSistema },
   ],
