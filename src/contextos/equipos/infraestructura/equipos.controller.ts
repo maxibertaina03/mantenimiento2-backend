@@ -16,7 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 import { Roles } from '../../../common/auth/decorators/roles.decorator';
 import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
-import { ConsultarEquipos } from '../aplicacion/consultar-equipos';
+import { ConsultarEquipos, aEquipoParaMostrar } from '../aplicacion/consultar-equipos';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
 import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
 import { RELOJ, Reloj } from '../puertos/reloj';
@@ -42,7 +42,7 @@ export class EquiposController {
 
   constructor(
     @Inject(REPOSITORIO_EQUIPOS) private readonly repo: RepositorioEquipos,
-    @Inject(RELOJ) reloj: Reloj,
+    @Inject(RELOJ) private readonly reloj: Reloj,
   ) {
     this.crear = new CrearEquipo(repo);
     this.actualizar = new ActualizarEquipo(repo);
@@ -84,23 +84,27 @@ export class EquiposController {
   @Post()
   @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Dar de alta un equipo' })
-  crearEquipo(@Body() dto: CrearEquipoDto) {
-    return this.crear.ejecutar({
+  async crearEquipo(@Body() dto: CrearEquipoDto) {
+    const equipo = await this.crear.ejecutar({
       ...dto,
       fechaAlta: this.aFecha(dto.fechaAlta),
       garantiaHasta: this.aFecha(dto.garantiaHasta),
     });
+    // Misma forma que el GET: si el alta respondiera sin `garantiaVencida`, la
+    // pantalla mostraría distinto según viniera de guardar o de recargar.
+    return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
   @Patch(':id')
   @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Editar un equipo o cambiar su estado' })
-  actualizarEquipo(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarEquipoDto) {
-    return this.actualizar.ejecutar(id, {
+  async actualizarEquipo(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarEquipoDto) {
+    const equipo = await this.actualizar.ejecutar(id, {
       ...dto,
       fechaAlta: this.aFecha(dto.fechaAlta),
       garantiaHasta: this.aFecha(dto.garantiaHasta),
     });
+    return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
   @Delete(':id')

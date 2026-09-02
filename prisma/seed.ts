@@ -60,10 +60,19 @@ async function main() {
   // ── Unidades de medida ──
   // La unidad es un catálogo, no texto libre: así "lt", "Lt" y "litros" no
   // terminan siendo tres unidades distintas al analizar el stock.
+  // upsert y no create: la migración del catálogo ya siembra estas 20 unidades,
+  // así que en una base recién migrada `create` choca con el índice único.
+  const unidad = (nombre: string, simbolo: string, orden: number) =>
+    prisma.unidadMedida.upsert({
+      where: { nombre },
+      update: {},
+      create: { nombre, simbolo, orden },
+    });
+
   const [unidadU, unidadM, unidadLt] = await Promise.all([
-    prisma.unidadMedida.create({ data: { nombre: 'Unidad', simbolo: 'u', orden: 10 } }),
-    prisma.unidadMedida.create({ data: { nombre: 'Metro', simbolo: 'm', orden: 90 } }),
-    prisma.unidadMedida.create({ data: { nombre: 'Litro', simbolo: 'lt', orden: 70 } }),
+    unidad('Unidad', 'u', 10),
+    unidad('Metro', 'm', 90),
+    unidad('Litro', 'lt', 70),
   ]);
 
   // ── Materiales ──

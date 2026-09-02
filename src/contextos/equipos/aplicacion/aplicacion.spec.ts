@@ -1,7 +1,7 @@
 import { ErrorConflicto, ErrorNoEncontrado, ErrorTransicionInvalida } from '../dominio/errores';
 import { RelojFijo } from '../puertos/reloj';
 import { ActualizarEquipo } from './actualizar-equipo';
-import { ConsultarEquipos } from './consultar-equipos';
+import { ConsultarEquipos, aEquipoParaMostrar } from './consultar-equipos';
 import { CrearEquipo } from './crear-equipo';
 import { RepositorioEquiposEnMemoria } from './repositorio-en-memoria';
 
@@ -170,6 +170,20 @@ describe('ConsultarEquipos', () => {
     const pagina = await consultar.listar({ ubicacionId: 'u1', skip: 0, take: 10 });
     expect(pagina.total).toBe(1);
     expect(pagina.datos).toHaveLength(1);
+  });
+
+  it('REGRESION: el alta y el GET devuelven la MISMA forma', async () => {
+    // Si el alta respondiera sin garantiaVencida y el GET con el, la pantalla
+    // mostraria distinto segun viniera de guardar o de recargar.
+    const { crear, consultar } = armar();
+    const creado = await crear.ejecutar({
+      nombre: 'Chiller',
+      garantiaHasta: new Date('2026-08-01T00:00:00.000Z'),
+    });
+    const leido = await consultar.obtener(creado.id);
+
+    expect(Object.keys(aEquipoParaMostrar(creado, HOY)).sort()).toEqual(Object.keys(leido).sort());
+    expect(aEquipoParaMostrar(creado, HOY).garantiaVencida).toBe(leido.garantiaVencida);
   });
 
   it('404 al pedir un equipo que no existe', async () => {

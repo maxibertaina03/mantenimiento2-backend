@@ -18,6 +18,18 @@ export interface ListadoEquipos {
 }
 
 /**
+ * Agrega lo derivado a un equipo.
+ *
+ * Vive suelta y no dentro de ConsultarEquipos porque el alta y la edición
+ * también tienen que devolver la misma forma: si el POST respondiera sin
+ * `garantiaVencida` y el GET con él, la pantalla mostraría distinto según
+ * viniera de guardar o de recargar.
+ */
+export function aEquipoParaMostrar(equipo: EquipoConRelaciones, hoy: Date): EquipoParaMostrar {
+  return { ...equipo, garantiaVencida: garantiaVencida(equipo.garantiaHasta, hoy) };
+}
+
+/**
  * Leer equipos.
  *
  * Los datos derivados (si la garantía venció) se calculan acá y no se guardan:
@@ -31,10 +43,7 @@ export class ConsultarEquipos {
   ) {}
 
   private decorar(equipo: EquipoConRelaciones): EquipoParaMostrar {
-    return {
-      ...equipo,
-      garantiaVencida: garantiaVencida(equipo.garantiaHasta, this.reloj.ahora()),
-    };
+    return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
   async listar(filtro: FiltroEquipos): Promise<ListadoEquipos> {
