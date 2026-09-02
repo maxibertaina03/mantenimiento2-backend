@@ -134,3 +134,17 @@ export class ListarEquiposDto extends PaginacionDto {
   @IsIn(['asc', 'desc'])
   direccion?: 'asc' | 'desc';
 }
+
+export class CambiarFotoDto {
+  @ApiProperty({ description: 'La imagen en base64, ya comprimida por el navegador' })
+  @IsString()
+  @MinLength(100)
+  // ~7 MB de base64 ≈ 5 MB de imagen, que es el tope que valida el caso de uso.
+  @MaxLength(7_000_000, { message: 'La imagen es demasiado grande.' })
+  imagenBase64!: string;
+
+  @ApiProperty({ example: 'compresor-1.jpg' })
+  @IsString()
+  @MaxLength(200)
+  nombreArchivo!: string;
+}

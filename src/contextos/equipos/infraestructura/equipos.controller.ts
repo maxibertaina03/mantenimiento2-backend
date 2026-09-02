@@ -18,16 +18,23 @@ import { RolUsuario } from '@prisma/client';
 import { Roles } from '../../../common/auth/decorators/roles.decorator';
 import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { ConsultarEquipos, aEquipoParaMostrar } from '../aplicacion/consultar-equipos';
+import { CambiarFotoEquipo } from '../aplicacion/cambiar-foto-equipo';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
 import { ImportarEquipos } from '../aplicacion/importar-equipos';
 import { detectarEquipos } from '../dominio/importacion';
+import { ALMACEN_IMAGENES, AlmacenImagenes } from '../puertos/almacen-imagenes';
 import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
 import {
   REPOSITORIO_UBICACIONES,
   RepositorioUbicaciones,
 } from '../puertos/repositorio-ubicaciones';
 import { RELOJ, Reloj } from '../puertos/reloj';
-import { ActualizarEquipoDto, CrearEquipoDto, ListarEquiposDto } from './equipos.dto';
+import {
+  ActualizarEquipoDto,
+  CambiarFotoDto,
+  CrearEquipoDto,
+  ListarEquiposDto,
+} from './equipos.dto';
 import { FiltroErroresDominio } from './filtro-errores-dominio';
 import { DetectarImportacionDto, ImportarEquiposDto } from './importacion.dto';
 
@@ -52,16 +59,19 @@ export class EquiposController {
   private readonly actualizar: ActualizarEquipo;
   private readonly consultar: ConsultarEquipos;
   private readonly importar: ImportarEquipos;
+  private readonly cambiarFoto: CambiarFotoEquipo;
 
   constructor(
     @Inject(REPOSITORIO_EQUIPOS) private readonly repo: RepositorioEquipos,
     @Inject(REPOSITORIO_UBICACIONES) ubicaciones: RepositorioUbicaciones,
+    @Inject(ALMACEN_IMAGENES) private readonly almacen: AlmacenImagenes,
     @Inject(RELOJ) private readonly reloj: Reloj,
   ) {
     this.crear = new CrearEquipo(repo);
     this.actualizar = new ActualizarEquipo(repo);
     this.consultar = new ConsultarEquipos(repo, reloj);
     this.importar = new ImportarEquipos(repo, ubicaciones);
+    this.cambiarFoto = new CambiarFotoEquipo(repo, almacen);
   }
 
   /** Las fechas llegan como texto ISO y el dominio trabaja con Date. */
@@ -134,6 +144,27 @@ export class EquiposController {
   })
   importarEquipos(@Body() dto: ImportarEquiposDto) {
     return this.importar.ejecutar(dto.filas);
+  }
+
+  @Get('almacen/estado')
+  @ApiOperation({
+    summary: 'Si la carga de fotos está disponible',
+    description: 'La pantalla oculta el campo de foto cuando no lo está.',
+  })
+  estadoAlmacen() {
+    return { disponible: this.almacen.estaConfigurado() };
+  }
+
+  @Post(':id/foto')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cambiar la foto de un equipo' })
+  async subirFoto(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CambiarFotoDto) {
+    const equipo = await this.cambiarFoto.ejecutar(
+      id,
+      Buffer.from(dto.imagenBase64, 'base64'),
+      dto.nombreArchivo,
+    );
+    return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
   @Patch(':id')

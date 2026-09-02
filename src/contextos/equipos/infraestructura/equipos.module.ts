@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ALMACEN_IMAGENES } from '../puertos/almacen-imagenes';
 import { REPOSITORIO_EQUIPOS } from '../puertos/repositorio-equipos';
 import { REPOSITORIO_UBICACIONES } from '../puertos/repositorio-ubicaciones';
 import { RELOJ, RelojDelSistema } from '../puertos/reloj';
@@ -10,6 +11,7 @@ import {
 import { EquiposController } from './equipos.controller';
 import { PrismaRepositorioEquipos } from './prisma-repositorio-equipos';
 import { PrismaRepositorioUbicaciones } from './prisma-repositorio-ubicaciones';
+import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
 
 /**
  * El cableado del contexto: acá se decide qué implementación concreta entra por
@@ -25,6 +27,7 @@ import { PrismaRepositorioUbicaciones } from './prisma-repositorio-ubicaciones';
     CatalogosEquipoService,
     { provide: REPOSITORIO_EQUIPOS, useClass: PrismaRepositorioEquipos },
     { provide: REPOSITORIO_UBICACIONES, useClass: PrismaRepositorioUbicaciones },
+    { provide: ALMACEN_IMAGENES, useClass: SupabaseAlmacenImagenes },
     { provide: RELOJ, useClass: RelojDelSistema },
   ],
   exports: [REPOSITORIO_EQUIPOS, RELOJ],

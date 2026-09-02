@@ -36,6 +36,15 @@ services:
         sync: false
       - key: MAIL_FROM
         value: mantenimiento@lacteoslastres.com.ar
+      # ── Fotos de los equipos ──
+      # La service_role da acceso total a la base: se carga en el dashboard de
+      # Render, nunca acá.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: equipos
       - key: MAIL_ADMINISTRACION
         value: administracion@lacteoslastres.com.ar
       - key: DIRECT_URL
