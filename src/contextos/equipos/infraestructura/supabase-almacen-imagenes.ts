@@ -30,8 +30,23 @@ export class SupabaseAlmacenImagenes implements AlmacenImagenes {
   /** Si Supabase no contesta en este tiempo, se corta con un error claro. */
   private static readonly TIMEOUT_MS = 30_000;
 
+  /**
+   * Deja la URL en la base del proyecto.
+   *
+   * El panel de Supabase muestra la URL con `/rest/v1/` al final —es la de la
+   * API REST— y es la que cualquiera copia. Sin limpiarla, las rutas de Storage
+   * quedarían pegadas después de ese tramo y fallarían con un 404 que no
+   * explica nada.
+   */
+  private static base(url: string | undefined): string | undefined {
+    return url
+      ?.trim()
+      .replace(/\/+(rest|storage|auth)\/v\d+\/?$/i, '')
+      .replace(/\/+$/, '');
+  }
+
   constructor(config: ConfigService) {
-    this.url = config.get<string>('SUPABASE_URL')?.replace(/\/+$/, '');
+    this.url = SupabaseAlmacenImagenes.base(config.get<string>('SUPABASE_URL'));
     this.clave = config.get<string>('SUPABASE_SERVICE_KEY');
     this.bucket = config.get<string>('SUPABASE_BUCKET') ?? 'equipos';
 
