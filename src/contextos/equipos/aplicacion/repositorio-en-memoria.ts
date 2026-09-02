@@ -1,0 +1,93 @@
+import { Equipo } from '../dominio/equipo';
+import {
+  EquipoConRelaciones,
+  FiltroEquipos,
+  PaginaEquipos,
+  RepositorioEquipos,
+} from '../puertos/repositorio-equipos';
+
+/**
+ * Repositorio en memoria, para probar los casos de uso sin base de datos.
+ *
+ * Es una implementación del puerto como cualquier otra: si mañana cambia la
+ * interfaz, TypeScript rompe acá y en el adaptador de Prisma al mismo tiempo.
+ * Esa es la ventaja concreta de tener el puerto declarado.
+ */
+export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
+  private readonly filas: EquipoConRelaciones[] = [];
+  private secuencia = 0;
+
+  constructor(iniciales: Partial<EquipoConRelaciones>[] = []) {
+    for (const fila of iniciales) this.sembrar(fila);
+  }
+
+  private sembrar(fila: Partial<EquipoConRelaciones>): EquipoConRelaciones {
+    const completo: EquipoConRelaciones = {
+      id: fila.id ?? `eq-${++this.secuencia}`,
+      codigoInterno: fila.codigoInterno ?? null,
+      nombre: fila.nombre ?? 'Equipo',
+      descripcion: fila.descripcion ?? null,
+      marca: fila.marca ?? null,
+      modelo: fila.modelo ?? null,
+      numeroSerie: fila.numeroSerie ?? null,
+      ubicacionId: fila.ubicacionId ?? null,
+      tipoId: fila.tipoId ?? null,
+      estado: fila.estado ?? 'OPERATIVO',
+      criticidad: fila.criticidad ?? 'MEDIA',
+      fotoUrl: fila.fotoUrl ?? null,
+      proveedorId: fila.proveedorId ?? null,
+      horasUso: fila.horasUso ?? null,
+      fechaAlta: fila.fechaAlta ?? null,
+      garantiaHasta: fila.garantiaHasta ?? null,
+      ubicacionNombre: fila.ubicacionNombre ?? null,
+      tipoNombre: fila.tipoNombre ?? null,
+      proveedorNombre: fila.proveedorNombre ?? null,
+    };
+    this.filas.push(completo);
+    return completo;
+  }
+
+  async crear(equipo: Omit<Equipo, 'id'>): Promise<EquipoConRelaciones> {
+    return this.sembrar(equipo);
+  }
+
+  async actualizar(id: string, cambios: Partial<Omit<Equipo, 'id'>>): Promise<EquipoConRelaciones> {
+    const fila = this.filas.find((f) => f.id === id);
+    if (!fila) throw new Error(`No existe ${id}`);
+    Object.assign(fila, cambios);
+    return fila;
+  }
+
+  async buscarPorId(id: string): Promise<EquipoConRelaciones | null> {
+    return this.filas.find((f) => f.id === id) ?? null;
+  }
+
+  async buscarPorCodigoInterno(codigo: string): Promise<Equipo | null> {
+    return this.filas.find((f) => f.codigoInterno === codigo) ?? null;
+  }
+
+  async listar(filtro: FiltroEquipos): Promise<PaginaEquipos> {
+    let filas = [...this.filas];
+
+    if (filtro.buscar) {
+      const q = filtro.buscar.toLowerCase();
+      filas = filas.filter((f) => f.nombre.toLowerCase().includes(q));
+    }
+    if (filtro.ubicacionId) filas = filas.filter((f) => f.ubicacionId === filtro.ubicacionId);
+    if (filtro.tipoId) filas = filas.filter((f) => f.tipoId === filtro.tipoId);
+    if (filtro.estado) filas = filas.filter((f) => f.estado === filtro.estado);
+    if (filtro.criticidad) filas = filas.filter((f) => f.criticidad === filtro.criticidad);
+    if (filtro.garantiaVencidaAl) {
+      const corte = filtro.garantiaVencidaAl.getTime();
+      filas = filas.filter((f) => f.garantiaHasta !== null && f.garantiaHasta.getTime() < corte);
+    }
+
+    const total = filas.length;
+    return { datos: filas.slice(filtro.skip, filtro.skip + filtro.take), total };
+  }
+
+  async eliminar(id: string): Promise<void> {
+    const i = this.filas.findIndex((f) => f.id === id);
+    if (i >= 0) this.filas.splice(i, 1);
+  }
+}

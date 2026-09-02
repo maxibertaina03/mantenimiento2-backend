@@ -49,6 +49,7 @@ model Proveedor {
   movimientos MovimientoStock[]
   equiposIt   EquipoIT[]
   ordenes     OrdenCompra[]
+  equipos     Equipo[]
 
   @@map("proveedores")
 }
@@ -422,4 +423,95 @@ model ContadorDocumento {
   ultimo Int    @default(0)
 
   @@map("contadores_documento")
+}
+
+// ═══════════════════ Contexto: Equipos de planta ═══════════════════
+//
+// Separado del módulo de Equipos IT a propósito: comparten la mitad de los
+// campos pero no la otra mitad ni el control de acceso, y unificarlos obligaría
+// a que cada pantalla pregunte "¿es de planta o de sistemas?".
+//
+// Las reglas de este contexto viven en src/contextos/equipos/dominio, sin
+// importar Prisma. Estos modelos son solo la forma en que se guardan.
+
+/// Dónde está el equipo. El catálogo sale de las carpetas de fotos de la
+/// planta: Caldera, Tinas, Drenoprensa, Saladero, Recibo, etc.
+model UbicacionEquipo {
+  id     String  @id @default(uuid())
+  nombre String  @unique
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  equipos Equipo[]
+
+  @@map("ubicaciones_equipo")
+}
+
+/// Qué clase de equipo es: compresor, bomba, caldera, tina, cinta.
+/// Es un catálogo propio, distinto del de Equipos IT.
+model TipoEquipoPlanta {
+  id     String  @id @default(uuid())
+  nombre String  @unique
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  equipos Equipo[]
+
+  @@map("tipos_equipo_planta")
+}
+
+model Equipo {
+  id String @id @default(uuid())
+
+  /// Opcional pero único cuando está: las fotos de la planta traen nombres,
+  /// no códigos, así que exigirlo frenaría la importación.
+  codigoInterno String? @unique
+
+  nombre      String
+  descripcion String?
+  marca       String?
+  modelo      String?
+  numeroSerie String?
+
+  ubicacionId String?
+  tipoId      String?
+
+  /// OPERATIVO | EN_REPARACION | FUERA_DE_SERVICIO | DADO_DE_BAJA.
+  /// Va como texto y no como enum de Postgres: agregar un estado a un enum
+  /// obliga a migrar, y las transiciones válidas ya las controla el dominio.
+  estado String @default("OPERATIVO")
+
+  /// ALTA | MEDIA | BAJA. Ordena la pantalla de servicios que vencen.
+  criticidad String @default("MEDIA")
+
+  fotoUrl String?
+
+  /// A quién se le compró.
+  proveedorId String?
+
+  /// Para los equipos que se sirven por horas de funcionamiento y no por
+  /// calendario (compresores, calderas).
+  horasUso Decimal? @db.Decimal(12, 1)
+
+  fechaAlta     DateTime?
+  garantiaHasta DateTime?
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  ubicacion UbicacionEquipo?  @relation(fields: [ubicacionId], references: [id])
+  tipo      TipoEquipoPlanta? @relation(fields: [tipoId], references: [id])
+  proveedor Proveedor?        @relation(fields: [proveedorId], references: [id])
+
+  @@index([ubicacionId])
+  @@index([tipoId])
+  @@index([estado])
+  @@index([criticidad])
+  @@map("equipos")
 }
