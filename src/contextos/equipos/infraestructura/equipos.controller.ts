@@ -20,6 +20,7 @@ import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { ConsultarEquipos, aEquipoParaMostrar } from '../aplicacion/consultar-equipos';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
 import { ImportarEquipos } from '../aplicacion/importar-equipos';
+import { detectarEquipos } from '../dominio/importacion';
 import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
 import {
   REPOSITORIO_UBICACIONES,
@@ -28,7 +29,7 @@ import {
 import { RELOJ, Reloj } from '../puertos/reloj';
 import { ActualizarEquipoDto, CrearEquipoDto, ListarEquiposDto } from './equipos.dto';
 import { FiltroErroresDominio } from './filtro-errores-dominio';
-import { ImportarEquiposDto } from './importacion.dto';
+import { DetectarImportacionDto, ImportarEquiposDto } from './importacion.dto';
 
 /**
  * La entrada HTTP del contexto.
@@ -104,6 +105,22 @@ export class EquiposController {
     // Misma forma que el GET: si el alta respondiera sin `garantiaVencida`, la
     // pantalla mostraría distinto según viniera de guardar o de recargar.
     return aEquipoParaMostrar(equipo, this.reloj.ahora());
+  }
+
+  @Post('detectar-importacion')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Ver qué equipos saldrían de una carpeta, sin crear nada',
+    description:
+      'La detección vive en el dominio y se expone acá para que exista una sola copia de la ' +
+      'regla. Si el navegador la repitiera, en algún momento las dos versiones diferirían y ' +
+      'la pantalla mostraría algo distinto de lo que después se importa.',
+  })
+  detectarImportacion(@Body() dto: DetectarImportacionDto) {
+    return detectarEquipos(
+      dto.rutas.map((ruta) => ({ ruta })),
+      dto.carpetasExcluidas,
+    );
   }
 
   @Post('importar')

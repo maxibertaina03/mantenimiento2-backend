@@ -38,3 +38,24 @@ export class ImportarEquiposDto {
   @Type(() => FilaImportacionDto)
   filas!: FilaImportacionDto[];
 }
+
+export class DetectarImportacionDto {
+  @ApiProperty({
+    description: 'Las rutas relativas de los archivos de la carpeta',
+    example: ['Caldera/Bomba caldera 1.jpg', 'Tinas/Tina 1.jpg'],
+  })
+  @IsArray()
+  // 2000 con margen sobre los 522 archivos reales.
+  @ArrayMaxSize(2000)
+  @IsString({ each: true })
+  rutas!: string[];
+
+  @ApiPropertyOptional({
+    description: 'Carpetas a dejar afuera. Por defecto, taller y manuales.',
+    example: ['taller', 'manuales'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  carpetasExcluidas?: string[];
+}
