@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { Criticidad, Equipo } from '../dominio/equipo';
+import { Equipo } from '../dominio/equipo';
 import { EstadoEquipo } from '../dominio/estado-equipo';
 import {
   EquipoConRelaciones,
@@ -49,7 +49,6 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
       ubicacionId: fila.ubicacionId,
       tipoId: fila.tipoId,
       estado: fila.estado as EstadoEquipo,
-      criticidad: fila.criticidad as Criticidad,
       fotoUrl: fila.fotoUrl,
       proveedorId: fila.proveedorId,
       horasUso: fila.horasUso === null ? null : Number(fila.horasUso),
@@ -130,8 +129,6 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
         return [{ codigoInterno: dir }, { nombre: 'asc' }];
       case 'ubicacion':
         return [{ ubicacion: { nombre: dir } }, { nombre: 'asc' }];
-      case 'criticidad':
-        return [{ criticidad: dir }, { nombre: 'asc' }];
       default:
         return [{ nombre: dir }];
     }
@@ -151,7 +148,6 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
     if (filtro.ubicacionId) where.ubicacionId = filtro.ubicacionId;
     if (filtro.tipoId) where.tipoId = filtro.tipoId;
     if (filtro.estado) where.estado = filtro.estado;
-    if (filtro.criticidad) where.criticidad = filtro.criticidad;
     if (filtro.garantiaVencidaAl) where.garantiaHasta = { lt: filtro.garantiaVencidaAl };
 
     const [filas, total] = await Promise.all([

@@ -102,7 +102,6 @@ export class EquiposController {
       ubicacionId: query.ubicacionId,
       tipoId: query.tipoId,
       estado: query.estado,
-      criticidad: query.criticidad,
       // El corte de garantía es "hoy", y hoy lo dice el reloj del contexto.
       garantiaVencidaAl: query.garantiaVencida === 'true' ? new Date() : undefined,
       ordenarPor: query.ordenarPor,

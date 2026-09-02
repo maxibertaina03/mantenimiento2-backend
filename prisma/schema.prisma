@@ -491,9 +491,6 @@ model Equipo {
   /// obliga a migrar, y las transiciones válidas ya las controla el dominio.
   estado String @default("OPERATIVO")
 
-  /// ALTA | MEDIA | BAJA. Ordena la pantalla de servicios que vencen.
-  criticidad String @default("MEDIA")
-
   fotoUrl String?
 
   /// A quién se le compró.
@@ -517,7 +514,6 @@ model Equipo {
   @@index([ubicacionId])
   @@index([tipoId])
   @@index([estado])
-  @@index([criticidad])
   @@map("equipos")
 }
 

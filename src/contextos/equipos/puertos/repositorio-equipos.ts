@@ -1,4 +1,4 @@
-import { Criticidad, Equipo } from '../dominio/equipo';
+import { Equipo } from '../dominio/equipo';
 import { EstadoEquipo } from '../dominio/estado-equipo';
 
 /** Un equipo con los nombres de sus relaciones, para mostrarlo sin más consultas. */
@@ -14,10 +14,9 @@ export interface FiltroEquipos {
   ubicacionId?: string;
   tipoId?: string;
   estado?: EstadoEquipo;
-  criticidad?: Criticidad;
   /** Solo los que ya no están en garantía, comparando contra esta fecha. */
   garantiaVencidaAl?: Date;
-  ordenarPor?: 'nombre' | 'codigo' | 'ubicacion' | 'criticidad';
+  ordenarPor?: 'nombre' | 'codigo' | 'ubicacion';
   direccion?: 'asc' | 'desc';
   skip: number;
   take: number;

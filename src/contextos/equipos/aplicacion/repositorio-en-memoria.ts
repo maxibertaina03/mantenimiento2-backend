@@ -33,7 +33,6 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
       ubicacionId: fila.ubicacionId ?? null,
       tipoId: fila.tipoId ?? null,
       estado: fila.estado ?? 'OPERATIVO',
-      criticidad: fila.criticidad ?? 'MEDIA',
       fotoUrl: fila.fotoUrl ?? null,
       proveedorId: fila.proveedorId ?? null,
       horasUso: fila.horasUso ?? null,
@@ -97,7 +96,6 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
     if (filtro.ubicacionId) filas = filas.filter((f) => f.ubicacionId === filtro.ubicacionId);
     if (filtro.tipoId) filas = filas.filter((f) => f.tipoId === filtro.tipoId);
     if (filtro.estado) filas = filas.filter((f) => f.estado === filtro.estado);
-    if (filtro.criticidad) filas = filas.filter((f) => f.criticidad === filtro.criticidad);
     if (filtro.garantiaVencidaAl) {
       const corte = filtro.garantiaVencidaAl.getTime();
       filas = filas.filter((f) => f.garantiaHasta !== null && f.garantiaHasta.getTime() < corte);

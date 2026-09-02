@@ -1,4 +1,4 @@
-import { Criticidad, Equipo, normalizarCodigoInterno, normalizarTexto } from '../dominio/equipo';
+import { Equipo, normalizarCodigoInterno, normalizarTexto } from '../dominio/equipo';
 import { ErrorConflicto, ErrorDatosInvalidos, ErrorNoEncontrado } from '../dominio/errores';
 import { EstadoEquipo, transicionar } from '../dominio/estado-equipo';
 import { EquipoConRelaciones, RepositorioEquipos } from '../puertos/repositorio-equipos';
@@ -13,7 +13,6 @@ export interface CambiosEquipo {
   ubicacionId?: string | null;
   tipoId?: string | null;
   estado?: EstadoEquipo;
-  criticidad?: Criticidad;
   fotoUrl?: string | null;
   proveedorId?: string | null;
   horasUso?: number | null;
@@ -81,8 +80,6 @@ export class ActualizarEquipo {
     for (const campo of ['fechaAlta', 'garantiaHasta'] as const) {
       if (cambios[campo] !== undefined) parche[campo] = cambios[campo] ?? null;
     }
-
-    if (cambios.criticidad !== undefined) parche.criticidad = cambios.criticidad;
 
     return this.repo.actualizar(id, parche);
   }

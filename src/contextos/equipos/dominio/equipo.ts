@@ -1,15 +1,6 @@
 import { ErrorDatosInvalidos } from './errores';
 import { EstadoEquipo } from './estado-equipo';
 
-/**
- * Qué tan grave es que este equipo se pare.
- *
- * No es decorativo: ordena la pantalla de servicios que vencen. Con doscientos
- * equipos, "qué atiendo primero" se contesta mirando esto.
- */
-export const CRITICIDADES = ['ALTA', 'MEDIA', 'BAJA'] as const;
-export type Criticidad = (typeof CRITICIDADES)[number];
-
 export interface Equipo {
   id: string;
   codigoInterno: string | null;
@@ -21,7 +12,6 @@ export interface Equipo {
   ubicacionId: string | null;
   tipoId: string | null;
   estado: EstadoEquipo;
-  criticidad: Criticidad;
   fotoUrl: string | null;
   proveedorId: string | null;
   horasUso: number | null;
@@ -39,7 +29,6 @@ export interface DatosNuevoEquipo {
   numeroSerie?: string | null;
   ubicacionId?: string | null;
   tipoId?: string | null;
-  criticidad?: Criticidad;
   fotoUrl?: string | null;
   proveedorId?: string | null;
   horasUso?: number | null;
@@ -105,7 +94,6 @@ export function crearEquipo(datos: DatosNuevoEquipo): Omit<Equipo, 'id'> {
     // Un equipo se da de alta operativo: si estuviera roto al comprarlo, se
     // cambia después, pero el caso normal no debería pedir un dato más.
     estado: 'OPERATIVO',
-    criticidad: datos.criticidad ?? 'MEDIA',
     fotoUrl: datos.fotoUrl ?? null,
     proveedorId: datos.proveedorId ?? null,
     horasUso: datos.horasUso ?? null,

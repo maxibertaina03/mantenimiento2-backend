@@ -42,10 +42,9 @@ describe('normalizarCodigoInterno', () => {
 });
 
 describe('crearEquipo', () => {
-  it('un equipo nuevo arranca operativo y de criticidad media', () => {
+  it('un equipo nuevo arranca operativo', () => {
     const equipo = crearEquipo({ nombre: 'Compresor 1' });
     expect(equipo.estado).toBe('OPERATIVO');
-    expect(equipo.criticidad).toBe('MEDIA');
   });
 
   it('normaliza todos los textos de una', () => {

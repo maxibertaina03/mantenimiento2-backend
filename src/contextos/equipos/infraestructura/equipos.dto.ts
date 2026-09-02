@@ -12,7 +12,6 @@ import {
   MinLength,
 } from 'class-validator';
 import { PaginacionDto } from '../../../common/dto/paginacion.dto';
-import { CRITICIDADES, Criticidad } from '../dominio/equipo';
 import { ESTADOS_EQUIPO, EstadoEquipo } from '../dominio/estado-equipo';
 
 /**
@@ -62,11 +61,6 @@ export class CrearEquipoDto {
   @IsUUID()
   proveedorId?: string | null;
 
-  @ApiPropertyOptional({ enum: CRITICIDADES })
-  @IsOptional()
-  @IsIn(CRITICIDADES)
-  criticidad?: Criticidad;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -98,7 +92,7 @@ export class ActualizarEquipoDto extends PartialType(CrearEquipoDto) {
   estado?: EstadoEquipo;
 }
 
-export const ORDENES_EQUIPO = ['nombre', 'codigo', 'ubicacion', 'criticidad'] as const;
+export const ORDENES_EQUIPO = ['nombre', 'codigo', 'ubicacion'] as const;
 
 export class ListarEquiposDto extends PaginacionDto {
   @ApiPropertyOptional({ description: 'Busca por nombre o por código interno' })
@@ -113,11 +107,6 @@ export class ListarEquiposDto extends PaginacionDto {
   @IsOptional()
   @IsIn(ESTADOS_EQUIPO)
   estado?: EstadoEquipo;
-
-  @ApiPropertyOptional({ enum: CRITICIDADES })
-  @IsOptional()
-  @IsIn(CRITICIDADES)
-  criticidad?: Criticidad;
 
   @ApiPropertyOptional({ description: 'Solo los que ya no están en garantía' })
   @IsOptional()
