@@ -91,6 +91,33 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
     return fila === null ? null : this.aDominio(fila);
   }
 
+  async buscarPorNombreYUbicacion(nombre: string, ubicacionId: string): Promise<Equipo | null> {
+    const fila = await this.prisma.equipo.findFirst({
+      // insensitive a propósito: "Bomba caldera 1" y "BOMBA CALDERA 1" son el
+      // mismo equipo, y sin esto reimportar crearía el segundo.
+      where: { nombre: { equals: nombre, mode: 'insensitive' }, ubicacionId },
+      include: this.relaciones,
+    });
+    return fila === null ? null : this.aDominio(fila);
+  }
+
+  async listarNombresPorUbicaciones(
+    ubicacionIds: string[],
+  ): Promise<{ nombre: string; ubicacionId: string }[]> {
+    if (ubicacionIds.length === 0) return [];
+    const filas = await this.prisma.equipo.findMany({
+      where: { ubicacionId: { in: ubicacionIds } },
+      select: { nombre: true, ubicacionId: true },
+    });
+    // ubicacionId no puede ser null acá: vienen filtradas por la lista.
+    return filas.map((f) => ({ nombre: f.nombre, ubicacionId: f.ubicacionId as string }));
+  }
+
+  async crearVarios(equipos: Omit<Equipo, 'id'>[]): Promise<number> {
+    const { count } = await this.prisma.equipo.createMany({ data: equipos });
+    return count;
+  }
+
   /**
    * El nombre queda como desempate en todos los órdenes: con equipos empatados
    * —varios de la misma ubicación, o todos de criticidad media— sin un criterio

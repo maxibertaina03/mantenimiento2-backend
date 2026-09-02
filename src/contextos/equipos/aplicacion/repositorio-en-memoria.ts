@@ -66,6 +66,27 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
     return this.filas.find((f) => f.codigoInterno === codigo) ?? null;
   }
 
+  async buscarPorNombreYUbicacion(nombre: string, ubicacionId: string): Promise<Equipo | null> {
+    return (
+      this.filas.find(
+        (f) => f.nombre.toLowerCase() === nombre.toLowerCase() && f.ubicacionId === ubicacionId,
+      ) ?? null
+    );
+  }
+
+  async listarNombresPorUbicaciones(
+    ubicacionIds: string[],
+  ): Promise<{ nombre: string; ubicacionId: string }[]> {
+    return this.filas
+      .filter((f) => f.ubicacionId !== null && ubicacionIds.includes(f.ubicacionId))
+      .map((f) => ({ nombre: f.nombre, ubicacionId: f.ubicacionId as string }));
+  }
+
+  async crearVarios(equipos: Omit<Equipo, 'id'>[]): Promise<number> {
+    for (const equipo of equipos) this.sembrar(equipo);
+    return equipos.length;
+  }
+
   async listar(filtro: FiltroEquipos): Promise<PaginaEquipos> {
     let filas = [...this.filas];
 

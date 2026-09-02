@@ -148,6 +148,7 @@ export class CatalogosEquipoService {
 
 @ApiTags('Equipos · Ubicaciones')
 @ApiBearerAuth()
+@Roles(RolUsuario.ADMIN)
 @Controller('ubicaciones-equipo')
 export class UbicacionesEquipoController {
   constructor(
@@ -186,6 +187,7 @@ export class UbicacionesEquipoController {
 
 @ApiTags('Equipos · Tipos')
 @ApiBearerAuth()
+@Roles(RolUsuario.ADMIN)
 @Controller('tipos-equipo-planta')
 export class TiposEquipoPlantaController {
   constructor(

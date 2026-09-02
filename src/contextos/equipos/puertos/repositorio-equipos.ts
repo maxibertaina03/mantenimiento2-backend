@@ -41,6 +41,23 @@ export interface RepositorioEquipos {
   buscarPorId(id: string): Promise<EquipoConRelaciones | null>;
   /** Para validar que el código no esté repetido antes de guardar. */
   buscarPorCodigoInterno(codigo: string): Promise<Equipo | null>;
+  /**
+   * Lo que hace idempotente a la importación: los equipos importados no traen
+   * código, así que la identidad es el nombre dentro de su ubicación.
+   */
+  buscarPorNombreYUbicacion(nombre: string, ubicacionId: string): Promise<Equipo | null>;
+  /**
+   * Los nombres ya cargados en esas ubicaciones, en UNA consulta.
+   *
+   * Existe por una caída real: preguntando fila por fila, importar 341 equipos
+   * eran 682 viajes a una base que está en otro continente, y el proceso se
+   * murió a los 129.
+   */
+  listarNombresPorUbicaciones(
+    ubicacionIds: string[],
+  ): Promise<{ nombre: string; ubicacionId: string }[]>;
+  /** Inserta una tanda. Devuelve cuántos entraron. */
+  crearVarios(equipos: Omit<Equipo, 'id'>[]): Promise<number>;
   listar(filtro: FiltroEquipos): Promise<PaginaEquipos>;
   eliminar(id: string): Promise<void>;
 }

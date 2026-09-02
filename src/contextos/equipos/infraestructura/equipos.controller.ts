@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpStatus,
   Inject,
   Param,
   ParseUUIDPipe,
@@ -18,10 +19,16 @@ import { Roles } from '../../../common/auth/decorators/roles.decorator';
 import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { ConsultarEquipos, aEquipoParaMostrar } from '../aplicacion/consultar-equipos';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
+import { ImportarEquipos } from '../aplicacion/importar-equipos';
 import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
+import {
+  REPOSITORIO_UBICACIONES,
+  RepositorioUbicaciones,
+} from '../puertos/repositorio-ubicaciones';
 import { RELOJ, Reloj } from '../puertos/reloj';
 import { ActualizarEquipoDto, CrearEquipoDto, ListarEquiposDto } from './equipos.dto';
 import { FiltroErroresDominio } from './filtro-errores-dominio';
+import { ImportarEquiposDto } from './importacion.dto';
 
 /**
  * La entrada HTTP del contexto.
@@ -34,19 +41,26 @@ import { FiltroErroresDominio } from './filtro-errores-dominio';
 @ApiTags('Equipos')
 @ApiBearerAuth()
 @UseFilters(FiltroErroresDominio)
+// Todo el módulo es de admin, igual que Equipos IT. Va a nivel de clase y no
+// endpoint por endpoint: así un endpoint nuevo nace protegido, en vez de nacer
+// abierto y depender de que alguien se acuerde de agregarle el decorador.
+@Roles(RolUsuario.ADMIN)
 @Controller('equipos')
 export class EquiposController {
   private readonly crear: CrearEquipo;
   private readonly actualizar: ActualizarEquipo;
   private readonly consultar: ConsultarEquipos;
+  private readonly importar: ImportarEquipos;
 
   constructor(
     @Inject(REPOSITORIO_EQUIPOS) private readonly repo: RepositorioEquipos,
+    @Inject(REPOSITORIO_UBICACIONES) ubicaciones: RepositorioUbicaciones,
     @Inject(RELOJ) private readonly reloj: Reloj,
   ) {
     this.crear = new CrearEquipo(repo);
     this.actualizar = new ActualizarEquipo(repo);
     this.consultar = new ConsultarEquipos(repo, reloj);
+    this.importar = new ImportarEquipos(repo, ubicaciones);
   }
 
   /** Las fechas llegan como texto ISO y el dominio trabaja con Date. */
@@ -79,10 +93,7 @@ export class EquiposController {
     return this.consultar.obtener(id);
   }
 
-  // Las altas y las bajas son de admin; las intervenciones (fase 3) las va a
-  // poder cargar cualquiera, que es donde el operario aporta el dato.
   @Post()
-  @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Dar de alta un equipo' })
   async crearEquipo(@Body() dto: CrearEquipoDto) {
     const equipo = await this.crear.ejecutar({
@@ -95,8 +106,20 @@ export class EquiposController {
     return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
+  @Post('importar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Importar equipos desde la carpeta de fotos de la planta',
+    description:
+      'Es idempotente: un equipo que ya existe con el mismo nombre en la misma ubicación no ' +
+      'se duplica, así que se puede correr de nuevo sin limpiar antes. Una fila que falla no ' +
+      'frena a las demás.',
+  })
+  importarEquipos(@Body() dto: ImportarEquiposDto) {
+    return this.importar.ejecutar(dto.filas);
+  }
+
   @Patch(':id')
-  @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Editar un equipo o cambiar su estado' })
   async actualizarEquipo(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarEquipoDto) {
     const equipo = await this.actualizar.ejecutar(id, {
@@ -108,7 +131,6 @@ export class EquiposController {
   }
 
   @Delete(':id')
-  @Roles(RolUsuario.ADMIN)
   @HttpCode(204)
   @ApiOperation({
     summary: 'Eliminar un equipo',
