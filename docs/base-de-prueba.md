@@ -7,16 +7,22 @@ ya pasó una vez y los movimientos perdidos no se recuperaron.
 Esta guía deja una segunda base, idéntica en estructura, donde romper lo que
 haga falta.
 
+Se usa desde la rama `develop`. Ver `CONTRIBUTING.md` para el flujo completo.
+
 ## Crear la base de prueba (una sola vez)
 
-1. En [supabase.com](https://supabase.com) → **New project**.
-   - Nombre: `mantenimiento2-prueba`
-   - **Tiene que ser un proyecto aparte**, no otro esquema dentro del de
-     producción: si comparten proyecto, un reset se lleva puestos los datos
-     reales y no habría ganado nada.
-   - El plan gratuito permite dos proyectos.
+1. En [neon.tech](https://neon.tech) → **New project** (`mantenimiento2-dev`).
 
-2. Project Settings → **Database** → copiar las cadenas de conexión.
+   Neon en vez de un segundo proyecto de Supabase por dos motivos: no consume
+   el cupo del plan gratuito de Supabase, y sobre todo, **las credenciales no
+   se parecen a las de producción**. Con dos proyectos de Supabase, las dos
+   cadenas se diferencian en unos pocos caracteres del medio: pegar la
+   equivocada es cuestión de tiempo.
+
+   También sirve un segundo proyecto de Supabase si lo preferís; el
+   `.env.prueba.example` trae las dos opciones.
+
+2. En Connection Details, copiar la cadena **pooled** y la **direct**.
 
 3. En `mantenimiento2-backend`:
 
