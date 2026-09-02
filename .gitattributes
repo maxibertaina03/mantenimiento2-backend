@@ -1,0 +1,13 @@
+# Los archivos de texto se guardan y se sacan con LF, en Windows también.
+#
+# Sin esto, core.autocrlf=true convierte a CRLF al hacer checkout y Prettier
+# marca un error por línea: 2619 errores de lint que no son errores de nada.
+# No afecta al build ni a los tests, pero tapa los problemas de verdad.
+* text=auto eol=lf
+
+# Binarios, sin tocar.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.ico binary
