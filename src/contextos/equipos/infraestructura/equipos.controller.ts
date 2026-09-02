@@ -15,14 +15,22 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
+import type { Usuario } from '@prisma/client';
 import { Roles } from '../../../common/auth/decorators/roles.decorator';
+import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.decorator';
 import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { ConsultarEquipos, aEquipoParaMostrar } from '../aplicacion/consultar-equipos';
 import { CambiarFotoEquipo } from '../aplicacion/cambiar-foto-equipo';
+import { ConsultarHistorial } from '../aplicacion/consultar-historial';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
+import { RegistrarIntervencion } from '../aplicacion/registrar-intervencion';
 import { ImportarEquipos } from '../aplicacion/importar-equipos';
 import { detectarEquipos } from '../dominio/importacion';
 import { ALMACEN_IMAGENES, AlmacenImagenes } from '../puertos/almacen-imagenes';
+import {
+  REPOSITORIO_INTERVENCIONES,
+  RepositorioIntervenciones,
+} from '../puertos/repositorio-intervenciones';
 import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
 import {
   REPOSITORIO_UBICACIONES,
@@ -37,6 +45,7 @@ import {
 } from './equipos.dto';
 import { FiltroErroresDominio } from './filtro-errores-dominio';
 import { DetectarImportacionDto, ImportarEquiposDto } from './importacion.dto';
+import { RegistrarIntervencionDto } from './intervenciones.dto';
 
 /**
  * La entrada HTTP del contexto.
@@ -60,10 +69,13 @@ export class EquiposController {
   private readonly consultar: ConsultarEquipos;
   private readonly importar: ImportarEquipos;
   private readonly cambiarFoto: CambiarFotoEquipo;
+  private readonly registrarIntervencion: RegistrarIntervencion;
+  private readonly historial: ConsultarHistorial;
 
   constructor(
     @Inject(REPOSITORIO_EQUIPOS) private readonly repo: RepositorioEquipos,
     @Inject(REPOSITORIO_UBICACIONES) ubicaciones: RepositorioUbicaciones,
+    @Inject(REPOSITORIO_INTERVENCIONES) intervenciones: RepositorioIntervenciones,
     @Inject(ALMACEN_IMAGENES) private readonly almacen: AlmacenImagenes,
     @Inject(RELOJ) private readonly reloj: Reloj,
   ) {
@@ -72,6 +84,8 @@ export class EquiposController {
     this.consultar = new ConsultarEquipos(repo, reloj);
     this.importar = new ImportarEquipos(repo, ubicaciones);
     this.cambiarFoto = new CambiarFotoEquipo(repo, almacen);
+    this.registrarIntervencion = new RegistrarIntervencion(intervenciones, repo, reloj);
+    this.historial = new ConsultarHistorial(intervenciones, repo);
   }
 
   /** Las fechas llegan como texto ISO y el dominio trabaja con Date. */
@@ -165,6 +179,37 @@ export class EquiposController {
       dto.nombreArchivo,
     );
     return aEquipoParaMostrar(equipo, this.reloj.ahora());
+  }
+
+  @Get(':id/historial')
+  @ApiOperation({
+    summary: 'Historial de intervenciones de un equipo, con su resumen',
+    description:
+      'El resumen se calcula al leer y no se guarda: un total acumulado en la ficha habría ' +
+      'que recalcularlo con cada alta, y bastaría un error para que quede desfasado.',
+  })
+  verHistorial(@Param('id', ParseUUIDPipe) id: string) {
+    return this.historial.ejecutar(id);
+  }
+
+  @Post(':id/intervenciones')
+  @ApiOperation({
+    summary: 'Registrar un trabajo hecho sobre el equipo',
+    description:
+      'Una intervención no se edita: es el registro de algo que pasó. Si hay un error, se ' +
+      'corrige con otra intervención que lo aclare.',
+  })
+  registrarTrabajo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RegistrarIntervencionDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.registrarIntervencion.ejecutar({
+      ...dto,
+      equipoId: id,
+      fecha: new Date(dto.fecha),
+      registradoPorId: usuario?.id ?? null,
+    });
   }
 
   @Patch(':id')

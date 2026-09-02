@@ -46,10 +46,11 @@ model Proveedor {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  movimientos MovimientoStock[]
-  equiposIt   EquipoIT[]
-  ordenes     OrdenCompra[]
-  equipos     Equipo[]
+  movimientos    MovimientoStock[]
+  equiposIt      EquipoIT[]
+  ordenes        OrdenCompra[]
+  equipos        Equipo[]
+  intervenciones Intervencion[]
 
   @@map("proveedores")
 }
@@ -202,6 +203,9 @@ model Usuario {
   equiposAsignados        EquipoIT[]           @relation("EquiposAsignados")
   asignacionesRecibidas   AsignacionEquipoIT[] @relation("AsignacionesRecibidas")
   asignacionesRegistradas AsignacionEquipoIT[] @relation("AsignacionesRegistradas")
+
+  intervencionesEjecutadas Intervencion[] @relation("IntervencionEjecutor")
+  intervencionesCargadas   Intervencion[] @relation("IntervencionRegistro")
   ordenesCreadas          OrdenCompra[]        @relation("OrdenesCreadas")
   ordenesRecibidas        OrdenCompra[]        @relation("OrdenesRecibidas")
 
@@ -505,13 +509,66 @@ model Equipo {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  ubicacion UbicacionEquipo?  @relation(fields: [ubicacionId], references: [id])
-  tipo      TipoEquipoPlanta? @relation(fields: [tipoId], references: [id])
-  proveedor Proveedor?        @relation(fields: [proveedorId], references: [id])
+  ubicacion     UbicacionEquipo?  @relation(fields: [ubicacionId], references: [id])
+  tipo          TipoEquipoPlanta? @relation(fields: [tipoId], references: [id])
+  proveedor     Proveedor?        @relation(fields: [proveedorId], references: [id])
+  intervenciones Intervencion[]
 
   @@index([ubicacionId])
   @@index([tipoId])
   @@index([estado])
   @@index([criticidad])
   @@map("equipos")
+}
+
+/// Un trabajo hecho sobre un equipo: el service, la reparación, la mejora.
+///
+/// Es el corazón de la trazabilidad. No se edita: una intervención cargada es
+/// el registro de algo que pasó, y reescribirla lo volvería inservible como
+/// respaldo. Si hay un error, se corrige con otra intervención que lo aclare.
+model Intervencion {
+  id       String @id @default(uuid())
+  equipoId String
+
+  /// PREVENTIVO | CORRECTIVO | MEJORA. Separarlos es lo que después contesta
+  /// cuánto del gasto fue planificado y cuánto fue apagar incendios.
+  tipo String
+
+  fecha DateTime
+
+  /// INTERNO | EXTERNO. Con el discriminador y las dos relaciones se puede
+  /// preguntar "cuánto gastamos con este proveedor", que con un texto libre
+  /// sería imposible.
+  ejecutor String
+
+  /// Quién lo hizo, si fue en fábrica.
+  usuarioId String?
+  /// Quién lo hizo, si fue un tercero.
+  proveedorId String?
+
+  descripcion String
+
+  costoManoObra Decimal? @db.Decimal(14, 2)
+
+  /// El costo de una rotura no son los repuestos, es la producción que no
+  /// salió. Sin este dato los números cuentan media historia.
+  horasParada Decimal? @db.Decimal(8, 2)
+
+  /// Remito, factura o informe del service.
+  documentoUrl String?
+
+  /// Quién la cargó en el sistema, que no siempre es quien hizo el trabajo.
+  registradoPorId String?
+
+  creadoEn DateTime @default(now())
+
+  equipo        Equipo     @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  usuario       Usuario?   @relation("IntervencionEjecutor", fields: [usuarioId], references: [id])
+  proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
+  registradoPor Usuario?   @relation("IntervencionRegistro", fields: [registradoPorId], references: [id])
+
+  @@index([equipoId, fecha])
+  @@index([tipo])
+  @@index([proveedorId])
+  @@map("intervenciones")
 }
