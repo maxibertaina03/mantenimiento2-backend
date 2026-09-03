@@ -47,6 +47,17 @@ services:
         value: equipos
       - key: MAIL_ADMINISTRACION
         value: administracion@lacteoslastres.com.ar
+      # ── Avisos de mantenimiento ──
+      # Casilla fija que recibe el correo diario de services que vencen, además
+      # de los administradores.
+      - key: MAIL_AVISOS
+        value: mantenimiento@lacteoslastres.com.ar
+      # Secreto que autoriza a disparar el envío. El MISMO valor va en el secret
+      # TOKEN_AVISOS del repositorio, que es de donde sale el cron: el plan
+      # gratuito apaga el servidor y un cron interno no se ejecutaría.
+      # Si falta, el endpoint queda cerrado y no se manda ningún aviso.
+      - key: TOKEN_AVISOS
+        sync: false
       - key: DIRECT_URL
         sync: false
       - key: CLERK_SECRET_KEY
