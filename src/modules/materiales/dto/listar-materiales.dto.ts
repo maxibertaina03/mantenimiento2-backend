@@ -15,6 +15,10 @@ import { PaginacionDto } from '../../../common/dto/paginacion.dto';
 export const ORDENES_MATERIAL = ['nombre', 'stock', 'categoria', 'unidad'] as const;
 export type OrdenMaterial = (typeof ORDENES_MATERIAL)[number];
 
+/** Qué materiales trae el listado según estén en uso o jubilados. */
+export const VISTAS_MATERIAL = ['activos', 'inactivos', 'todos'] as const;
+export type VistaMaterial = (typeof VISTAS_MATERIAL)[number];
+
 /** Filtros del listado de materiales. */
 export class ListarMaterialesDto extends PaginacionDto {
   @ApiPropertyOptional({ description: 'Busca por nombre (contiene, sin distinguir mayúsculas)' })
@@ -61,6 +65,17 @@ export class ListarMaterialesDto extends PaginacionDto {
   @IsOptional()
   @IsBooleanString()
   sinUnidad?: string;
+
+  @ApiPropertyOptional({
+    enum: VISTAS_MATERIAL,
+    default: 'activos',
+    description:
+      'Por defecto solo los que están en uso. Los desactivados conservan su ' +
+      'historial y se pueden volver a mirar con "inactivos" o "todos".',
+  })
+  @IsOptional()
+  @IsIn(VISTAS_MATERIAL)
+  mostrar?: VistaMaterial;
 
   @ApiPropertyOptional({ enum: ORDENES_MATERIAL, default: 'nombre' })
   @IsOptional()

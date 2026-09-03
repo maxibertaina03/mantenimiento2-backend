@@ -61,7 +61,12 @@ function armar(orden: any = ordenBase) {
     eliminar: jest.fn<Promise<any>, any[]>(async () => undefined),
   };
   const proveedores = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'prov-1' })) };
-  const materiales = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'mat-1' })) };
+  const materiales = {
+    obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'mat-1' })),
+    // Las ordenes validan con `obtenerEnUso`: no tiene sentido comprar algo
+    // que se saco de circulacion.
+    obtenerEnUso: jest.fn<Promise<any>, any[]>(async () => ({ id: 'mat-1', activo: true })),
+  };
   // Por defecto el material no tiene ajustes: la regla de la fecha no estorba a
   // las pruebas que estan mirando otra cosa.
   const movimientos = {
@@ -102,7 +107,7 @@ describe('OrdenesCompraService - crear()', () => {
     expect(proveedores.obtener).toHaveBeenCalledWith('prov-1');
   });
 
-  it('valida que cada material exista', async () => {
+  it('valida que cada material exista Y este en uso', async () => {
     const { service, materiales } = armar();
     await service.crear({
       proveedorId: 'prov-1',
@@ -111,7 +116,18 @@ describe('OrdenesCompraService - crear()', () => {
         { materialId: 'mat-2', cantidad: 2 },
       ],
     } as any);
-    expect(materiales.obtener).toHaveBeenCalledTimes(2);
+    expect(materiales.obtenerEnUso).toHaveBeenCalledTimes(2);
+  });
+
+  it('REGRESION: no deja comprar un material jubilado', async () => {
+    // Se lo saco de circulacion justamente para que deje de aparecer en las
+    // cargas nuevas; una orden de compra es la mas nueva de todas.
+    const { service, materiales } = armar();
+    materiales.obtenerEnUso.mockRejectedValue(
+      new BadRequestException('El material "Cable viejo" está desactivado'),
+    );
+
+    await expect(service.crear(dtoBase as any)).rejects.toThrow(BadRequestException);
   });
 
   it('propaga 404 si el proveedor no existe', async () => {

@@ -90,6 +90,14 @@ export interface RepositorioMovimientos {
    */
   fechaDelUltimoAjuste(materialId: string, excluirMovimientoId?: string): Promise<Date | null>;
 
+  /**
+   * Nombre y estado del material, o null si no existe.
+   *
+   * Va por el puerto y no por el módulo de materiales para no atar los dos
+   * módulos entre sí por un dato que son dos columnas.
+   */
+  datosDelMaterial(materialId: string): Promise<{ nombre: string; activo: boolean } | null>;
+
   listarEdiciones(movimientoId: string): Promise<EdicionConUsuario[]>;
   buscarConFiltros(
     filtro: FiltroMovimientos,

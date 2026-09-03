@@ -22,6 +22,7 @@ function crearRepoFalso(stockInicial = 0) {
     // Estos casos miran la precision decimal, no las fechas: sin ajustes
     // previos, la regla de la fecha no interviene.
     fechaDelUltimoAjuste: jest.fn(async () => null),
+    datosDelMaterial: jest.fn(async () => ({ nombre: 'Material de prueba', activo: true })),
   } as unknown as RepositorioMovimientos & { estado: { stock: Decimal } };
 }
 
@@ -151,6 +152,7 @@ describe('Casos limite y riesgos', () => {
         // transaccion. Sin ajustes previos no interviene, que es lo que este
         // caso necesita: lo que se mide aca es el lock, no las fechas.
         movimientoStock: { findFirst: jest.fn(async () => null) },
+        material: { findUnique: jest.fn(async () => ({ nombre: 'Material', activo: true })) },
       } as unknown as PrismaService;
       const service = new MovimientosStockService(new MovimientosStockRepository(prisma));
 

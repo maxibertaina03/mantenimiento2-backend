@@ -126,7 +126,9 @@ export class OrdenesCompraService {
         );
       }
       vistos.add(renglon.materialId);
-      await this.materiales.obtener(renglon.materialId);
+      // `obtenerEnUso` y no `obtener`: no tiene sentido comprar algo que se
+      // saco de circulacion.
+      await this.materiales.obtenerEnUso(renglon.materialId);
     }
   }
 

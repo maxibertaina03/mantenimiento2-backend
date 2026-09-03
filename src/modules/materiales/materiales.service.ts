@@ -41,6 +41,12 @@ export class MaterialesService {
   private async armarFiltro(query: ListarMaterialesDto): Promise<Prisma.MaterialWhereInput> {
     const where: Prisma.MaterialWhereInput = {};
 
+    // Por defecto el listado muestra solo los materiales en uso. Con 896 en el
+    // catálogo, arrastrar los jubilados en cada búsqueda es justamente lo que
+    // se quiere evitar; los desactivados se siguen pudiendo mirar pidiéndolos.
+    if (query.mostrar === 'activos' || query.mostrar === undefined) where.activo = true;
+    else if (query.mostrar === 'inactivos') where.activo = false;
+
     if (query.buscar) {
       where.nombre = { contains: query.buscar, mode: 'insensitive' };
     }
@@ -126,6 +132,24 @@ export class MaterialesService {
     return materiales.map(MaterialRespuestaDto.desde);
   }
 
+  /**
+   * Igual que `obtener`, pero rechaza los materiales jubilados.
+   *
+   * Lo usan las operaciones que CARGAN algo nuevo: un movimiento, una orden de
+   * compra. Editar un movimiento viejo de un material jubilado sigue estando
+   * permitido, porque eso es corregir historia, no seguir usándolo.
+   */
+  async obtenerEnUso(id: string): Promise<MaterialRespuestaDto> {
+    const material = await this.obtener(id);
+    if (!material.activo) {
+      throw new BadRequestException(
+        `El material "${material.nombre}" está desactivado y no se puede usar en cargas ` +
+          'nuevas. Si volvió a hacer falta, activalo de nuevo desde su ficha.',
+      );
+    }
+    return material;
+  }
+
   async actualizar(id: string, dto: ActualizarMaterialDto): Promise<MaterialRespuestaDto> {
     await this.obtener(id);
     if (dto.categoriaId) {
@@ -169,8 +193,14 @@ export class MaterialesService {
     await this.obtener(id);
     const movimientos = await this.repo.contarMovimientos(id);
     if (movimientos > 0) {
+      // Borrarlo se llevaría puesto el historial, que es lo que hay que
+      // conservar. Desactivarlo hace lo que la persona quiere —sacarlo de las
+      // listas— sin perder nada, así que el mensaje lo ofrece en vez de dejarla
+      // sin salida.
       throw new BadRequestException(
-        `No se puede eliminar: el material tiene ${movimientos} movimiento(s) registrado(s).`,
+        `No se puede eliminar: el material tiene ${movimientos} movimiento(s) registrado(s), ` +
+          'y borrarlo se llevaría ese historial. Si ya no se usa, desactivalo: deja de ' +
+          'aparecer al cargar movimientos y órdenes, pero se conserva todo lo registrado.',
       );
     }
     await this.repo.eliminar(id);

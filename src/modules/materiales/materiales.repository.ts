@@ -58,7 +58,8 @@ export class MaterialesRepository {
    */
   async buscarBajoStock(): Promise<MaterialConCategoria[]> {
     const ids = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM materiales WHERE "stockMinimo" > 0 AND "stockActual" <= "stockMinimo"
+      SELECT id FROM materiales
+      WHERE activo = true AND "stockMinimo" > 0 AND "stockActual" <= "stockMinimo"
     `;
     if (ids.length === 0) return [];
     return this.prisma.material.findMany({
@@ -77,7 +78,8 @@ export class MaterialesRepository {
    */
   async idsBajoStock(): Promise<string[]> {
     const filas = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM materiales WHERE "stockMinimo" > 0 AND "stockActual" <= "stockMinimo"
+      SELECT id FROM materiales
+      WHERE activo = true AND "stockMinimo" > 0 AND "stockActual" <= "stockMinimo"
     `;
     return filas.map((f) => f.id);
   }

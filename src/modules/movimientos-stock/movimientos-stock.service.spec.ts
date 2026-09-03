@@ -36,6 +36,8 @@ function crearRepoFalso(stockInicial = 0) {
     listarEdiciones: jest.fn(async () => []),
     // Se resuelve desde la lista en memoria, no con un stub: asi la regla de la
     // fecha se ejerce de verdad en vez de quedar siempre en verde.
+    // Activo por defecto: el material jubilado se prueba aparte.
+    datosDelMaterial: jest.fn(async () => ({ nombre: 'Material de prueba', activo: true })),
     fechaDelUltimoAjuste: jest.fn(async (materialId: string, excluir?: string) => {
       const ajustes = estado.movimientos
         .filter(
@@ -453,5 +455,63 @@ describe('MovimientosStockService - fecha por detras de un ajuste', () => {
 
     expect(repo.fechaDelUltimoAjuste).toHaveBeenCalledWith('mat-1', 'mov-aj');
     expect(repo.editarConAuditoria).toHaveBeenCalled();
+  });
+});
+
+describe('MovimientosStockService - materiales jubilados', () => {
+  it('REGRESION: un material desactivado no admite movimientos nuevos', async () => {
+    // Es el punto de jubilarlo: sacarlo de las cargas sin perder su historial.
+    const repo = crearRepoFalso(100);
+    const service = new MovimientosStockService(repo);
+    (repo.datosDelMaterial as jest.Mock).mockResolvedValue({
+      nombre: 'Cable viejo',
+      activo: false,
+    });
+
+    await expect(service.crear(dtoBase as any)).rejects.toThrow(BadRequestException);
+    expect(repo.estado.stock.toNumber()).toBe(100);
+  });
+
+  it('el mensaje nombra el material y dice como volver atras', async () => {
+    const repo = crearRepoFalso(0);
+    const service = new MovimientosStockService(repo);
+    (repo.datosDelMaterial as jest.Mock).mockResolvedValue({
+      nombre: 'Cable viejo',
+      activo: false,
+    });
+
+    let mensaje = '';
+    try {
+      await service.crear(dtoBase as any);
+    } catch (e) {
+      mensaje = (e as BadRequestException).message;
+    }
+    expect(mensaje).toContain('Cable viejo');
+    expect(mensaje).toMatch(/activalo/i);
+  });
+
+  it('editar un movimiento viejo de un material jubilado sigue permitido', async () => {
+    // Corregir historia no es seguir usando el material. Si se bloqueara, un
+    // error de carga quedaria congelado para siempre.
+    const repo = crearRepoFalso(0);
+    const service = new MovimientosStockService(repo);
+    (repo.buscarPorId as jest.Mock).mockResolvedValue(movimientoBase);
+    (repo.datosDelMaterial as jest.Mock).mockResolvedValue({
+      nombre: 'Cable viejo',
+      activo: false,
+    });
+
+    await service.editar('mov-1', { notas: 'era otra cosa', motivoEdicion: 'correccion' } as any);
+
+    expect(repo.editarConAuditoria).toHaveBeenCalled();
+  });
+
+  it('un material que no existe da 404 antes de abrir la transaccion', async () => {
+    const repo = crearRepoFalso(0);
+    const service = new MovimientosStockService(repo);
+    (repo.datosDelMaterial as jest.Mock).mockResolvedValue(null);
+
+    await expect(service.crear(dtoBase as any)).rejects.toThrow(NotFoundException);
+    expect(repo.crearConActualizacionDeStock).not.toHaveBeenCalled();
   });
 });

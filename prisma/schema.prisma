@@ -113,6 +113,12 @@ model Material {
   // stockMinimo: umbral para alertas de bajo stock.
   stockMinimo Decimal @default(0) @db.Decimal(14, 3)
 
+  /// Un material fuera de uso se desactiva, no se borra: borrarlo se lleva
+  /// puesto su historial de movimientos, que es justamente lo que hay que
+  /// conservar. Desactivado sigue existiendo y consultable, pero deja de
+  /// aparecer en los desplegables donde se elige qué cargar.
+  activo Boolean @default(true)
+
   notas         String?
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -124,6 +130,7 @@ model Material {
 
   @@index([categoriaId])
   @@index([unidadId])
+  @@index([activo])
   @@map("materiales")
 }
 

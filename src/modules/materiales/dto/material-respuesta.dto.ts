@@ -44,6 +44,12 @@ export class MaterialRespuestaDto {
   @ApiProperty({ description: 'true si stockActual <= stockMinimo', example: false })
   bajoStock!: boolean;
 
+  @ApiProperty({
+    description: 'false = jubilado: conserva su historial pero no se ofrece al cargar',
+    example: true,
+  })
+  activo!: boolean;
+
   @ApiPropertyOptional({ nullable: true })
   notas!: string | null;
 
@@ -68,6 +74,7 @@ export class MaterialRespuestaDto {
       stockMinimo,
       // Solo se marca bajo stock si hay un mínimo definido (> 0).
       bajoStock: stockMinimo > 0 && stockActual <= stockMinimo,
+      activo: m.activo,
       notas: m.notas,
       creadoEn: m.creadoEn,
       actualizadoEn: m.actualizadoEn,

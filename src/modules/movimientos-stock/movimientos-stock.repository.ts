@@ -195,6 +195,13 @@ export class MovimientosStockRepository implements RepositorioMovimientos {
     return ultimo?.fecha ?? null;
   }
 
+  datosDelMaterial(materialId: string): Promise<{ nombre: string; activo: boolean } | null> {
+    return this.prisma.material.findUnique({
+      where: { id: materialId },
+      select: { nombre: true, activo: true },
+    });
+  }
+
   listarEdiciones(movimientoId: string): Promise<EdicionConUsuario[]> {
     return this.prisma.edicionMovimiento.findMany({
       where: { movimientoId },

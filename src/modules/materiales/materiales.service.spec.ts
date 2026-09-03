@@ -96,16 +96,32 @@ describe('MaterialesService', () => {
   });
 
   describe('listar()', () => {
-    it('sin busqueda no filtra', async () => {
+    it('sin busqueda solo esconde los materiales jubilados', async () => {
+      // Con 896 materiales en el catalogo, arrastrar los que ya no se usan en
+      // cada busqueda es justo lo que se quiere evitar. Se los sigue pudiendo
+      // mirar pidiendolos con `mostrar`.
       const { service, repo } = armar();
       await service.listar({ pagina: 1, limite: 20, skip: 0 } as any);
+      expect(repo.buscarTodosOrdenado.mock.calls[0][2]).toEqual({ activo: true });
+    });
+
+    it('mostrar=todos trae tambien los jubilados', async () => {
+      const { service, repo } = armar();
+      await service.listar({ pagina: 1, limite: 20, skip: 0, mostrar: 'todos' } as any);
       expect(repo.buscarTodosOrdenado.mock.calls[0][2]).toEqual({});
+    });
+
+    it('mostrar=inactivos trae solo los jubilados', async () => {
+      const { service, repo } = armar();
+      await service.listar({ pagina: 1, limite: 20, skip: 0, mostrar: 'inactivos' } as any);
+      expect(repo.buscarTodosOrdenado.mock.calls[0][2]).toEqual({ activo: false });
     });
 
     it('con busqueda filtra por nombre sin distinguir mayusculas', async () => {
       const { service, repo } = armar();
       await service.listar({ pagina: 1, limite: 20, skip: 0, buscar: 'cable' } as any);
       expect(repo.buscarTodosOrdenado.mock.calls[0][2]).toEqual({
+        activo: true,
         nombre: { contains: 'cable', mode: 'insensitive' },
       });
     });
@@ -208,10 +224,10 @@ describe('MaterialesService - listar() con filtros', () => {
   /** El `orderBy` con el que se consulto el listado. */
   const orden = (repo: any) => repo.buscarTodosOrdenado.mock.calls[0][3];
 
-  it('sin filtros no arma ninguna condicion', async () => {
+  it('sin filtros la unica condicion es esconder los jubilados', async () => {
     const { service, repo } = armar();
     await service.listar({ skip: 0, limite: 20, pagina: 1 } as any);
-    expect(filtro(repo)).toEqual({});
+    expect(filtro(repo)).toEqual({ activo: true });
   });
 
   it('filtra por categoria y por unidad', async () => {

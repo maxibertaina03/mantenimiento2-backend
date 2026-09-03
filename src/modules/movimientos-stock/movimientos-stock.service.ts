@@ -84,10 +84,26 @@ export class MovimientosStockService {
     this.validarCantidad(dto.tipo, cantidad);
     this.validarTipoYMotivo(dto.tipo, dto.motivo);
 
+    const material = await this.repo.datosDelMaterial(dto.materialId);
+    if (!material) {
+      throw new NotFoundException(`No existe el material con id ${dto.materialId}`);
+    }
+    if (!material.activo) {
+      // Editar un movimiento viejo de un material jubilado sigue permitido: eso
+      // es corregir historia. Lo que no se puede es seguir cargando movimientos
+      // nuevos, que es justamente de lo que se lo saco.
+      throw new BadRequestException(
+        `El material "${material.nombre}" está desactivado y no admite movimientos nuevos. ` +
+          'Si volvió a hacer falta, activalo de nuevo desde su ficha.',
+      );
+    }
+
     // Vale tambien para un AJUSTE nuevo: retrofechado por detras de otro ajuste
     // arrastra el mismo desacuerdo entre el stock guardado y el recalculo.
     const fechaDelMovimiento = dto.fecha ? new Date(dto.fecha) : new Date();
-    await this.verificarFechaContraAjustes(dto.materialId, fechaDelMovimiento);
+    await this.verificarFechaContraAjustes(dto.materialId, fechaDelMovimiento, {
+      nombreDelMaterial: material.nombre,
+    });
 
     // Regla de negocio: cómo cambia el stock según el tipo de movimiento.
     // Toda la aritmética es Decimal para no arrastrar error de punto flotante.
