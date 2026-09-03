@@ -30,6 +30,8 @@ export const ETIQUETA_EJECUTOR: Record<Ejecutor, string> = {
 export interface Intervencion {
   id: string;
   equipoId: string;
+  /** Si el trabajo corresponde a un plan, registrarlo adelanta su próxima fecha. */
+  planId: string | null;
   tipo: TipoIntervencion;
   fecha: Date;
   ejecutor: Ejecutor;
@@ -47,6 +49,7 @@ export interface Intervencion {
 
 export interface DatosNuevaIntervencion {
   equipoId: string;
+  planId?: string | null;
   tipo: TipoIntervencion;
   fecha: Date;
   ejecutor: Ejecutor;
@@ -117,6 +120,7 @@ export function crearIntervencion(
 
   return {
     equipoId: datos.equipoId,
+    planId: datos.planId ?? null,
     tipo: datos.tipo,
     fecha: datos.fecha,
     ejecutor: datos.ejecutor,

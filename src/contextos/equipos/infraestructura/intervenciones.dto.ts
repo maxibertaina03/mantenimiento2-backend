@@ -25,6 +25,14 @@ import {
  * carga que no entre por HTTP.
  */
 export class RegistrarIntervencionDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'El plan al que responde. Registrarlo adelanta su próxima fecha.',
+  })
+  @IsOptional()
+  @IsUUID()
+  planId?: string | null;
+
   @ApiProperty({ enum: TIPOS_INTERVENCION })
   @IsIn(TIPOS_INTERVENCION)
   tipo!: TipoIntervencion;

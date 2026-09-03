@@ -22,6 +22,7 @@ import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { ConsultarEquipos, aEquipoParaMostrar } from '../aplicacion/consultar-equipos';
 import { CambiarFotoEquipo } from '../aplicacion/cambiar-foto-equipo';
 import { ConsultarHistorial } from '../aplicacion/consultar-historial';
+import { GestionarPlanes } from '../aplicacion/gestionar-planes';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
 import { RegistrarIntervencion } from '../aplicacion/registrar-intervencion';
 import { ImportarEquipos } from '../aplicacion/importar-equipos';
@@ -31,6 +32,7 @@ import {
   REPOSITORIO_INTERVENCIONES,
   RepositorioIntervenciones,
 } from '../puertos/repositorio-intervenciones';
+import { REPOSITORIO_PLANES, RepositorioPlanes } from '../puertos/repositorio-planes';
 import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
 import {
   REPOSITORIO_UBICACIONES,
@@ -46,6 +48,7 @@ import {
 import { FiltroErroresDominio } from './filtro-errores-dominio';
 import { DetectarImportacionDto, ImportarEquiposDto } from './importacion.dto';
 import { RegistrarIntervencionDto } from './intervenciones.dto';
+import { ActualizarPlanDto, CrearPlanDto } from './planes.dto';
 
 /**
  * La entrada HTTP del contexto.
@@ -71,11 +74,13 @@ export class EquiposController {
   private readonly cambiarFoto: CambiarFotoEquipo;
   private readonly registrarIntervencion: RegistrarIntervencion;
   private readonly historial: ConsultarHistorial;
+  private readonly planes: GestionarPlanes;
 
   constructor(
     @Inject(REPOSITORIO_EQUIPOS) private readonly repo: RepositorioEquipos,
     @Inject(REPOSITORIO_UBICACIONES) ubicaciones: RepositorioUbicaciones,
     @Inject(REPOSITORIO_INTERVENCIONES) intervenciones: RepositorioIntervenciones,
+    @Inject(REPOSITORIO_PLANES) planesRepo: RepositorioPlanes,
     @Inject(ALMACEN_IMAGENES) private readonly almacen: AlmacenImagenes,
     @Inject(RELOJ) private readonly reloj: Reloj,
   ) {
@@ -84,7 +89,13 @@ export class EquiposController {
     this.consultar = new ConsultarEquipos(repo, reloj);
     this.importar = new ImportarEquipos(repo, ubicaciones);
     this.cambiarFoto = new CambiarFotoEquipo(repo, almacen);
-    this.registrarIntervencion = new RegistrarIntervencion(intervenciones, repo, reloj);
+    this.planes = new GestionarPlanes(planesRepo, repo, reloj);
+    this.registrarIntervencion = new RegistrarIntervencion(
+      intervenciones,
+      repo,
+      reloj,
+      this.planes,
+    );
     this.historial = new ConsultarHistorial(intervenciones, repo);
   }
 
@@ -180,6 +191,54 @@ export class EquiposController {
     return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
+  @Get('planes/vencen')
+  @ApiOperation({
+    summary: 'Los servicios que vencen, de lo más urgente a lo menos',
+    description:
+      'Incluye los ya vencidos: si nadie los hizo, dejar de mostrarlos sería lo contrario de ' +
+      'lo que hace falta. No incluye equipos fuera de servicio ni dados de baja.',
+  })
+  planesQueVencen(@Query('dias') dias?: string) {
+    return this.planes.listarQueVencen(dias ? Number(dias) : 7);
+  }
+
+  @Get(':id/planes')
+  @ApiOperation({ summary: 'Planes de mantenimiento de un equipo' })
+  planesDelEquipo(@Param('id', ParseUUIDPipe) id: string) {
+    return this.planes.listarPorEquipo(id);
+  }
+
+  @Post(':id/planes')
+  @ApiOperation({ summary: 'Definir un plan de mantenimiento' })
+  crearPlan(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CrearPlanDto) {
+    return this.planes.crear({
+      ...dto,
+      equipoId: id,
+      proximaFecha: new Date(dto.proximaFecha),
+    });
+  }
+
+  @Patch('planes/:planId')
+  @ApiOperation({ summary: 'Editar un plan, o desactivarlo' })
+  actualizarPlan(@Param('planId', ParseUUIDPipe) planId: string, @Body() dto: ActualizarPlanDto) {
+    return this.planes.actualizar(planId, {
+      ...dto,
+      proximaFecha: dto.proximaFecha ? new Date(dto.proximaFecha) : undefined,
+    });
+  }
+
+  @Delete('planes/:planId')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Eliminar un plan',
+    description:
+      'Los trabajos ya registrados NO se borran: el trabajo pasó, exista o no el plan. Si el ' +
+      'plan dejó de usarse, conviene desactivarlo en vez de borrarlo.',
+  })
+  eliminarPlan(@Param('planId', ParseUUIDPipe) planId: string) {
+    return this.planes.eliminar(planId);
+  }
+
   @Get(':id/historial')
   @ApiOperation({
     summary: 'Historial de intervenciones de un equipo, con su resumen',
@@ -206,6 +265,7 @@ export class EquiposController {
     return this.registrarIntervencion.ejecutar({
       ...dto,
       equipoId: id,
+      planId: dto.planId ?? null,
       fecha: new Date(dto.fecha),
       registradoPorId: usuario?.id ?? null,
     });

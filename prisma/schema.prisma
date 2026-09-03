@@ -508,8 +508,9 @@ model Equipo {
 
   ubicacion     UbicacionEquipo?  @relation(fields: [ubicacionId], references: [id])
   tipo          TipoEquipoPlanta? @relation(fields: [tipoId], references: [id])
-  proveedor     Proveedor?        @relation(fields: [proveedorId], references: [id])
+  proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
   intervenciones Intervencion[]
+  planes         PlanMantenimiento[]
 
   @@index([ubicacionId])
   @@index([tipoId])
@@ -525,6 +526,10 @@ model Equipo {
 model Intervencion {
   id       String @id @default(uuid())
   equipoId String
+
+  /// Si el trabajo corresponde a un plan, registrarlo adelanta su próxima
+  /// fecha. Es opcional: una rotura no responde a ningún plan.
+  planId String?
 
   /// PREVENTIVO | CORRECTIVO | MEJORA. Separarlos es lo que después contesta
   /// cuánto del gasto fue planificado y cuánto fue apagar incendios.
@@ -558,7 +563,8 @@ model Intervencion {
 
   creadoEn DateTime @default(now())
 
-  equipo        Equipo     @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  equipo        Equipo             @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  plan          PlanMantenimiento? @relation(fields: [planId], references: [id], onDelete: SetNull)
   usuario       Usuario?   @relation("IntervencionEjecutor", fields: [usuarioId], references: [id])
   proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
   registradoPor Usuario?   @relation("IntervencionRegistro", fields: [registradoPorId], references: [id])
@@ -566,5 +572,41 @@ model Intervencion {
   @@index([equipoId, fecha])
   @@index([tipo])
   @@index([proveedorId])
+  @@index([planId])
   @@map("intervenciones")
+}
+
+/// Qué se le hace a un equipo y cada cuánto.
+///
+/// Un equipo puede tener varios: el aceite cada 90 días y la correa cada 365
+/// son dos planes distintos del mismo equipo.
+model PlanMantenimiento {
+  id       String @id @default(uuid())
+  equipoId String
+
+  nombre String
+  tareas String?
+
+  /// En días. Podría ser por horas de uso para compresores y calderas, pero eso
+  /// necesita un horómetro cargado y se deja para cuando haga falta.
+  periodicidadDias Int
+
+  /// Cuándo toca la próxima vez. Se recalcula al registrar un trabajo del plan,
+  /// y se puede corregir a mano: en la práctica un service se adelanta o se
+  /// corre, y si el sistema no deja moverla la gente deja de usarlo.
+  proximaFecha DateTime
+
+  /// Los planes en desuso se desactivan en vez de borrarse, para no perder las
+  /// intervenciones que los referencian.
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  equipo         Equipo         @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  intervenciones Intervencion[]
+
+  @@index([equipoId])
+  @@index([proximaFecha])
+  @@map("planes_mantenimiento")
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ALMACEN_IMAGENES } from '../puertos/almacen-imagenes';
 import { REPOSITORIO_INTERVENCIONES } from '../puertos/repositorio-intervenciones';
+import { REPOSITORIO_PLANES } from '../puertos/repositorio-planes';
 import { REPOSITORIO_EQUIPOS } from '../puertos/repositorio-equipos';
 import { REPOSITORIO_UBICACIONES } from '../puertos/repositorio-ubicaciones';
 import { RELOJ, RelojDelSistema } from '../puertos/reloj';
@@ -12,6 +13,7 @@ import {
 import { EquiposController } from './equipos.controller';
 import { PrismaRepositorioEquipos } from './prisma-repositorio-equipos';
 import { PrismaRepositorioIntervenciones } from './prisma-repositorio-intervenciones';
+import { PrismaRepositorioPlanes } from './prisma-repositorio-planes';
 import { PrismaRepositorioUbicaciones } from './prisma-repositorio-ubicaciones';
 import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
 
@@ -30,6 +32,7 @@ import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
     { provide: REPOSITORIO_EQUIPOS, useClass: PrismaRepositorioEquipos },
     { provide: REPOSITORIO_UBICACIONES, useClass: PrismaRepositorioUbicaciones },
     { provide: REPOSITORIO_INTERVENCIONES, useClass: PrismaRepositorioIntervenciones },
+    { provide: REPOSITORIO_PLANES, useClass: PrismaRepositorioPlanes },
     { provide: ALMACEN_IMAGENES, useClass: SupabaseAlmacenImagenes },
     { provide: RELOJ, useClass: RelojDelSistema },
   ],

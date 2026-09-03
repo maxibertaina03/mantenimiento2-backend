@@ -30,6 +30,7 @@ export class PrismaRepositorioIntervenciones implements RepositorioIntervencione
     return {
       id: fila.id,
       equipoId: fila.equipoId,
+      planId: fila.planId,
       tipo: fila.tipo as TipoIntervencion,
       fecha: fila.fecha,
       ejecutor: fila.ejecutor as Ejecutor,

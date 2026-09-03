@@ -6,6 +6,7 @@ import {
 } from '../puertos/repositorio-intervenciones';
 import { RepositorioEquipos } from '../puertos/repositorio-equipos';
 import { Reloj } from '../puertos/reloj';
+import { GestionarPlanes } from './gestionar-planes';
 
 /**
  * Registrar un trabajo hecho sobre un equipo.
@@ -19,12 +20,25 @@ export class RegistrarIntervencion {
     private readonly intervenciones: RepositorioIntervenciones,
     private readonly equipos: RepositorioEquipos,
     private readonly reloj: Reloj,
+    private readonly planes?: GestionarPlanes,
   ) {}
 
   async ejecutar(datos: DatosNuevaIntervencion): Promise<IntervencionConRelaciones> {
     const equipo = await this.equipos.buscarPorId(datos.equipoId);
     if (!equipo) throw new ErrorNoEncontrado(`No existe el equipo con id ${datos.equipoId}`);
 
-    return this.intervenciones.crear(crearIntervencion(datos, equipo.estado, this.reloj.ahora()));
+    const registrada = await this.intervenciones.crear(
+      crearIntervencion(datos, equipo.estado, this.reloj.ahora()),
+    );
+
+    // El plan se adelanta DESPUÉS de que la intervención quedó guardada. Al
+    // revés, un fallo al registrar dejaría el plan corrido sin que exista el
+    // trabajo que lo justifica, y el equipo pasaría meses sin service creyendo
+    // que está al día.
+    if (registrada.planId && this.planes) {
+      await this.planes.adelantarDespuesDeTrabajo(registrada.planId, registrada.fecha);
+    }
+
+    return registrada;
   }
 }
