@@ -127,6 +127,17 @@ export class MaterialesRepository {
   }
 
   /**
+   * Materiales en uso a los que nadie les puso un stock mínimo.
+   *
+   * Son los que la alerta de bajo stock NO puede avisar: la regla exige un
+   * mínimo definido, así que sin él el material podría quedar en cero sin que
+   * nadie se entere.
+   */
+  contarSinStockMinimo(): Promise<number> {
+    return this.prisma.material.count({ where: { activo: true, stockMinimo: 0 } });
+  }
+
+  /**
    * Asigna una unidad a muchos materiales de una.
    *
    * `soloSinUnidad` es el modo normal: completa los huecos sin pisar lo que

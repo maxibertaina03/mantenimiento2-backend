@@ -204,6 +204,27 @@ export class MaterialesService {
   }
 
   /**
+   * Cuántos materiales cubre la alerta de bajo stock y cuántos no.
+   *
+   * La alerta solo mira los materiales con un mínimo definido. Si casi ninguno
+   * lo tiene, la pantalla puede decir "todo OK" mientras media planta está en
+   * cero, y nadie sabría que la alerta estaba ciega.
+   */
+  async coberturaDeAlertas(): Promise<{
+    enUso: number;
+    conMinimo: number;
+    sinMinimo: number;
+    bajoStock: number;
+  }> {
+    const [enUso, sinMinimo, bajos] = await Promise.all([
+      this.repo.contar({ activo: true }),
+      this.repo.contarSinStockMinimo(),
+      this.repo.idsBajoStock(),
+    ]);
+    return { enUso, conMinimo: enUso - sinMinimo, sinMinimo, bajoStock: bajos.length };
+  }
+
+  /**
    * Pone una unidad por defecto a los materiales que no tienen.
    *
    * Valida la unidad antes de tocar nada: si no existiera, un updateMany

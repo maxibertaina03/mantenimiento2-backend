@@ -38,6 +38,7 @@ function armar() {
     contarSinUnidad: jest.fn<Promise<any>, any[]>(async () => 0),
     // Nombre libre por defecto: el choque de duplicados se prueba aparte.
     buscarPorNombreParecido: jest.fn<Promise<any>, any[]>(async () => []),
+    contarSinStockMinimo: jest.fn<Promise<any>, any[]>(async () => 0),
     idsBajoStock: jest.fn<Promise<any>, any[]>(async () => ['mat-1', 'mat-2']),
     buscarTodosOrdenado: jest.fn<Promise<any>, any[]>(async () => [material]),
     asignarUnidadMasiva: jest.fn<Promise<any>, any[]>(async () => 831),
@@ -426,5 +427,34 @@ describe('MaterialesService - nombres duplicados', () => {
       BadRequestException,
     );
     expect(repo.actualizar).not.toHaveBeenCalled();
+  });
+});
+
+describe('MaterialesService - cobertura de las alertas', () => {
+  it('dice a cuantos materiales puede avisar y a cuantos no', async () => {
+    // La alerta solo mira los que tienen minimo definido. Si casi ninguno lo
+    // tiene, la pantalla diria "todo OK" mientras media planta esta en cero.
+    const { service, repo } = armar();
+    repo.contar.mockResolvedValue(920);
+    repo.contarSinStockMinimo.mockResolvedValue(785);
+    repo.idsBajoStock.mockResolvedValue(['a', 'b', 'c']);
+
+    expect(await service.coberturaDeAlertas()).toEqual({
+      enUso: 920,
+      conMinimo: 135,
+      sinMinimo: 785,
+      bajoStock: 3,
+    });
+  });
+
+  it('con todos los minimos cargados no queda ninguno fuera', async () => {
+    const { service, repo } = armar();
+    repo.contar.mockResolvedValue(10);
+    repo.contarSinStockMinimo.mockResolvedValue(0);
+    repo.idsBajoStock.mockResolvedValue([]);
+
+    const r = await service.coberturaDeAlertas();
+    expect(r.sinMinimo).toBe(0);
+    expect(r.conMinimo).toBe(10);
   });
 });

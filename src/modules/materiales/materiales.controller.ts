@@ -44,6 +44,15 @@ export class MaterialesController {
   }
 
   // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
+  @Get('cobertura-alertas')
+  @ApiOperation({
+    summary: 'A cuántos materiales puede avisar la alerta de bajo stock, y a cuántos no',
+  })
+  coberturaAlertas() {
+    return this.service.coberturaDeAlertas();
+  }
+
+  // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
   @Get('sin-unidad')
   @ApiOperation({ summary: 'Cuántos materiales todavía no tienen unidad cargada' })
   sinUnidad() {
