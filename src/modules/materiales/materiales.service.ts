@@ -9,6 +9,7 @@ import { ListarMaterialesDto } from './dto/listar-materiales.dto';
 import { MaterialRespuestaDto } from './dto/material-respuesta.dto';
 import { MaterialConHistorialDto } from './dto/material-con-historial.dto';
 import { MaterialesRepository } from './materiales.repository';
+import { normalizarNombreMaterial, sonElMismoNombre } from './nombre-material';
 import { AsignarUnidadMasivaDto, ResultadoAsignacionDto } from './dto/asignar-unidad-masiva.dto';
 import { UnidadesMedidaService } from '../unidades-medida/unidades-medida.service';
 
@@ -20,14 +21,36 @@ export class MaterialesService {
     private readonly unidades: UnidadesMedidaService,
   ) {}
 
+  /**
+   * Rechaza un nombre que ya existe, salvo que sea el del propio material.
+   *
+   * Sin esto, "Rodamiento 6204" y "RODAMIENTO 6204" conviven como materiales
+   * distintos y el stock se parte en dos fichas sin que nadie lo note. La carga
+   * rápida desde la orden de compra lo hace especialmente fácil: ahí se escribe
+   * de memoria, sin mirar el catálogo.
+   */
+  private async verificarNombreLibre(nombre: string, exceptoId?: string): Promise<void> {
+    const parecidos = await this.repo.buscarPorNombreParecido(nombre);
+    const choque = parecidos.find((m) => m.id !== exceptoId && sonElMismoNombre(m.nombre, nombre));
+    if (choque) {
+      throw new BadRequestException(
+        `Ya existe un material llamado "${choque.nombre}". Usá ese en vez de crear otro: ` +
+          'dos fichas para lo mismo parten el stock en dos y ninguna queda bien.',
+      );
+    }
+  }
+
   async crear(dto: CrearMaterialDto): Promise<MaterialRespuestaDto> {
     // Valida que categoría y unidad existan, con un error claro en vez de un
     // fallo de FK genérico.
     await this.categorias.obtener(dto.categoriaId);
     await this.unidades.obtener(dto.unidadId);
 
+    const nombre = normalizarNombreMaterial(dto.nombre);
+    await this.verificarNombreLibre(nombre);
+
     const creado = await this.repo.crear({
-      nombre: dto.nombre,
+      nombre,
       stockMinimo: dto.stockMinimo ?? 0,
       notas: dto.notas,
       categoria: { connect: { id: dto.categoriaId } },
@@ -152,6 +175,12 @@ export class MaterialesService {
 
   async actualizar(id: string, dto: ActualizarMaterialDto): Promise<MaterialRespuestaDto> {
     await this.obtener(id);
+    if (dto.nombre !== undefined) {
+      dto.nombre = normalizarNombreMaterial(dto.nombre);
+      // `id` exceptuado: renombrar un material a lo que ya se llamaba (o solo
+      // cambiarle una mayúscula) tiene que seguir siendo posible.
+      await this.verificarNombreLibre(dto.nombre, id);
+    }
     if (dto.categoriaId) {
       await this.categorias.obtener(dto.categoriaId);
     }

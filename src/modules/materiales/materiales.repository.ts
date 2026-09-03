@@ -15,6 +15,20 @@ export class MaterialesRepository {
   /** La unidad viene del catálogo; el DTO expone su símbolo junto a la cantidad. */
   private readonly relaciones = { categoria: true, unidad: true } as const;
 
+  /**
+   * Materiales cuyo nombre coincide sin distinguir mayúsculas.
+   *
+   * La comparación fina (acentos, espacios repetidos) se hace después en
+   * memoria: Postgres no compara sin acentos sin la extensión `unaccent`, que
+   * no está instalada, y son a lo sumo un puñado de filas.
+   */
+  buscarPorNombreParecido(nombre: string): Promise<{ id: string; nombre: string }[]> {
+    return this.prisma.material.findMany({
+      where: { nombre: { equals: nombre, mode: 'insensitive' } },
+      select: { id: true, nombre: true },
+    });
+  }
+
   crear(data: Prisma.MaterialCreateInput): Promise<MaterialConCategoria> {
     return this.prisma.material.create({ data, include: this.relaciones });
   }

@@ -36,6 +36,8 @@ function armar() {
     eliminar: jest.fn<Promise<any>, any[]>(async () => material),
     contarMovimientos: jest.fn<Promise<any>, any[]>(async () => 0),
     contarSinUnidad: jest.fn<Promise<any>, any[]>(async () => 0),
+    // Nombre libre por defecto: el choque de duplicados se prueba aparte.
+    buscarPorNombreParecido: jest.fn<Promise<any>, any[]>(async () => []),
     idsBajoStock: jest.fn<Promise<any>, any[]>(async () => ['mat-1', 'mat-2']),
     buscarTodosOrdenado: jest.fn<Promise<any>, any[]>(async () => [material]),
     asignarUnidadMasiva: jest.fn<Promise<any>, any[]>(async () => 831),
@@ -345,5 +347,84 @@ describe('MaterialesService - listar() con filtros', () => {
     const { service, repo } = armar();
     await service.listar({ skip: 0, limite: 20, pagina: 1, categoriaId: 'cat-1' } as any);
     expect(repo.contar).toHaveBeenCalledWith(filtro(repo));
+  });
+});
+
+describe('MaterialesService - nombres duplicados', () => {
+  it('REGRESION: no deja crear un material que ya existe con otras mayusculas', async () => {
+    // Dos fichas para lo mismo parten el stock en dos y ninguna queda bien.
+    const { service, repo } = armar();
+    repo.buscarPorNombreParecido.mockResolvedValue([{ id: 'otro', nombre: 'Rodamiento 6204' }]);
+
+    await expect(
+      service.crear({
+        nombre: 'RODAMIENTO 6204',
+        categoriaId: 'cat-1',
+        unidadId: 'uni-1',
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+    expect(repo.crear).not.toHaveBeenCalled();
+  });
+
+  it('el mensaje muestra como esta escrito el que ya existe', async () => {
+    // Para que la persona pueda ir a buscarlo, en vez de adivinar.
+    const { service, repo } = armar();
+    repo.buscarPorNombreParecido.mockResolvedValue([{ id: 'otro', nombre: 'Rodamiento 6204' }]);
+
+    let mensaje = '';
+    try {
+      await service.crear({
+        nombre: 'rodamiento 6204',
+        categoriaId: 'cat-1',
+        unidadId: 'uni-1',
+      } as any);
+    } catch (e) {
+      mensaje = (e as BadRequestException).message;
+    }
+    expect(mensaje).toContain('Rodamiento 6204');
+  });
+
+  it('guarda el nombre sin espacios de sobra', async () => {
+    const { service, repo } = armar();
+
+    await service.crear({
+      nombre: '  Rodamiento   6204 ',
+      categoriaId: 'cat-1',
+      unidadId: 'uni-1',
+    } as any);
+
+    expect(repo.crear.mock.calls[0][0].nombre).toBe('Rodamiento 6204');
+  });
+
+  it('un nombre libre se crea sin problema', async () => {
+    const { service, repo } = armar();
+
+    await service.crear({
+      nombre: 'Rodamiento 6205',
+      categoriaId: 'cat-1',
+      unidadId: 'uni-1',
+    } as any);
+
+    expect(repo.crear).toHaveBeenCalled();
+  });
+
+  it('renombrar un material a lo que ya se llamaba sigue funcionando', async () => {
+    // Se excluye a si mismo: si no, corregirle una mayuscula seria imposible.
+    const { service, repo } = armar();
+    repo.buscarPorNombreParecido.mockResolvedValue([{ id: 'mat-1', nombre: 'Cable NYA' }]);
+
+    await service.actualizar('mat-1', { nombre: 'Cable nya' } as any);
+
+    expect(repo.actualizar).toHaveBeenCalled();
+  });
+
+  it('pero no se lo puede renombrar al nombre de OTRO material', async () => {
+    const { service, repo } = armar();
+    repo.buscarPorNombreParecido.mockResolvedValue([{ id: 'otro', nombre: 'Cable NYA' }]);
+
+    await expect(service.actualizar('mat-1', { nombre: 'cable nya' } as any)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(repo.actualizar).not.toHaveBeenCalled();
   });
 });
