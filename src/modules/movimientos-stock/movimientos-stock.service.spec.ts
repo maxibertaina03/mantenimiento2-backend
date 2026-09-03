@@ -34,6 +34,18 @@ function crearRepoFalso(stockInicial = 0) {
       creadoEn: new Date(),
     })),
     listarEdiciones: jest.fn(async () => []),
+    // Se resuelve desde la lista en memoria, no con un stub: asi la regla de la
+    // fecha se ejerce de verdad en vez de quedar siempre en verde.
+    fechaDelUltimoAjuste: jest.fn(async (materialId: string, excluir?: string) => {
+      const ajustes = estado.movimientos
+        .filter(
+          (m) =>
+            m.materialId === materialId && m.tipo === TipoMovimiento.AJUSTE && m.id !== excluir,
+        )
+        .map((m) => m.fecha as Date)
+        .sort((a, b) => b.getTime() - a.getTime());
+      return ajustes[0] ?? null;
+    }),
   };
   return repo as unknown as RepositorioMovimientos & typeof repo;
 }
@@ -299,5 +311,147 @@ describe('MovimientosStockService', () => {
         service.editar('mov-1', { tipo: TipoMovimiento.SALIDA, motivoEdicion: 'x' } as any),
       ).rejects.toThrow(/no corresponde/);
     });
+  });
+});
+
+describe('MovimientosStockService - fecha por detras de un ajuste', () => {
+  const f = (iso: string) => new Date(`${iso}T12:00:00.000Z`);
+
+  /** Deja el material con un AJUSTE a 100 con fecha del 1 de septiembre. */
+  async function conAjusteDelPrimeroDeSeptiembre() {
+    const repo = crearRepoFalso(0);
+    const service = new MovimientosStockService(repo);
+    await service.crear({
+      materialId: 'mat-1',
+      tipo: TipoMovimiento.AJUSTE,
+      motivo: MotivoMovimiento.AJUSTE,
+      cantidad: 100,
+      fecha: f('2026-09-01').toISOString(),
+    } as any);
+    return { repo, service };
+  }
+
+  it('REGRESION: no deja cargar una SALIDA con fecha anterior al ultimo ajuste', async () => {
+    // Es el caso que dejaba el stock guardado y el recalculo en desacuerdo. El
+    // alta restaba la salida (90) y el recalculo por fecha la ignoraba (100),
+    // porque el ajuste posterior borra lo anterior. Nadie lo notaba hasta que
+    // alguien editaba cualquier movimiento del material y el stock saltaba solo.
+    const { repo, service } = await conAjusteDelPrimeroDeSeptiembre();
+
+    await expect(
+      service.crear({
+        materialId: 'mat-1',
+        tipo: TipoMovimiento.SALIDA,
+        motivo: MotivoMovimiento.TRABAJO,
+        cantidad: 10,
+        fecha: f('2026-08-15').toISOString(),
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+
+    // Y el stock no se movio.
+    expect(repo.estado.stock.toNumber()).toBe(100);
+  });
+
+  it('la misma salida con fecha posterior al ajuste entra sin problema', async () => {
+    const { repo, service } = await conAjusteDelPrimeroDeSeptiembre();
+
+    await service.crear({
+      materialId: 'mat-1',
+      tipo: TipoMovimiento.SALIDA,
+      motivo: MotivoMovimiento.TRABAJO,
+      cantidad: 10,
+      fecha: f('2026-09-02').toISOString(),
+    } as any);
+
+    expect(repo.estado.stock.toNumber()).toBe(90);
+  });
+
+  it('tampoco deja meter un AJUSTE por detras de otro', async () => {
+    // Arrastra el mismo desacuerdo: el alta guarda el valor del ajuste nuevo,
+    // pero en el orden por fecha el que manda sigue siendo el viejo.
+    const { service } = await conAjusteDelPrimeroDeSeptiembre();
+
+    await expect(
+      service.crear({
+        materialId: 'mat-1',
+        tipo: TipoMovimiento.AJUSTE,
+        motivo: MotivoMovimiento.AJUSTE,
+        cantidad: 55,
+        fecha: f('2026-08-01').toISOString(),
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('un material sin ajustes acepta cualquier fecha', async () => {
+    // Retrofechar es normal: "me olvide de cargar la salida del martes". La
+    // regla solo aparece donde hace falta.
+    const repo = crearRepoFalso(100);
+    const service = new MovimientosStockService(repo);
+
+    await service.crear({
+      materialId: 'mat-1',
+      tipo: TipoMovimiento.SALIDA,
+      motivo: MotivoMovimiento.TRABAJO,
+      cantidad: 10,
+      fecha: f('2020-01-01').toISOString(),
+    } as any);
+
+    expect(repo.estado.stock.toNumber()).toBe(90);
+  });
+
+  it('el ajuste de OTRO material no bloquea', async () => {
+    const { service, repo } = await conAjusteDelPrimeroDeSeptiembre();
+
+    await service.crear({
+      materialId: 'mat-2',
+      tipo: TipoMovimiento.SALIDA,
+      motivo: MotivoMovimiento.TRABAJO,
+      cantidad: 1,
+      fecha: f('2020-01-01').toISOString(),
+    } as any);
+
+    expect(repo.estado.movimientos).toHaveLength(2);
+  });
+
+  it('REGRESION: la edicion tampoco puede retrofechar por detras de un ajuste', async () => {
+    // Por esta puerta el salto era peor: la edicion recalcula y persiste, asi
+    // que el stock cambiaba en el acto sin que nadie lo hubiera pedido.
+    const repo = crearRepoFalso(0);
+    const service = new MovimientosStockService(repo);
+    (repo.buscarPorId as jest.Mock).mockResolvedValue({
+      ...movimientoBase,
+      id: 'mov-9',
+      tipo: TipoMovimiento.SALIDA,
+      motivo: MotivoMovimiento.TRABAJO,
+      fecha: f('2026-09-05'),
+    });
+    (repo.fechaDelUltimoAjuste as jest.Mock).mockResolvedValue(f('2026-09-01'));
+
+    await expect(
+      service.editar('mov-9', { fecha: f('2026-08-15').toISOString(), motivoEdicion: 'x' } as any),
+    ).rejects.toThrow(BadRequestException);
+    expect(repo.editarConAuditoria).not.toHaveBeenCalled();
+  });
+
+  it('un ajuste no se compara contra si mismo al editarlo', async () => {
+    // Si no, ninguna edicion de un ajuste seria posible: siempre encontraria su
+    // propia fecha y se rechazaria a si mismo.
+    const repo = crearRepoFalso(0);
+    const service = new MovimientosStockService(repo);
+    (repo.buscarPorId as jest.Mock).mockResolvedValue({
+      ...movimientoBase,
+      id: 'mov-aj',
+      tipo: TipoMovimiento.AJUSTE,
+      motivo: MotivoMovimiento.AJUSTE,
+      fecha: f('2026-09-01'),
+    });
+
+    await service.editar('mov-aj', {
+      fecha: f('2026-08-20').toISOString(),
+      motivoEdicion: 'la fecha estaba mal',
+    } as any);
+
+    expect(repo.fechaDelUltimoAjuste).toHaveBeenCalledWith('mat-1', 'mov-aj');
+    expect(repo.editarConAuditoria).toHaveBeenCalled();
   });
 });

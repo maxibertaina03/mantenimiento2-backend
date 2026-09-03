@@ -76,6 +76,20 @@ export interface RepositorioMovimientos {
     validarStock: (stockRecalculado: Decimal) => void;
   }): Promise<MovimientoConRelaciones>;
 
+  /**
+   * Fecha del último AJUSTE del material, o null si nunca se le hizo uno.
+   *
+   * Se usa para no dejar cargar movimientos por detrás de un ajuste. El AJUSTE
+   * es la única operación que NO es conmutativa: fija el stock en un valor
+   * absoluto y descarta todo lo anterior. Una entrada y una salida se pueden
+   * intercalar en cualquier orden y el total no cambia; una intercalada antes
+   * de un ajuste, en cambio, deja de contar.
+   *
+   * `excluirMovimientoId` sirve al editar: un ajuste no se compara contra sí
+   * mismo, porque si no ninguna edición de un ajuste sería posible.
+   */
+  fechaDelUltimoAjuste(materialId: string, excluirMovimientoId?: string): Promise<Date | null>;
+
   listarEdiciones(movimientoId: string): Promise<EdicionConUsuario[]>;
   buscarConFiltros(
     filtro: FiltroMovimientos,

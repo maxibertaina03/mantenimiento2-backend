@@ -10,6 +10,7 @@ import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { aDecimal } from '../../common/dominio/decimal';
 import { finDelDia, inicioDelDia } from '../../common/dominio/fechas';
 import { MaterialesService } from '../materiales/materiales.service';
+import { MovimientosStockService } from '../movimientos-stock/movimientos-stock.service';
 import { ProveedoresService } from '../proveedores/proveedores.service';
 import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
 import { CrearOrdenDto, RenglonOrdenDto } from './dto/crear-orden.dto';
@@ -40,6 +41,7 @@ export class OrdenesCompraService {
     private readonly repo: OrdenesCompraRepository,
     private readonly proveedores: ProveedoresService,
     private readonly materiales: MaterialesService,
+    private readonly movimientos: MovimientosStockService,
     private readonly correo: CorreoService,
     private readonly config: ConfigService,
   ) {}
@@ -253,12 +255,24 @@ export class OrdenesCompraService {
     }
     this.validarTransicion(orden.numero, orden.estado, EstadoOrdenCompra.RECIBIDA);
 
+    const fechaRecepcion = dto.fechaRecepcion ? new Date(dto.fechaRecepcion) : new Date();
+
+    // Recibir genera un movimiento de ENTRADA por renglón con esta fecha, así
+    // que le corresponde la misma regla que a un movimiento cargado a mano: no
+    // puede quedar por detrás del último ajuste del material. Se comprueban
+    // TODOS antes de tocar nada, para no dejar media orden recibida.
+    for (const renglon of orden.renglones ?? []) {
+      await this.movimientos.verificarFechaContraAjustes(renglon.materialId, fechaRecepcion, {
+        nombreDelMaterial: renglon.material?.nombre,
+      });
+    }
+
     // La referencia queda en cada movimiento: desde el stock se llega a la orden.
     const referencia = dto.remito ? `${orden.numero} · Remito ${dto.remito}` : orden.numero;
 
     const recibida = await this.repo.recibir({
       id,
-      fechaRecepcion: dto.fechaRecepcion ? new Date(dto.fechaRecepcion) : new Date(),
+      fechaRecepcion,
       recibidaPorId: usuarioActual?.id ?? null,
       referencia,
       notas: dto.notas ?? null,

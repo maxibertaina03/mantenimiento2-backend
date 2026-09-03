@@ -19,6 +19,7 @@ import {
   REPOSITORIO_MOVIMIENTOS,
   RepositorioMovimientos,
 } from './movimientos-stock.puerto';
+import { verificarNoQuedaDetrasDeUnAjuste } from './regla-fecha-ajuste';
 
 /**
  * Motivos válidos según el tipo de movimiento.
@@ -58,11 +59,35 @@ export class MovimientosStockService {
     }
   }
 
+  /**
+   * Comprueba que la fecha no caiga por detras del ultimo ajuste del material.
+   *
+   * Es publico porque la recepcion de una orden de compra genera movimientos de
+   * ENTRADA por su cuenta, con la fecha de recepcion que carga el usuario: es la
+   * misma puerta al mismo problema, y la regla tiene que valer en las dos.
+   */
+  async verificarFechaContraAjustes(
+    materialId: string,
+    fecha: Date,
+    opciones: { excluirMovimientoId?: string; nombreDelMaterial?: string } = {},
+  ): Promise<void> {
+    const ultimoAjuste = await this.repo.fechaDelUltimoAjuste(
+      materialId,
+      opciones.excluirMovimientoId,
+    );
+    verificarNoQuedaDetrasDeUnAjuste(fecha, ultimoAjuste, opciones.nombreDelMaterial);
+  }
+
   async crear(dto: CrearMovimientoDto, usuarioIdActual?: string): Promise<MovimientoRespuestaDto> {
     const cantidad = aDecimal(dto.cantidad);
 
     this.validarCantidad(dto.tipo, cantidad);
     this.validarTipoYMotivo(dto.tipo, dto.motivo);
+
+    // Vale tambien para un AJUSTE nuevo: retrofechado por detras de otro ajuste
+    // arrastra el mismo desacuerdo entre el stock guardado y el recalculo.
+    const fechaDelMovimiento = dto.fecha ? new Date(dto.fecha) : new Date();
+    await this.verificarFechaContraAjustes(dto.materialId, fechaDelMovimiento);
 
     // Regla de negocio: cómo cambia el stock según el tipo de movimiento.
     // Toda la aritmética es Decimal para no arrastrar error de punto flotante.
@@ -94,7 +119,7 @@ export class MovimientosStockService {
         tipo: dto.tipo,
         motivo: dto.motivo,
         cantidad,
-        fecha: dto.fecha ? new Date(dto.fecha) : undefined,
+        fecha: dto.fecha ? fechaDelMovimiento : undefined,
         proveedorId: dto.proveedorId,
         usuarioId: usuarioIdActual ?? dto.usuarioId,
         referenciaTrabajo: dto.referenciaTrabajo,
@@ -177,6 +202,13 @@ export class MovimientosStockService {
     // Validaciones de negocio (mismas reglas que al crear).
     this.validarCantidad(tipo, cantidad);
     this.validarTipoYMotivo(tipo, motivo);
+
+    // El movimiento no se compara contra si mismo: si no, ninguna edicion de un
+    // ajuste seria posible. Una edicion que lo retrofechara por detras de OTRO
+    // ajuste movería el stock sola, que es justo la sorpresa que se evita.
+    await this.verificarFechaContraAjustes(actual.materialId, fecha, {
+      excluirMovimientoId: id,
+    });
 
     // Snapshot antes/después (valores serializables para la auditoría).
     const antes = {

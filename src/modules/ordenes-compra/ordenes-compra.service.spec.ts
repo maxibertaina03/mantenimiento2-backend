@@ -11,6 +11,7 @@ import { CorreoService } from '../../common/correo/correo.service';
 import { OrdenesCompraRepository } from './ordenes-compra.repository';
 import { ProveedoresService } from '../proveedores/proveedores.service';
 import { MaterialesService } from '../materiales/materiales.service';
+import { MovimientosStockService } from '../movimientos-stock/movimientos-stock.service';
 import { aDecimal } from '../../common/dominio/decimal';
 
 const ordenBase = {
@@ -61,6 +62,11 @@ function armar(orden: any = ordenBase) {
   };
   const proveedores = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'prov-1' })) };
   const materiales = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'mat-1' })) };
+  // Por defecto el material no tiene ajustes: la regla de la fecha no estorba a
+  // las pruebas que estan mirando otra cosa.
+  const movimientos = {
+    verificarFechaContraAjustes: jest.fn<Promise<any>, any[]>(async () => undefined),
+  };
   const correo = {
     estaConfigurado: jest.fn(() => true),
     enviar: jest.fn<Promise<any>, any[]>(async () => undefined),
@@ -75,12 +81,14 @@ function armar(orden: any = ordenBase) {
     repo,
     proveedores,
     materiales,
+    movimientos,
     correo,
     config,
     service: new OrdenesCompraService(
       repo as unknown as OrdenesCompraRepository,
       proveedores as unknown as ProveedoresService,
       materiales as unknown as MaterialesService,
+      movimientos as unknown as MovimientosStockService,
       correo as unknown as CorreoService,
       config as unknown as ConfigService,
     ),
@@ -457,5 +465,53 @@ describe('OrdenesCompraService - enviarPorCorreo()', () => {
       BadRequestException,
     );
     expect(correo.enviar).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrdenesCompraService - recibir() y la fecha del ultimo ajuste', () => {
+  it('REGRESION: no recibe con una fecha anterior al ultimo ajuste del material', async () => {
+    // Recibir genera un movimiento de ENTRADA por renglon con la fecha de
+    // recepcion: es la misma puerta al mismo problema que cargar el movimiento
+    // a mano, y si la regla valiera solo en un lado se colaria por el otro.
+    const { service, movimientos, repo } = armar({
+      ...ordenBase,
+      estado: EstadoOrdenCompra.EMITIDA,
+    });
+    movimientos.verificarFechaContraAjustes.mockRejectedValue(
+      new BadRequestException('La fecha es anterior al último ajuste'),
+    );
+
+    await expect(
+      service.recibir('oc-1', { fechaRecepcion: '2026-08-15T12:00:00.000Z' } as any),
+    ).rejects.toThrow(BadRequestException);
+
+    // Y no se recibio nada: ni media orden.
+    expect(repo.recibir).not.toHaveBeenCalled();
+  });
+
+  it('comprueba TODOS los renglones antes de tocar el stock', async () => {
+    // Si se comprobara renglon por renglon mientras se recibe, una orden podria
+    // quedar a medio recibir y sin forma de retomarla: el estado ya cambio.
+    const orden = {
+      ...ordenBase,
+      estado: EstadoOrdenCompra.EMITIDA,
+      renglones: [
+        { ...ordenBase.renglones[0], id: 'r1', materialId: 'mat-1' },
+        { ...ordenBase.renglones[0], id: 'r2', materialId: 'mat-2' },
+      ],
+    };
+    const { service, movimientos } = armar(orden);
+
+    await service.recibir('oc-1', {} as any);
+
+    expect(movimientos.verificarFechaContraAjustes).toHaveBeenCalledTimes(2);
+  });
+
+  it('sin ajustes de por medio, recibir sigue funcionando igual', async () => {
+    const { service, repo } = armar({ ...ordenBase, estado: EstadoOrdenCompra.EMITIDA });
+
+    await service.recibir('oc-1', {} as any);
+
+    expect(repo.recibir).toHaveBeenCalled();
   });
 });

@@ -179,6 +179,22 @@ export class MovimientosStockRepository implements RepositorioMovimientos {
     });
   }
 
+  async fechaDelUltimoAjuste(
+    materialId: string,
+    excluirMovimientoId?: string,
+  ): Promise<Date | null> {
+    const ultimo = await this.prisma.movimientoStock.findFirst({
+      where: {
+        materialId,
+        tipo: TipoMovimiento.AJUSTE,
+        ...(excluirMovimientoId ? { id: { not: excluirMovimientoId } } : {}),
+      },
+      orderBy: { fecha: 'desc' },
+      select: { fecha: true },
+    });
+    return ultimo?.fecha ?? null;
+  }
+
   listarEdiciones(movimientoId: string): Promise<EdicionConUsuario[]> {
     return this.prisma.edicionMovimiento.findMany({
       where: { movimientoId },
