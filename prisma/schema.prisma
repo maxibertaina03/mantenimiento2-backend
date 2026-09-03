@@ -605,8 +605,38 @@ model PlanMantenimiento {
 
   equipo         Equipo         @relation(fields: [equipoId], references: [id], onDelete: Cascade)
   intervenciones Intervencion[]
+  avisos         AvisoEnviado[]
 
   @@index([equipoId])
   @@index([proximaFecha])
   @@map("planes_mantenimiento")
+}
+
+/// Qué aviso de mantenimiento ya se mandó.
+///
+/// Es lo que hace idempotente al envío. El disparador corre todos los días; sin
+/// este registro, un service vencido que nadie atiende generaría un correo
+/// idéntico cada mañana, y a la semana alguien arma una regla de bandeja que
+/// los archiva sin leer. Ahí el módulo entero deja de servir.
+model AvisoEnviado {
+  id     String @id @default(uuid())
+  planId String
+
+  /// La fecha de vencimiento del ciclo que se avisó, no la del envío.
+  ///
+  /// Es la otra mitad de la clave: cuando el trabajo se hace, el plan avanza a
+  /// otra fecha y eso habilita el aviso del ciclo siguiente sin tocar nada.
+  fechaService DateTime
+
+  enviadoEn DateTime @default(now())
+
+  /// A quiénes se les mandó, separados por coma. Para poder responder "¿por qué
+  /// no me llegó?" sin adivinar.
+  destinatarios String
+
+  plan PlanMantenimiento @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, fechaService])
+  @@index([enviadoEn])
+  @@map("avisos_enviados")
 }

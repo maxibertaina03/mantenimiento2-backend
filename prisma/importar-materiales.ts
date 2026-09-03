@@ -881,7 +881,9 @@ async function main() {
   }
 
   console.log(`✅ Nombres en la lista: ${nombres.length}`);
-  console.log(`✅ Insertados ahora: ${aInsertar.length} (ya existían: ${nombres.length - aInsertar.length})`);
+  console.log(
+    `✅ Insertados ahora: ${aInsertar.length} (ya existían: ${nombres.length - aInsertar.length})`,
+  );
   console.log(`✅ Total de materiales en la DB: ${await prisma.material.count()}`);
 }
 

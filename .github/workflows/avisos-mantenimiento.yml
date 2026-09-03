@@ -1,0 +1,64 @@
+# Dispara los avisos de mantenimiento por correo.
+#
+# El cron vive acá y no adentro de la aplicación porque el plan gratuito de
+# Render APAGA el servidor cuando nadie lo usa: un `@Cron` de Nest no se
+# ejecutaría justamente de madrugada, que es cuando tiene que correr. La llamada
+# HTTP, además, despierta al servidor.
+name: Avisos de mantenimiento
+
+on:
+  schedule:
+    # 07:00 en Argentina (UTC-3). GitHub interpreta el cron en UTC.
+    - cron: '0 10 * * *'
+  # Para dispararlo a mano desde la pestaña Actions, sin esperar a mañana.
+  workflow_dispatch:
+    inputs:
+      dias:
+        description: 'Cuántos días de anticipación (por defecto 7)'
+        required: false
+        default: '7'
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Procesar los avisos
+        env:
+          URL_API: ${{ secrets.URL_API }}
+          TOKEN_AVISOS: ${{ secrets.TOKEN_AVISOS }}
+          DIAS: ${{ inputs.dias || '7' }}
+        run: |
+          set -u
+
+          # Se reintenta porque Render tarda hasta un minuto en levantar desde
+          # dormido, y el primer pedido se encuentra un 502. Reintentar es
+          # seguro: el endpoint es idempotente, dos llamadas el mismo día mandan
+          # un solo correo.
+          for intento in 1 2 3 4 5 6; do
+            respuesta=$(curl -s -w '\n%{http_code}' -X POST --max-time 120 \
+              -H "x-token-avisos: $TOKEN_AVISOS" \
+              "$URL_API/api/avisos/procesar?dias=$DIAS" || echo $'\n000')
+
+            codigo=$(echo "$respuesta" | tail -n1)
+            cuerpo=$(echo "$respuesta" | sed '$d')
+
+            if [ "$codigo" = "200" ]; then
+              echo "$cuerpo"
+              exit 0
+            fi
+
+            # 401 es un token mal configurado: reintentar no lo va a arreglar.
+            if [ "$codigo" = "401" ]; then
+              echo "::error::Token rechazado. Revisá el secret TOKEN_AVISOS y la variable del mismo nombre en Render."
+              exit 1
+            fi
+
+            echo "Intento $intento: HTTP $codigo. El servidor puede estar despertando; espero 20 s."
+            sleep 20
+          done
+
+          # Que falle en rojo: un aviso que no salió tiene que verse en la lista
+          # de Actions, no quedar escondido en un log verde.
+          echo "::error::El disparador de avisos falló (último código HTTP: $codigo)"
+          echo "$cuerpo"
+          exit 1

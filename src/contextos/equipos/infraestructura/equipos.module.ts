@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ALMACEN_IMAGENES } from '../puertos/almacen-imagenes';
+import { DESTINATARIOS_AVISOS } from '../puertos/destinatarios-avisos';
+import { ENVIADOR_AVISOS } from '../puertos/enviador-avisos';
+import { REPOSITORIO_AVISOS } from '../puertos/repositorio-avisos';
 import { REPOSITORIO_INTERVENCIONES } from '../puertos/repositorio-intervenciones';
 import { REPOSITORIO_PLANES } from '../puertos/repositorio-planes';
 import { REPOSITORIO_EQUIPOS } from '../puertos/repositorio-equipos';
@@ -10,7 +13,11 @@ import {
   TiposEquipoPlantaController,
   UbicacionesEquipoController,
 } from './catalogos.controller';
+import { AvisosController } from './avisos.controller';
+import { CorreoEnviadorAvisos } from './correo-enviador-avisos';
 import { EquiposController } from './equipos.controller';
+import { PrismaDestinatariosAvisos } from './prisma-destinatarios-avisos';
+import { PrismaRepositorioAvisos } from './prisma-repositorio-avisos';
 import { PrismaRepositorioEquipos } from './prisma-repositorio-equipos';
 import { PrismaRepositorioIntervenciones } from './prisma-repositorio-intervenciones';
 import { PrismaRepositorioPlanes } from './prisma-repositorio-planes';
@@ -26,7 +33,12 @@ import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
  * con las implementaciones en memoria sin cambiar una línea.
  */
 @Module({
-  controllers: [EquiposController, UbicacionesEquipoController, TiposEquipoPlantaController],
+  controllers: [
+    EquiposController,
+    AvisosController,
+    UbicacionesEquipoController,
+    TiposEquipoPlantaController,
+  ],
   providers: [
     CatalogosEquipoService,
     { provide: REPOSITORIO_EQUIPOS, useClass: PrismaRepositorioEquipos },
@@ -34,6 +46,9 @@ import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
     { provide: REPOSITORIO_INTERVENCIONES, useClass: PrismaRepositorioIntervenciones },
     { provide: REPOSITORIO_PLANES, useClass: PrismaRepositorioPlanes },
     { provide: ALMACEN_IMAGENES, useClass: SupabaseAlmacenImagenes },
+    { provide: REPOSITORIO_AVISOS, useClass: PrismaRepositorioAvisos },
+    { provide: DESTINATARIOS_AVISOS, useClass: PrismaDestinatariosAvisos },
+    { provide: ENVIADOR_AVISOS, useClass: CorreoEnviadorAvisos },
     { provide: RELOJ, useClass: RelojDelSistema },
   ],
   exports: [REPOSITORIO_EQUIPOS, RELOJ],

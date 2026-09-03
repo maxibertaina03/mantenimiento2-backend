@@ -1119,7 +1119,9 @@ async function main() {
 
   console.log(`✅ Filas en la lista: ${filas.length}`);
   console.log(`✅ Únicos por nombre: ${unicos.length}`);
-  console.log(`✅ Insertados ahora: ${aInsertar.length} (ya existían: ${unicos.length - aInsertar.length})`);
+  console.log(
+    `✅ Insertados ahora: ${aInsertar.length} (ya existían: ${unicos.length - aInsertar.length})`,
+  );
   console.log(`✅ Total de proveedores en la DB: ${await prisma.proveedor.count()}`);
 }
 

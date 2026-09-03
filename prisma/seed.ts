@@ -22,7 +22,11 @@ async function main() {
 
   // ── Usuarios ──
   const admin = await prisma.usuario.create({
-    data: { nombre: 'Admin Mantenimiento', email: 'admin@mantenimiento.local', rol: RolUsuario.ADMIN },
+    data: {
+      nombre: 'Admin Mantenimiento',
+      email: 'admin@mantenimiento.local',
+      rol: RolUsuario.ADMIN,
+    },
   });
   const operario = await prisma.usuario.create({
     data: { nombre: 'Juan Operario', email: 'juan@mantenimiento.local', rol: RolUsuario.OPERARIO },

@@ -263,7 +263,7 @@ describe('el ciclo completo: registrar un trabajo adelanta el plan', () => {
 
   it('un plan borrado entre medio no rompe el registro del trabajo', async () => {
     // El trabajo se hizo igual: perderlo por un plan que ya no está sería peor.
-    const { crearEquipo, gestionar, registrar } = armar();
+    const { crearEquipo, registrar } = armar();
     const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 1' });
 
     await expect(
