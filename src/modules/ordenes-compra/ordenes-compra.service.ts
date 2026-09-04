@@ -337,6 +337,20 @@ export class OrdenesCompraService {
     }
     this.validarTransicion(orden.numero, orden.estado, EstadoOrdenCompra.RECIBIDA);
 
+    // Sin comprobante no se cierra la orden. Es lo único que ata la entrada de
+    // stock al papel que quedó en la empresa: sin eso, una diferencia de
+    // inventario no se puede reconstruir contra nada. La regla vive acá y no
+    // solo en el DTO para que valga también si mañana la recepción entra por
+    // otro lado (una importación, un script).
+    const remito = dto.remito?.trim() || null;
+    const factura = dto.factura?.trim() || null;
+    if (!remito && !factura) {
+      throw new BadRequestException(
+        `Para cerrar la orden ${orden.numero} hace falta el número de remito o el de ` +
+          'factura del proveedor. Es lo que después permite cruzar el stock con el papel.',
+      );
+    }
+
     const fechaRecepcion = dto.fechaRecepcion ? new Date(dto.fechaRecepcion) : new Date();
 
     // Recibir genera un movimiento de ENTRADA por renglón con esta fecha, así
@@ -349,14 +363,20 @@ export class OrdenesCompraService {
       });
     }
 
-    // La referencia queda en cada movimiento: desde el stock se llega a la orden.
-    const referencia = dto.remito ? `${orden.numero} · Remito ${dto.remito}` : orden.numero;
+    // La referencia queda en cada movimiento: desde el stock se llega a la orden
+    // y al comprobante sin abrir nada más.
+    const comprobante = [remito ? `Remito ${remito}` : null, factura ? `Factura ${factura}` : null]
+      .filter(Boolean)
+      .join(' · ');
+    const referencia = `${orden.numero} · ${comprobante}`;
 
     const recibida = await this.repo.recibir({
       id,
       fechaRecepcion,
       recibidaPorId: usuarioActual?.id ?? null,
       referencia,
+      remito,
+      factura,
       notas: dto.notas ?? null,
     });
 

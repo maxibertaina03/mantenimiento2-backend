@@ -66,8 +66,17 @@ export interface Destinatarios {
  * de perderse.
  */
 export function destinatarios(orden: OrdenRespuestaDto, mailAdministracion: string): Destinatarios {
-  if (esEmailValido(orden.proveedorEmail)) {
-    return { para: [orden.proveedorEmail!.trim()], copia: [mailAdministracion] };
+  if (!esEmailValido(orden.proveedorEmail)) {
+    return { para: [mailAdministracion], copia: [] };
   }
-  return { para: [mailAdministracion], copia: [] };
+
+  const proveedor = orden.proveedorEmail!.trim();
+
+  // Si el proveedor tiene cargada la misma casilla que administración, la copia
+  // sobra: mandar dos veces a la misma dirección la deja duplicada en la
+  // bandeja, y hay proveedores de correo que rechazan el mensaje entero por
+  // destinatario repetido.
+  const esLaMisma = proveedor.toLowerCase() === mailAdministracion.trim().toLowerCase();
+
+  return { para: [proveedor], copia: esLaMisma ? [] : [mailAdministracion] };
 }

@@ -72,6 +72,12 @@ export class OrdenRespuestaDto {
   @ApiPropertyOptional({ nullable: true }) recibidaEn!: Date | null;
   @ApiPropertyOptional({ nullable: true }) recibidaPorNombre!: string | null;
 
+  @ApiPropertyOptional({ description: 'Nº de remito con el que llegó', nullable: true })
+  remito!: string | null;
+
+  @ApiPropertyOptional({ description: 'Nº de factura con el que llegó', nullable: true })
+  factura!: string | null;
+
   @ApiProperty({ type: [RenglonRespuestaDto] }) renglones!: RenglonRespuestaDto[];
 
   @ApiPropertyOptional({
@@ -109,6 +115,8 @@ export class OrdenRespuestaDto {
       emitidaEn: o.emitidaEn,
       recibidaEn: o.recibidaEn,
       recibidaPorNombre: o.recibidaPor?.nombre ?? null,
+      remito: o.remito,
+      factura: o.factura,
       renglones,
       total,
       editable: o.estado === EstadoOrdenCompra.BORRADOR,

@@ -41,6 +41,9 @@ const ordenBase = {
   ],
 };
 
+/** Recepción mínima válida: sin comprobante ya no se puede cerrar una orden. */
+const RECEPCION = { remito: 'R-0001-00012345' };
+
 const dtoBase = {
   proveedorId: 'prov-1',
   renglones: [{ materialId: 'mat-1', cantidad: 100, precioUnitario: 10 }],
@@ -219,26 +222,32 @@ describe('OrdenesCompraService - transiciones de estado', () => {
 
   it('EMITIDA -> RECIBIDA se permite', async () => {
     const { service, repo } = conEstado(EstadoOrdenCompra.EMITIDA);
-    await service.recibir('oc-1', {} as any);
+    await service.recibir('oc-1', RECEPCION as any);
     expect(repo.recibir).toHaveBeenCalled();
   });
 
   it('REGRESION: BORRADOR -> RECIBIDA NO se permite (hay que emitir primero)', async () => {
     const { service, repo } = conEstado(EstadoOrdenCompra.BORRADOR);
-    await expect(service.recibir('oc-1', {} as any)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.recibir('oc-1', RECEPCION as any)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(repo.recibir).not.toHaveBeenCalled();
   });
 
   it('REGRESION: una orden RECIBIDA no se puede volver a recibir (duplicaria el stock)', async () => {
     const { service, repo } = conEstado(EstadoOrdenCompra.RECIBIDA);
-    await expect(service.recibir('oc-1', {} as any)).rejects.toThrow(/no puede pasar a RECIBIDA/);
+    await expect(service.recibir('oc-1', RECEPCION as any)).rejects.toThrow(
+      /no puede pasar a RECIBIDA/,
+    );
     expect(repo.recibir).not.toHaveBeenCalled();
   });
 
   it('una orden ANULADA no se puede emitir ni recibir', async () => {
     const { service } = conEstado(EstadoOrdenCompra.ANULADA);
     await expect(service.emitir('oc-1')).rejects.toBeInstanceOf(BadRequestException);
-    await expect(service.recibir('oc-1', {} as any)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.recibir('oc-1', RECEPCION as any)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('una orden RECIBIDA no se puede anular (ya movio stock)', async () => {
@@ -262,10 +271,12 @@ describe('OrdenesCompraService - transiciones de estado', () => {
 });
 
 describe('OrdenesCompraService - recepcion', () => {
-  it('usa el numero de orden como referencia del movimiento', async () => {
+  it('la referencia del movimiento lleva la orden Y el comprobante', async () => {
+    // Desde el historial de stock se llega a la orden y al papel sin abrir
+    // nada mas, que es para lo que sirve al revisar una diferencia.
     const { service, repo } = armar({ ...ordenBase, estado: EstadoOrdenCompra.EMITIDA });
-    await service.recibir('oc-1', {} as any);
-    expect(repo.recibir.mock.calls[0][0].referencia).toBe('OC-2026-0001');
+    await service.recibir('oc-1', RECEPCION as any);
+    expect(repo.recibir.mock.calls[0][0].referencia).toBe('OC-2026-0001 · Remito R-0001-00012345');
   });
 
   it('si hay remito, queda en la referencia (trazabilidad)', async () => {
@@ -276,21 +287,24 @@ describe('OrdenesCompraService - recepcion', () => {
 
   it('registra quien recibio', async () => {
     const { service, repo } = armar({ ...ordenBase, estado: EstadoOrdenCompra.EMITIDA });
-    await service.recibir('oc-1', {} as any, { id: 'user-7' } as Usuario);
+    await service.recibir('oc-1', RECEPCION as any, { id: 'user-7' } as Usuario);
     expect(repo.recibir.mock.calls[0][0].recibidaPorId).toBe('user-7');
   });
 
   it('sin fecha explicita usa el momento actual', async () => {
     const { service, repo } = armar({ ...ordenBase, estado: EstadoOrdenCompra.EMITIDA });
     const antes = Date.now();
-    await service.recibir('oc-1', {} as any);
+    await service.recibir('oc-1', RECEPCION as any);
     const usada = repo.recibir.mock.calls[0][0].fechaRecepcion as Date;
     expect(usada.getTime()).toBeGreaterThanOrEqual(antes);
   });
 
   it('respeta la fecha de recepcion informada', async () => {
     const { service, repo } = armar({ ...ordenBase, estado: EstadoOrdenCompra.EMITIDA });
-    await service.recibir('oc-1', { fechaRecepcion: '2026-08-20T09:00:00.000Z' } as any);
+    await service.recibir('oc-1', {
+      ...RECEPCION,
+      fechaRecepcion: '2026-08-20T09:00:00.000Z',
+    } as any);
     expect((repo.recibir.mock.calls[0][0].fechaRecepcion as Date).toISOString()).toBe(
       '2026-08-20T09:00:00.000Z',
     );
@@ -505,7 +519,7 @@ describe('OrdenesCompraService - recibir() y la fecha del ultimo ajuste', () => 
     );
 
     await expect(
-      service.recibir('oc-1', { fechaRecepcion: '2026-08-15T12:00:00.000Z' } as any),
+      service.recibir('oc-1', { ...RECEPCION, fechaRecepcion: '2026-08-15T12:00:00.000Z' } as any),
     ).rejects.toThrow(BadRequestException);
 
     // Y no se recibio nada: ni media orden.
@@ -525,7 +539,7 @@ describe('OrdenesCompraService - recibir() y la fecha del ultimo ajuste', () => 
     };
     const { service, movimientos } = armar(orden);
 
-    await service.recibir('oc-1', {} as any);
+    await service.recibir('oc-1', RECEPCION as any);
 
     expect(movimientos.verificarFechaContraAjustes).toHaveBeenCalledTimes(2);
   });
@@ -533,7 +547,7 @@ describe('OrdenesCompraService - recibir() y la fecha del ultimo ajuste', () => 
   it('sin ajustes de por medio, recibir sigue funcionando igual', async () => {
     const { service, repo } = armar({ ...ordenBase, estado: EstadoOrdenCompra.EMITIDA });
 
-    await service.recibir('oc-1', {} as any);
+    await service.recibir('oc-1', RECEPCION as any);
 
     expect(repo.recibir).toHaveBeenCalled();
   });
@@ -640,5 +654,73 @@ describe('OrdenesCompraService - constancia de los envios', () => {
     ]);
 
     expect((await service.listarEnvios('oc-1'))[0].usuarioNombre).toBeNull();
+  });
+});
+
+describe('OrdenesCompraService - el comprobante es obligatorio al recibir', () => {
+  const emitida = () => armar({ ...ordenBase, estado: EstadoOrdenCompra.EMITIDA });
+
+  it('REGRESION: sin remito ni factura no se cierra la orden', async () => {
+    // El comprobante es lo unico que ata la entrada de stock al papel que
+    // quedo en la empresa. Sin eso, una diferencia de inventario no se puede
+    // reconstruir contra nada.
+    const { service, repo } = emitida();
+
+    await expect(service.recibir('oc-1', {} as any)).rejects.toThrow(BadRequestException);
+
+    // Y no entro stock: la orden sigue esperando la mercaderia.
+    expect(repo.recibir).not.toHaveBeenCalled();
+  });
+
+  it('el mensaje dice que sirve remito O factura', async () => {
+    const { service } = emitida();
+    let mensaje = '';
+    try {
+      await service.recibir('oc-1', {} as any);
+    } catch (e) {
+      mensaje = (e as BadRequestException).message;
+    }
+    expect(mensaje).toMatch(/remito/i);
+    expect(mensaje).toMatch(/factura/i);
+  });
+
+  it('con solo el remito alcanza', async () => {
+    const { service, repo } = emitida();
+    await service.recibir('oc-1', { remito: 'R-0001-00012345' } as any);
+    expect(repo.recibir.mock.calls[0][0].remito).toBe('R-0001-00012345');
+    expect(repo.recibir.mock.calls[0][0].factura).toBeNull();
+  });
+
+  it('con solo la factura tambien', async () => {
+    // A veces la mercaderia llega con factura y sin remito.
+    const { service, repo } = emitida();
+    await service.recibir('oc-1', { factura: 'A-0001-00098765' } as any);
+    expect(repo.recibir.mock.calls[0][0].factura).toBe('A-0001-00098765');
+    expect(repo.recibir.mock.calls[0][0].referencia).toContain('Factura A-0001-00098765');
+  });
+
+  it('si vienen los dos, los dos quedan en la referencia', async () => {
+    const { service, repo } = emitida();
+    await service.recibir('oc-1', { remito: 'R-1', factura: 'F-2' } as any);
+    expect(repo.recibir.mock.calls[0][0].referencia).toBe(
+      'OC-2026-0001 · Remito R-1 · Factura F-2',
+    );
+  });
+
+  it('REGRESION: un comprobante con solo espacios no cuenta', async () => {
+    // Si contara, alcanzaria con apretar la barra espaciadora para saltear la
+    // regla, y el campo quedaria guardado vacio igual.
+    const { service, repo } = emitida();
+
+    await expect(service.recibir('oc-1', { remito: '   ' } as any)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(repo.recibir).not.toHaveBeenCalled();
+  });
+
+  it('los espacios de los costados no se guardan', async () => {
+    const { service, repo } = emitida();
+    await service.recibir('oc-1', { remito: '  R-0001-00012345  ' } as any);
+    expect(repo.recibir.mock.calls[0][0].remito).toBe('R-0001-00012345');
   });
 });

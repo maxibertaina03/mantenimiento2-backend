@@ -430,6 +430,14 @@ model OrdenCompra {
   recibidaEn    DateTime?
   recibidaPorId String?
 
+  /// Comprobante con el que llegó la mercadería. Al recibir hay que cargar uno
+  /// de los dos: es lo único que ata la entrada de stock al papel que quedó en
+  /// la empresa, y sin eso una diferencia de inventario no se puede
+  /// reconstruir. Son dos campos y no uno porque a veces llega remito, a veces
+  /// factura, y a veces los dos con números distintos.
+  remito  String?
+  factura String?
+
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 

@@ -11,6 +11,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 import type { Usuario } from '@prisma/client';
@@ -34,7 +35,10 @@ import { UsuariosService } from './usuarios.service';
 @ApiBearerAuth()
 @Controller('usuarios')
 export class UsuariosController {
-  constructor(private readonly service: UsuariosService) {}
+  constructor(
+    private readonly service: UsuariosService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear un usuario' })
@@ -54,7 +58,28 @@ export class UsuariosController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Usuario autenticado actual (o null si no hay sesión)' })
   yo(@UsuarioActual() usuario?: Usuario): UsuarioRespuestaDto | null {
-    return usuario ? UsuarioRespuestaDto.desde(usuario) : null;
+    if (usuario) return UsuarioRespuestaDto.desde(usuario);
+
+    // Con AUTH_DISABLED no hay sesión, así que esto devolvía null y el frontend
+    // trataba a quien probara en local como si no fuera administrador: las
+    // pantallas reservadas a admin quedaban escondidas y no había forma de
+    // probarlas sin levantar Clerk.
+    //
+    // No abre nada: con AUTH_DISABLED la API ya está completamente abierta, y
+    // el guard deja pasar todo antes de llegar acá. La condición es sobre el
+    // valor exacto "true" para que un typo no lo active en producción.
+    if (this.config.get<string>('AUTH_DISABLED') === 'true') {
+      return {
+        id: 'sin-sesion-local',
+        nombre: 'Usuario local (sin login)',
+        email: 'local@sin-acceso.local',
+        rol: RolUsuario.ADMIN,
+        creadoEn: new Date(),
+        actualizadoEn: new Date(),
+      } as UsuarioRespuestaDto;
+    }
+
+    return null;
   }
 
   @Get(':id')

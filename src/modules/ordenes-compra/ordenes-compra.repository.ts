@@ -243,9 +243,11 @@ export class OrdenesCompraRepository {
     fechaRecepcion: Date;
     recibidaPorId: string | null;
     referencia: string;
+    remito: string | null;
+    factura: string | null;
     notas?: string | null;
   }): Promise<OrdenConRelaciones> {
-    const { id, fechaRecepcion, recibidaPorId, referencia, notas } = params;
+    const { id, fechaRecepcion, recibidaPorId, referencia, remito, factura, notas } = params;
 
     return this.prisma.$transaction(async (tx) => {
       const orden = await tx.ordenCompra.findUnique({
@@ -301,6 +303,8 @@ export class OrdenesCompraRepository {
           estado: EstadoOrdenCompra.RECIBIDA,
           recibidaEn: fechaRecepcion,
           recibidaPorId,
+          remito,
+          factura,
         },
         include: this.relaciones,
       });

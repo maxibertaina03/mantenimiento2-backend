@@ -42,7 +42,9 @@ const paramsRecibir = {
   id: 'oc-1',
   fechaRecepcion: new Date('2026-08-27T12:00:00.000Z'),
   recibidaPorId: 'user-1',
-  referencia: 'OC-2026-0001',
+  referencia: 'OC-2026-0001 · Remito 1234',
+  remito: '1234',
+  factura: null,
   notas: null,
 };
 
@@ -85,7 +87,7 @@ describe('OrdenesCompraRepository.recibir()', () => {
     await repo.recibir(paramsRecibir);
 
     const datos = (tx.movimientoStock.create as jest.Mock).mock.calls[0][0].data;
-    expect(datos.referenciaTrabajo).toBe('OC-2026-0001');
+    expect(datos.referenciaTrabajo).toBe('OC-2026-0001 · Remito 1234');
     expect(datos.tipo).toBe('ENTRADA');
     expect(datos.motivo).toBe('COMPRA');
   });
