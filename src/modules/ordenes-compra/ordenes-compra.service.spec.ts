@@ -724,3 +724,59 @@ describe('OrdenesCompraService - el comprobante es obligatorio al recibir', () =
     expect(repo.recibir.mock.calls[0][0].remito).toBe('R-0001-00012345');
   });
 });
+
+describe('OrdenesCompraService - sin copia interna configurada', () => {
+  const conProveedor = (email: string | null) => ({
+    ...ordenBase,
+    proveedor: { nombre: 'Ferreteria Central', cuit: '30-1', email, telefono: null },
+  });
+
+  /** Como queda el servidor con MAIL_ADMINISTRACION borrada del panel. */
+  const sinCasillaInterna = (orden: any) => {
+    const armado = armar(orden);
+    armado.repo.buscarPorId.mockResolvedValue(orden);
+    armado.config.get.mockReturnValue(undefined);
+    return armado;
+  };
+
+  it('la orden sale SOLO al proveedor', async () => {
+    const { service, correo } = sinCasillaInterna(conProveedor('ventas@ferreteria.com.ar'));
+
+    const r = await service.enviarPorCorreo('oc-1', { pdfBase64: 'JVBERi0=' } as any);
+
+    expect(r.para).toEqual(['ventas@ferreteria.com.ar']);
+    expect(r.copia).toEqual([]);
+    expect(correo.enviar.mock.calls[0][0].copia).toEqual([]);
+  });
+
+  it('REGRESION: un proveedor sin correo no se manda a la nada', async () => {
+    // Sin destinatario, el envio no falla: simplemente no le llega a nadie, y
+    // la orden quedaria registrada como enviada.
+    const { service, correo, repo } = sinCasillaInterna(conProveedor(null));
+
+    await expect(service.enviarPorCorreo('oc-1', { pdfBase64: 'JVBERi0=' } as any)).rejects.toThrow(
+      BadRequestException,
+    );
+
+    expect(correo.enviar).not.toHaveBeenCalled();
+    expect(repo.registrarEnvio).not.toHaveBeenCalled();
+  });
+
+  it('el error dice como resolverlo, no solo que fallo', async () => {
+    const { service } = sinCasillaInterna(conProveedor(null));
+
+    let mensaje = '';
+    try {
+      await service.enviarPorCorreo('oc-1', { pdfBase64: 'JVBERi0=' } as any);
+    } catch (e) {
+      mensaje = (e as BadRequestException).message;
+    }
+    expect(mensaje).toMatch(/cargale el correo/i);
+    expect(mensaje).toMatch(/whatsapp/i);
+  });
+
+  it('la configuracion que ve la pantalla dice que no hay copia interna', () => {
+    const { service } = sinCasillaInterna(conProveedor('ventas@ferreteria.com.ar'));
+    expect(service.configuracionDeEnvio().mailAdministracion).toBeNull();
+  });
+});

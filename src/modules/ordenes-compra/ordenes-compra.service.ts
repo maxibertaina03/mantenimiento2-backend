@@ -67,9 +67,18 @@ export class OrdenesCompraService {
     }
 
     const orden = await this.obtener(id);
-    const mailAdministracion =
-      this.config.get<string>('MAIL_ADMINISTRACION') ?? 'administracion@lacteoslastres.com.ar';
-    const { para, copia } = destinatarios(orden, mailAdministracion);
+    const { para, copia } = destinatarios(orden, this.mailAdministracion());
+
+    // Un proveedor sin correo y sin copia interna configurada no deja a dónde
+    // mandar. Mandar un correo sin destinatario no falla: simplemente no le
+    // llega a nadie, y la orden quedaría marcada como enviada.
+    if (para.length === 0) {
+      throw new BadRequestException(
+        `${orden.proveedorNombre ?? 'El proveedor'} no tiene correo cargado, y no hay una ` +
+          'casilla interna configurada para recibir la copia. Cargale el correo desde esta ' +
+          'misma pantalla, o mandale la orden por WhatsApp.',
+      );
+    }
     const { asunto, cuerpo } = armarMensaje(orden);
 
     // El correo del usuario va en Reply-To: el remitente es la casilla del
@@ -182,11 +191,21 @@ export class OrdenesCompraService {
    */
   configuracionDeEnvio() {
     return {
-      mailAdministracion:
-        this.config.get<string>('MAIL_ADMINISTRACION') ?? 'administracion@lacteoslastres.com.ar',
+      mailAdministracion: this.mailAdministracion(),
       whatsappAdministracion: this.config.get<string>('WHATSAPP_ADMINISTRACION') ?? null,
       correoConfigurado: this.correo.estaConfigurado(),
     };
+  }
+
+  /**
+   * La casilla que recibe copia de cada orden, o null si no hay ninguna.
+   *
+   * Sin valor por defecto escrito en el código: si lo hubiera, borrar la
+   * variable en el panel no apagaría nada y los correos seguirían saliendo a
+   * una casilla que ya nadie quiso.
+   */
+  private mailAdministracion(): string | null {
+    return this.config.get<string>('MAIL_ADMINISTRACION')?.trim() || null;
   }
 
   /** Valida que existan el proveedor y todos los materiales del detalle. */

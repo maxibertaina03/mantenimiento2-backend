@@ -61,13 +61,32 @@ export interface Destinatarios {
 /**
  * A quién va la orden.
  *
- * Administración recibe siempre: si el proveedor tiene correo va en copia, y si
- * no lo tiene pasa a ser el destinatario, así el envío queda registrado en vez
- * de perderse.
+ * La copia interna es opcional. Hoy está apagada porque el servidor de correo
+ * de la empresa rechaza todo lo que sale por Brevo con
+ * `550 5.7.1 Blacklisted [France, Europe]`: es un bloqueo por IP europea, no un
+ * problema de autenticación, así que ningún registro DNS lo arregla y la copia
+ * rebotaba siempre. Que quede como opcional y no borrada permite volver a
+ * encenderla con una variable el día que el hosting lo destrabe.
+ *
+ * Sin copia interna, la constancia de lo que salió la da la tabla
+ * `envios_orden`, que además guarda lo que se mandó por WhatsApp.
+ *
+ * `para` puede volver vacío: es el caso de un proveedor sin correo y sin copia
+ * interna configurada. Quien llama tiene que tratarlo, porque mandar un correo
+ * sin destinatario no falla, simplemente no le llega a nadie.
  */
-export function destinatarios(orden: OrdenRespuestaDto, mailAdministracion: string): Destinatarios {
+export function destinatarios(
+  orden: OrdenRespuestaDto,
+  mailAdministracion: string | null,
+): Destinatarios {
+  const interno = (mailAdministracion ?? '').trim();
+  const copiaInterna = esEmailValido(interno) ? [interno] : [];
+
   if (!esEmailValido(orden.proveedorEmail)) {
-    return { para: [mailAdministracion], copia: [] };
+    // Sin correo del proveedor, la copia interna pasa a ser el destinatario:
+    // así el envío queda registrado en vez de perderse. Si tampoco hay copia
+    // interna, no hay a dónde mandarlo y `para` vuelve vacío.
+    return { para: copiaInterna, copia: [] };
   }
 
   const proveedor = orden.proveedorEmail!.trim();
@@ -76,7 +95,7 @@ export function destinatarios(orden: OrdenRespuestaDto, mailAdministracion: stri
   // sobra: mandar dos veces a la misma dirección la deja duplicada en la
   // bandeja, y hay proveedores de correo que rechazan el mensaje entero por
   // destinatario repetido.
-  const esLaMisma = proveedor.toLowerCase() === mailAdministracion.trim().toLowerCase();
+  const esLaMisma = proveedor.toLowerCase() === interno.toLowerCase();
 
-  return { para: [proveedor], copia: esLaMisma ? [] : [mailAdministracion] };
+  return { para: [proveedor], copia: esLaMisma ? [] : copiaInterna };
 }

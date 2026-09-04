@@ -89,3 +89,39 @@ describe('esEmailValido', () => {
     expect(esEmailValido(v)).toBe(false);
   });
 });
+
+describe('destinatarios sin copia interna', () => {
+  // Hoy la copia interna esta apagada: el servidor de correo de la empresa
+  // rechaza todo lo que sale por Brevo con 550 Blacklisted [France, Europe],
+  // asi que rebotaba siempre.
+  it('sin casilla interna, la orden va SOLO al proveedor', () => {
+    expect(destinatarios(orden(), null)).toEqual({
+      para: ['ventas@ferreteria.com.ar'],
+      copia: [],
+    });
+  });
+
+  it('una casilla interna vacia se trata como si no hubiera', () => {
+    // Es lo que queda al borrar la variable en el panel sin quitar la linea.
+    expect(destinatarios(orden(), '   ').copia).toEqual([]);
+  });
+
+  it('una casilla interna rota tampoco se usa', () => {
+    // Mandarle a algo que no es una direccion hace rebotar el envio entero.
+    expect(destinatarios(orden(), 'esto no es un correo').copia).toEqual([]);
+  });
+
+  it('REGRESION: sin correo del proveedor NI casilla interna, no hay a donde mandar', () => {
+    // Mandar un correo sin destinatario no falla: simplemente no le llega a
+    // nadie, y la orden quedaria marcada como enviada. Quien llama tiene que
+    // ver este caso y frenar.
+    expect(destinatarios(orden({ proveedorEmail: null }), null)).toEqual({ para: [], copia: [] });
+  });
+
+  it('con casilla interna, un proveedor sin correo sigue teniendo a donde ir', () => {
+    expect(destinatarios(orden({ proveedorEmail: null }), ADMIN)).toEqual({
+      para: [ADMIN],
+      copia: [],
+    });
+  });
+});

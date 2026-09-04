@@ -45,8 +45,13 @@ services:
         sync: false
       - key: SUPABASE_BUCKET
         value: equipos
+      # Copia interna de las órdenes. Vacía a propósito: el servidor de correo
+      # de la empresa rechaza lo que sale por Brevo con "550 Blacklisted
+      # [France, Europe]", un bloqueo por IP europea del hosting que ningún
+      # registro DNS arregla. La orden va solo al proveedor y la constancia
+      # queda en envios_orden. Se reactiva poniéndole una dirección.
       - key: MAIL_ADMINISTRACION
-        value: administracion@lacteoslastres.com.ar
+        value: ""
       # WhatsApp de administración, para mandarle una copia de la orden. Antes
       # estaba escrito en el código del frontend, donde cambiarlo pedía un
       # deploy. Si falta, ese botón no aparece.
