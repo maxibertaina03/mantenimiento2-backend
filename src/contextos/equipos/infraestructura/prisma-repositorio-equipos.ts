@@ -8,6 +8,7 @@ import {
   FiltroEquipos,
   PaginaEquipos,
   RepositorioEquipos,
+  ResumenEquipos,
 } from '../puertos/repositorio-equipos';
 
 /** Lo que trae Prisma, antes de convertirlo a la forma del dominio. */
@@ -166,5 +167,29 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
 
   async eliminar(id: string): Promise<void> {
     await this.prisma.equipo.delete({ where: { id } });
+  }
+
+  async resumen(): Promise<ResumenEquipos> {
+    // Dos agregados en paralelo: contar por estado, y contar los que necesitan
+    // mantenimiento y no tienen ningun plan activo.
+    const [porEstado, sinPlan, total] = await Promise.all([
+      this.prisma.equipo.groupBy({ by: ['estado'], _count: { _all: true } }),
+      this.prisma.equipo.count({
+        where: {
+          // Un equipo dado de baja o fuera de servicio no deberia tener plan:
+          // no tiene sentido contarlo como un hueco. El estado va como texto,
+          // no como enum de Postgres, asi que se comparan las cadenas.
+          estado: { in: ['OPERATIVO', 'EN_REPARACION'] },
+          planes: { none: { activo: true } },
+        },
+      }),
+      this.prisma.equipo.count(),
+    ]);
+
+    return {
+      total,
+      porEstado: Object.fromEntries(porEstado.map((f) => [f.estado, f._count._all])),
+      sinPlan,
+    };
   }
 }

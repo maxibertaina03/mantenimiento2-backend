@@ -122,6 +122,13 @@ export class EquiposController {
     });
   }
 
+  // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
+  @Get('resumen')
+  @ApiOperation({ summary: 'Cuántos equipos hay, en qué estado, y cuántos sin plan' })
+  resumen() {
+    return this.repo.resumen();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un equipo' })
   obtener(@Param('id', ParseUUIDPipe) id: string) {

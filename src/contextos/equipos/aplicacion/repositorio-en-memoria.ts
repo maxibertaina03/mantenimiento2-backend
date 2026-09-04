@@ -4,6 +4,7 @@ import {
   FiltroEquipos,
   PaginaEquipos,
   RepositorioEquipos,
+  ResumenEquipos,
 } from '../puertos/repositorio-equipos';
 
 /**
@@ -108,5 +109,19 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
   async eliminar(id: string): Promise<void> {
     const i = this.filas.findIndex((f) => f.id === id);
     if (i >= 0) this.filas.splice(i, 1);
+  }
+
+  async resumen(): Promise<ResumenEquipos> {
+    const porEstado: Record<string, number> = {};
+    for (const e of this.filas) porEstado[e.estado] = (porEstado[e.estado] ?? 0) + 1;
+
+    // Sin planes cargados en el doble, todos los que requieren mantenimiento
+    // cuentan como sin plan. Los tests que miran los planes usan su propio
+    // repositorio.
+    const sinPlan = this.filas.filter(
+      (e) => e.estado === 'OPERATIVO' || e.estado === 'EN_REPARACION',
+    ).length;
+
+    return { total: this.filas.length, porEstado, sinPlan };
   }
 }

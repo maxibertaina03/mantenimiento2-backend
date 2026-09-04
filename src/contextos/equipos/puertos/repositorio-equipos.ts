@@ -58,7 +58,30 @@ export interface RepositorioEquipos {
   /** Inserta una tanda. Devuelve cuántos entraron. */
   crearVarios(equipos: Omit<Equipo, 'id'>[]): Promise<number>;
   listar(filtro: FiltroEquipos): Promise<PaginaEquipos>;
+  /**
+   * El estado del parque en una sola consulta.
+   *
+   * En una y no varias porque lo pide la pantalla de inicio, que se abre todo
+   * el tiempo: son 326 equipos y no tiene sentido traerlos para contarlos en
+   * memoria cada vez que alguien entra al sistema.
+   */
+  resumen(): Promise<ResumenEquipos>;
   eliminar(id: string): Promise<void>;
+}
+
+/** Cuántos equipos hay y en qué estado, para la pantalla de inicio. */
+export interface ResumenEquipos {
+  total: number;
+  /** Cuántos hay en cada estado. Los estados sin equipos no aparecen. */
+  porEstado: Record<string, number>;
+  /**
+   * Equipos que necesitan mantenimiento y no tienen ningún plan activo.
+   *
+   * Es el número que dice cuánto del parque está fuera del alcance de los
+   * avisos: sin plan, un equipo nunca va a generar un recordatorio, y eso no se
+   * ve mirando la pantalla de servicios, que justamente lista lo que sí tiene.
+   */
+  sinPlan: number;
 }
 
 export const REPOSITORIO_EQUIPOS = Symbol('RepositorioEquipos');
