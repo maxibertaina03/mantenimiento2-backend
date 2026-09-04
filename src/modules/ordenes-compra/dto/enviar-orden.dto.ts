@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { EstadoOrdenCompra } from '@prisma/client';
 import { IsString, MaxLength, MinLength } from 'class-validator';
 
 /** ~6 MB de base64 ≈ 4,5 MB de PDF. Una orden pesa muy por debajo de eso. */
@@ -25,4 +26,19 @@ export class ResultadoEnvioDto {
 
   @ApiProperty({ description: 'A dónde contesta el proveedor si responde' })
   responderA!: string | null;
+
+  @ApiProperty({
+    enum: EstadoOrdenCompra,
+    description: 'Estado en que quedó la orden. Al mandarla, un BORRADOR pasa a EMITIDA.',
+  })
+  estado!: EstadoOrdenCompra;
+}
+
+/** El envío por WhatsApp lo hace la persona; el sistema solo deja constancia. */
+export class RegistrarWhatsappDto {
+  @ApiProperty({ description: 'El número al que se abrió el chat', example: '5493534403519' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(20)
+  numero!: string;
 }

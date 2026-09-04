@@ -59,6 +59,13 @@ function armar(orden: any = ordenBase) {
       estado: EstadoOrdenCompra.RECIBIDA,
     })),
     eliminar: jest.fn<Promise<any>, any[]>(async () => undefined),
+    // Registrar el envio emite la orden si estaba en BORRADOR: el doble
+    // devuelve la orden ya emitida, como la de verdad.
+    registrarEnvio: jest.fn<Promise<any>, any[]>(async () => ({
+      ...orden,
+      estado: EstadoOrdenCompra.EMITIDA,
+    })),
+    listarEnvios: jest.fn<Promise<any>, any[]>(async () => []),
   };
   const proveedores = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'prov-1' })) };
   const materiales = {
@@ -529,5 +536,109 @@ describe('OrdenesCompraService - recibir() y la fecha del ultimo ajuste', () => 
     await service.recibir('oc-1', {} as any);
 
     expect(repo.recibir).toHaveBeenCalled();
+  });
+});
+
+describe('OrdenesCompraService - constancia de los envios', () => {
+  it('REGRESION: mandar la orden la emite, no la deja editable', async () => {
+    // Una orden que ya salio no puede seguir editandose, o el proveedor termina
+    // con un PDF que no coincide con lo que dice el sistema.
+    const { service, repo } = armar();
+
+    const r = await service.enviarPorCorreo('oc-1', { pdfBase64: 'JVBERi0=' } as any);
+
+    expect(repo.registrarEnvio).toHaveBeenCalled();
+    expect(r.estado).toBe(EstadoOrdenCompra.EMITIDA);
+  });
+
+  it('REGRESION: si el correo falla, no queda constancia de un envio que no paso', async () => {
+    // Al reves, "ya se la mandamos" seria mentira justo cuando alguien lo
+    // consulta para no mandarla dos veces.
+    const { service, repo, correo } = armar();
+    correo.enviar.mockRejectedValue(new Error('Brevo respondio 500'));
+
+    await expect(
+      service.enviarPorCorreo('oc-1', { pdfBase64: 'JVBERi0=' } as any),
+    ).rejects.toThrow();
+    expect(repo.registrarEnvio).not.toHaveBeenCalled();
+  });
+
+  it('guarda a quien se le mando, destinatarios y copia juntos', async () => {
+    // Para poder contestar "¿por que no le llego?" sin adivinar.
+    const { service, repo } = armar();
+
+    await service.enviarPorCorreo('oc-1', { pdfBase64: 'JVBERi0=' } as any);
+
+    const registro = repo.registrarEnvio.mock.calls[0][0];
+    expect(registro.via).toBe('CORREO');
+    expect(registro.automatico).toBe(true);
+    expect(registro.destinatarios).toContain('administracion@lacteoslastres.com.ar');
+  });
+
+  it('el envio por WhatsApp se registra como NO automatico', async () => {
+    // El sistema abre el chat; quien manda es la persona. Marcarlo como
+    // automatico haria leer el registro como una confirmacion de entrega.
+    const { service, repo } = armar();
+
+    await service.registrarEnvioWhatsapp('oc-1', '5493534403519');
+
+    const registro = repo.registrarEnvio.mock.calls[0][0];
+    expect(registro.via).toBe('WHATSAPP');
+    expect(registro.automatico).toBe(false);
+    expect(registro.destinatarios).toBe('5493534403519');
+  });
+
+  it('mandar por WhatsApp tambien emite la orden', async () => {
+    const { service, repo } = armar();
+
+    await service.registrarEnvioWhatsapp('oc-1', '5493534403519');
+
+    expect(repo.registrarEnvio).toHaveBeenCalled();
+  });
+
+  it('registrar un envio de una orden que no existe da 404', async () => {
+    const { service, repo } = armar();
+    repo.buscarPorId.mockResolvedValue(null);
+
+    await expect(service.registrarEnvioWhatsapp('oc-9', '549353')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(repo.registrarEnvio).not.toHaveBeenCalled();
+  });
+
+  it('lista los envios con quien los hizo', async () => {
+    const { service, repo } = armar();
+    repo.listarEnvios.mockResolvedValue([
+      {
+        id: 'e1',
+        via: 'CORREO',
+        destinatarios: 'proveedor@x.com',
+        automatico: true,
+        enviadoEn: new Date('2026-09-04'),
+        usuario: { nombre: 'Máximo' },
+      },
+    ]);
+
+    const envios = await service.listarEnvios('oc-1');
+
+    expect(envios[0].usuarioNombre).toBe('Máximo');
+    expect(envios[0].via).toBe('CORREO');
+  });
+
+  it('un envio sin usuario no rompe el listado', async () => {
+    // Los movimientos viejos y los cargados sin sesion no tienen usuario.
+    const { service, repo } = armar();
+    repo.listarEnvios.mockResolvedValue([
+      {
+        id: 'e1',
+        via: 'WHATSAPP',
+        destinatarios: '549353',
+        automatico: false,
+        enviadoEn: new Date('2026-09-04'),
+        usuario: null,
+      },
+    ]);
+
+    expect((await service.listarEnvios('oc-1'))[0].usuarioNombre).toBeNull();
   });
 });

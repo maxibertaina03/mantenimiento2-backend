@@ -20,7 +20,7 @@ import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
 import { RolUsuario } from '@prisma/client';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
-import { EnviarOrdenDto } from './dto/enviar-orden.dto';
+import { EnviarOrdenDto, RegistrarWhatsappDto } from './dto/enviar-orden.dto';
 import { OrdenesCompraService } from './ordenes-compra.service';
 
 @ApiTags('Órdenes de compra')
@@ -39,6 +39,13 @@ export class OrdenesCompraController {
   @ApiOperation({ summary: 'Listar órdenes con filtros (estado, proveedor, rango de fechas)' })
   listar(@Query() query: ListarOrdenesDto) {
     return this.service.listar(query);
+  }
+
+  // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
+  @Get('configuracion-envio')
+  @ApiOperation({ summary: 'Casilla y WhatsApp de administración, y si el correo está andando' })
+  configuracionEnvio() {
+    return this.service.configuracionDeEnvio();
   }
 
   @Get(':id')
@@ -90,6 +97,32 @@ export class OrdenesCompraController {
     @UsuarioActual() usuario?: Usuario,
   ) {
     return this.service.enviarPorCorreo(id, dto, usuario);
+  }
+
+  @Post(':id/registrar-whatsapp')
+  // Mismo criterio que el correo: deja constancia y emite la orden, así que no
+  // es algo que deba poder disparar cualquiera con una sesión.
+  @Roles(RolUsuario.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dejar constancia de que la orden se mandó por WhatsApp',
+    description:
+      'WhatsApp no sale solo: el sistema abre el chat con el texto escrito y la persona ' +
+      'toca enviar y adjunta el PDF. Esto registra ese envío y, si la orden estaba en ' +
+      'BORRADOR, la emite.',
+  })
+  registrarWhatsapp(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RegistrarWhatsappDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.service.registrarEnvioWhatsapp(id, dto.numero, usuario);
+  }
+
+  @Get(':id/envios')
+  @ApiOperation({ summary: 'Por dónde y cuándo salió esta orden' })
+  envios(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.listarEnvios(id);
   }
 
   @Patch(':id/anular')

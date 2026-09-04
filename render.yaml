@@ -47,6 +47,11 @@ services:
         value: equipos
       - key: MAIL_ADMINISTRACION
         value: administracion@lacteoslastres.com.ar
+      # WhatsApp de administración, para mandarle una copia de la orden. Antes
+      # estaba escrito en el código del frontend, donde cambiarlo pedía un
+      # deploy. Si falta, ese botón no aparece.
+      - key: WHATSAPP_ADMINISTRACION
+        value: "+54 9 3534 40-3519"
       # ── Avisos de mantenimiento ──
       # Casilla fija que recibe el correo diario de services que vencen, además
       # de los administradores.

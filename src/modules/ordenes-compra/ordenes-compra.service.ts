@@ -5,7 +5,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { EstadoOrdenCompra, Usuario } from '@prisma/client';
+import { EstadoOrdenCompra, Usuario, ViaEnvioOrden } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { aDecimal } from '../../common/dominio/decimal';
 import { finDelDia, inicioDelDia } from '../../common/dominio/fechas';
@@ -106,7 +106,87 @@ export class OrdenesCompraService {
       );
     }
 
-    return { para, copia, responderA: responderA ?? null };
+    // Se registra DESPUES de que el correo salio. Al reves, un fallo de Brevo
+    // dejaria constancia de un envio que nunca ocurrio, y "ya se la mandamos"
+    // pasaria a ser mentira justo cuando alguien lo consulta.
+    //
+    // Emitir va junto: una orden que ya salio no puede seguir editandose, o el
+    // proveedor termina con un PDF que no coincide con lo que dice el sistema.
+    const actualizada = await this.repo.registrarEnvio({
+      ordenId: id,
+      via: ViaEnvioOrden.CORREO,
+      destinatarios: [...para, ...copia].join(', '),
+      automatico: true,
+      usuarioId: usuario?.id ?? null,
+    });
+
+    return {
+      para,
+      copia,
+      responderA: responderA ?? null,
+      estado: actualizada.estado,
+    };
+  }
+
+  /**
+   * Deja constancia de que la orden se mando por WhatsApp.
+   *
+   * WhatsApp no sale solo: el sistema abre el chat con el texto escrito y la
+   * persona toca enviar y adjunta el PDF. Por eso se registra `automatico:
+   * false`, y por eso lo llama el frontend cuando la persona abre el chat, no
+   * cuando WhatsApp confirma nada.
+   *
+   * Es deliberadamente optimista: si alguien abre el chat y despues no manda,
+   * queda un envio registrado de mas. Lo contrario —no registrar nada— deja la
+   * orden en BORRADOR y editable despues de que el proveedor la recibio, que es
+   * bastante peor.
+   */
+  async registrarEnvioWhatsapp(
+    id: string,
+    numero: string,
+    usuario?: Usuario,
+  ): Promise<OrdenRespuestaDto> {
+    await this.obtener(id); // 404 con mensaje claro si no existe
+
+    const actualizada = await this.repo.registrarEnvio({
+      ordenId: id,
+      via: ViaEnvioOrden.WHATSAPP,
+      destinatarios: numero,
+      automatico: false,
+      usuarioId: usuario?.id ?? null,
+    });
+    return OrdenRespuestaDto.desde(actualizada);
+  }
+
+  /** Por dónde y cuándo salió esta orden. */
+  async listarEnvios(id: string) {
+    await this.obtener(id);
+    const envios = await this.repo.listarEnvios(id);
+    return envios.map((e) => ({
+      id: e.id,
+      via: e.via,
+      destinatarios: e.destinatarios,
+      automatico: e.automatico,
+      enviadoEn: e.enviadoEn,
+      usuarioNombre: e.usuario?.nombre ?? null,
+    }));
+  }
+
+  /**
+   * Los datos fijos de la empresa que la pantalla de envío necesita.
+   *
+   * Salen del servidor y no de una constante en el frontend: la casilla de
+   * administración ya estaba escrita en los dos lados, y el día que cambie hay
+   * que acordarse de los dos. El número de WhatsApp estaba solo en el frontend,
+   * donde nadie con acceso al panel de Render puede cambiarlo.
+   */
+  configuracionDeEnvio() {
+    return {
+      mailAdministracion:
+        this.config.get<string>('MAIL_ADMINISTRACION') ?? 'administracion@lacteoslastres.com.ar',
+      whatsappAdministracion: this.config.get<string>('WHATSAPP_ADMINISTRACION') ?? null,
+      correoConfigurado: this.correo.estaConfigurado(),
+    };
   }
 
   /** Valida que existan el proveedor y todos los materiales del detalle. */

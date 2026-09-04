@@ -1,5 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { EstadoOrdenCompra, MotivoMovimiento, Prisma, TipoMovimiento } from '@prisma/client';
+import {
+  EstadoOrdenCompra,
+  MotivoMovimiento,
+  Prisma,
+  TipoMovimiento,
+  ViaEnvioOrden,
+} from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { Decimal, aDecimal } from '../../common/dominio/decimal';
 import { OrdenConRelaciones } from './dto/orden-respuesta.dto';
@@ -167,6 +173,48 @@ export class OrdenesCompraRepository {
         },
         include: this.relaciones,
       });
+    });
+  }
+
+  /**
+   * Deja constancia de un envío y, si la orden estaba en BORRADOR, la emite.
+   *
+   * Las dos cosas juntas y en una transacción porque son la misma decisión: una
+   * orden que ya salió no puede seguir editándose, o el proveedor termina con
+   * un PDF que no coincide con lo que dice el sistema.
+   */
+  async registrarEnvio(params: {
+    ordenId: string;
+    via: ViaEnvioOrden;
+    destinatarios: string;
+    automatico: boolean;
+    usuarioId: string | null;
+  }): Promise<OrdenConRelaciones> {
+    const { ordenId, ...envio } = params;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.envioOrden.create({ data: { ordenId, ...envio } });
+
+      const orden = await tx.ordenCompra.findUniqueOrThrow({ where: { id: ordenId } });
+      if (orden.estado === EstadoOrdenCompra.BORRADOR) {
+        await tx.ordenCompra.update({
+          where: { id: ordenId },
+          data: { estado: EstadoOrdenCompra.EMITIDA, emitidaEn: new Date() },
+        });
+      }
+
+      return tx.ordenCompra.findUniqueOrThrow({
+        where: { id: ordenId },
+        include: this.relaciones,
+      });
+    });
+  }
+
+  listarEnvios(ordenId: string) {
+    return this.prisma.envioOrden.findMany({
+      where: { ordenId },
+      orderBy: { enviadoEn: 'desc' },
+      include: { usuario: { select: { nombre: true } } },
     });
   }
 

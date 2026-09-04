@@ -215,6 +215,7 @@ model Usuario {
   intervencionesCargadas   Intervencion[] @relation("IntervencionRegistro")
   ordenesCreadas          OrdenCompra[]        @relation("OrdenesCreadas")
   ordenesRecibidas        OrdenCompra[]        @relation("OrdenesRecibidas")
+  enviosDeOrden           EnvioOrden[]         @relation("EnviosDeOrden")
 
   @@map("usuarios")
 }
@@ -371,6 +372,46 @@ enum EstadoOrdenCompra {
   ANULADA
 }
 
+/// Por dónde salió una orden.
+///
+/// CORREO sale solo desde el servidor. WHATSAPP no: abre el chat con el texto
+/// escrito y la persona toca enviar y adjunta el PDF. Se registran los dos, y
+/// el campo dice cuál fue automático y cuál no, para que "se mandó" signifique
+/// lo mismo en los dos casos.
+enum ViaEnvioOrden {
+  CORREO
+  WHATSAPP
+}
+
+/// Registro de cada vez que una orden salió hacia afuera.
+///
+/// Sin esto, "¿le mandamos la orden a Fraluga?" no tiene respuesta en el
+/// sistema: hay que buscar en la casilla de quien la mandó, si es que fue esa
+/// persona la que la mandó. Con varias personas cargando órdenes eso no escala.
+model EnvioOrden {
+  id      String        @id @default(uuid())
+  ordenId String
+  via     ViaEnvioOrden
+
+  /// A quiénes se les mandó, separados por coma. En WhatsApp, el número.
+  destinatarios String
+
+  /// false en WhatsApp: el sistema abre el chat, pero quien manda es la persona.
+  /// Que quede escrito evita leer el registro como si fuera una confirmación de
+  /// entrega, que no lo es.
+  automatico Boolean @default(true)
+
+  enviadoEn DateTime @default(now())
+  usuarioId String?
+
+  orden   OrdenCompra @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  usuario Usuario?    @relation("EnviosDeOrden", fields: [usuarioId], references: [id])
+
+  @@index([ordenId])
+  @@index([enviadoEn])
+  @@map("envios_orden")
+}
+
 model OrdenCompra {
   id String @id @default(uuid())
 
@@ -396,6 +437,7 @@ model OrdenCompra {
   creadoPor   Usuario?             @relation("OrdenesCreadas", fields: [creadoPorId], references: [id])
   recibidaPor Usuario?             @relation("OrdenesRecibidas", fields: [recibidaPorId], references: [id])
   renglones   RenglonOrdenCompra[]
+  envios      EnvioOrden[]
 
   @@index([estado])
   @@index([proveedorId])
