@@ -28,19 +28,22 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
       codigoInterno: fila.codigoInterno ?? null,
       nombre: fila.nombre ?? 'Equipo',
       descripcion: fila.descripcion ?? null,
-      marca: fila.marca ?? null,
-      modelo: fila.modelo ?? null,
+      marcaId: fila.marcaId ?? null,
+      modeloId: fila.modeloId ?? null,
       numeroSerie: fila.numeroSerie ?? null,
       ubicacionId: fila.ubicacionId ?? null,
       tipoId: fila.tipoId ?? null,
       estado: fila.estado ?? 'OPERATIVO',
       fotoUrl: fila.fotoUrl ?? null,
+      qrGeneradoEn: fila.qrGeneradoEn ?? null,
       proveedorId: fila.proveedorId ?? null,
       horasUso: fila.horasUso ?? null,
       fechaAlta: fila.fechaAlta ?? null,
       garantiaHasta: fila.garantiaHasta ?? null,
       ubicacionNombre: fila.ubicacionNombre ?? null,
       tipoNombre: fila.tipoNombre ?? null,
+      marcaNombre: fila.marcaNombre ?? null,
+      modeloNombre: fila.modeloNombre ?? null,
       proveedorNombre: fila.proveedorNombre ?? null,
     };
     this.filas.push(completo);
@@ -123,5 +126,16 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
     ).length;
 
     return { total: this.filas.length, porEstado, sinPlan };
+  }
+
+  async marcarQrGenerado(ids: string[], cuando: Date): Promise<number> {
+    let n = 0;
+    for (const fila of this.filas) {
+      if (ids.includes(fila.id)) {
+        fila.qrGeneradoEn = cuando;
+        n++;
+      }
+    }
+    return n;
   }
 }

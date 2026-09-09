@@ -6,8 +6,9 @@ export interface Equipo {
   codigoInterno: string | null;
   nombre: string;
   descripcion: string | null;
-  marca: string | null;
-  modelo: string | null;
+  /** Referencias al catálogo. Antes eran texto libre y no se podían agrupar. */
+  marcaId: string | null;
+  modeloId: string | null;
   numeroSerie: string | null;
   ubicacionId: string | null;
   tipoId: string | null;
@@ -24,8 +25,8 @@ export interface DatosNuevoEquipo {
   nombre: string;
   codigoInterno?: string | null;
   descripcion?: string | null;
-  marca?: string | null;
-  modelo?: string | null;
+  marcaId?: string | null;
+  modeloId?: string | null;
   numeroSerie?: string | null;
   ubicacionId?: string | null;
   tipoId?: string | null;
@@ -86,8 +87,9 @@ export function crearEquipo(datos: DatosNuevoEquipo): Omit<Equipo, 'id'> {
     codigoInterno: normalizarCodigoInterno(datos.codigoInterno),
     nombre,
     descripcion: normalizarTexto(datos.descripcion),
-    marca: normalizarTexto(datos.marca),
-    modelo: normalizarTexto(datos.modelo),
+    // Son ids del catálogo, no texto: no hay nada que normalizar.
+    marcaId: datos.marcaId ?? null,
+    modeloId: datos.modeloId ?? null,
     numeroSerie: normalizarTexto(datos.numeroSerie),
     ubicacionId: datos.ubicacionId ?? null,
     tipoId: datos.tipoId ?? null,

@@ -16,6 +16,8 @@ type FilaEquipo = Prisma.EquipoGetPayload<{
   include: {
     ubicacion: { select: { nombre: true } };
     tipo: { select: { nombre: true } };
+    marca: { select: { nombre: true } };
+    modelo: { select: { nombre: true } };
     proveedor: { select: { nombre: true } };
   };
 }>;
@@ -35,6 +37,8 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
   private readonly relaciones = {
     ubicacion: { select: { nombre: true } },
     tipo: { select: { nombre: true } },
+    marca: { select: { nombre: true } },
+    modelo: { select: { nombre: true } },
     proveedor: { select: { nombre: true } },
   } as const;
 
@@ -44,19 +48,22 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
       codigoInterno: fila.codigoInterno,
       nombre: fila.nombre,
       descripcion: fila.descripcion,
-      marca: fila.marca,
-      modelo: fila.modelo,
+      marcaId: fila.marcaId,
+      modeloId: fila.modeloId,
       numeroSerie: fila.numeroSerie,
       ubicacionId: fila.ubicacionId,
       tipoId: fila.tipoId,
       estado: fila.estado as EstadoEquipo,
       fotoUrl: fila.fotoUrl,
+      qrGeneradoEn: fila.qrGeneradoEn,
       proveedorId: fila.proveedorId,
       horasUso: fila.horasUso === null ? null : Number(fila.horasUso),
       fechaAlta: fila.fechaAlta,
       garantiaHasta: fila.garantiaHasta,
       ubicacionNombre: fila.ubicacion?.nombre ?? null,
       tipoNombre: fila.tipo?.nombre ?? null,
+      marcaNombre: fila.marca?.nombre ?? null,
+      modeloNombre: fila.modelo?.nombre ?? null,
       proveedorNombre: fila.proveedor?.nombre ?? null,
     };
   }
@@ -148,7 +155,11 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
     }
     if (filtro.ubicacionId) where.ubicacionId = filtro.ubicacionId;
     if (filtro.tipoId) where.tipoId = filtro.tipoId;
+    if (filtro.marcaId) where.marcaId = filtro.marcaId;
+    if (filtro.modeloId) where.modeloId = filtro.modeloId;
     if (filtro.estado) where.estado = filtro.estado;
+    // Los que faltan etiquetar: es la lista que se manda a imprimir.
+    if (filtro.sinQr) where.qrGeneradoEn = null;
     if (filtro.garantiaVencidaAl) where.garantiaHasta = { lt: filtro.garantiaVencidaAl };
 
     const [filas, total] = await Promise.all([
@@ -163,6 +174,14 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
     ]);
 
     return { datos: filas.map((f) => this.aDominio(f)), total };
+  }
+
+  async marcarQrGenerado(ids: string[], cuando: Date): Promise<number> {
+    const { count } = await this.prisma.equipo.updateMany({
+      where: { id: { in: ids } },
+      data: { qrGeneradoEn: cuando },
+    });
+    return count;
   }
 
   async eliminar(id: string): Promise<void> {

@@ -527,6 +527,49 @@ model TipoEquipoPlanta {
   @@map("tipos_equipo_planta")
 }
 
+/// Marca del equipo.
+///
+/// Era texto libre en la ficha, y por eso "Grundfos", "GRUNDFOS" y "grundfos"
+/// eran tres marcas distintas para cualquier reporte. Como catálogo, la
+/// pregunta "cuántos equipos Grundfos tenemos" tiene una sola respuesta.
+model MarcaEquipo {
+  id     String  @id @default(uuid())
+  nombre String  @unique
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  equipos Equipo[]
+  modelos ModeloEquipo[]
+
+  @@map("marcas_equipo")
+}
+
+/// Modelo del equipo, colgado de su marca.
+///
+/// El modelo no existe solo: un "5030" de Grundfos no es el mismo que un "5030"
+/// de Siemens. Por eso cuelga de la marca en vez de ser una lista aparte, y por
+/// eso el nombre es único DENTRO de cada marca y no en todo el catálogo.
+model ModeloEquipo {
+  id      String @id @default(uuid())
+  marcaId String
+  nombre  String
+  orden   Int     @default(0)
+  activo  Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  marca   MarcaEquipo @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  equipos Equipo[]
+
+  @@unique([marcaId, nombre])
+  @@index([marcaId])
+  @@map("modelos_equipo")
+}
+
 model Equipo {
   id String @id @default(uuid())
 
@@ -536,8 +579,12 @@ model Equipo {
 
   nombre      String
   descripcion String?
-  marca       String?
-  modelo      String?
+
+  /// Marca y modelo salen de catálogos, no son texto libre: es lo que después
+  /// permite filtrar y contar. El número de serie sí es texto, porque es único
+  /// de cada máquina y un catálogo no tendría sentido.
+  marcaId     String?
+  modeloId    String?
   numeroSerie String?
 
   ubicacionId String?
@@ -549,6 +596,12 @@ model Equipo {
   estado String @default("OPERATIVO")
 
   fotoUrl String?
+
+  /// Cuándo se generó la etiqueta con el código QR de esta máquina.
+  ///
+  /// Es una fecha y no un sí/no para poder reimprimir las viejas si cambia el
+  /// formato de la etiqueta, y para saber cuáles quedan sin pegar.
+  qrGeneradoEn DateTime?
 
   /// A quién se le compró.
   proveedorId String?
@@ -565,12 +618,16 @@ model Equipo {
 
   ubicacion     UbicacionEquipo?  @relation(fields: [ubicacionId], references: [id])
   tipo          TipoEquipoPlanta? @relation(fields: [tipoId], references: [id])
+  marca         MarcaEquipo?      @relation(fields: [marcaId], references: [id])
+  modelo        ModeloEquipo?     @relation(fields: [modeloId], references: [id])
   proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
   intervenciones Intervencion[]
   planes         PlanMantenimiento[]
 
   @@index([ubicacionId])
   @@index([tipoId])
+  @@index([marcaId])
+  @@index([modeloId])
   @@index([estado])
   @@map("equipos")
 }

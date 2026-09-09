@@ -47,17 +47,33 @@ describe('crearEquipo', () => {
     expect(equipo.estado).toBe('OPERATIVO');
   });
 
-  it('normaliza todos los textos de una', () => {
+  it('normaliza los textos: espacios de sobra fuera, codigo en mayusculas', () => {
     const equipo = crearEquipo({
       nombre: '  Bomba   caldera 1 ',
-      marca: '  Grundfos ',
-      modelo: '   ',
       codigoInterno: 'bc-01',
     });
     expect(equipo.nombre).toBe('Bomba caldera 1');
-    expect(equipo.marca).toBe('Grundfos');
-    expect(equipo.modelo).toBeNull();
+    // El codigo va en mayusculas porque es un identificador: "bc-01" y "BC-01"
+    // son la misma chapita.
     expect(equipo.codigoInterno).toBe('BC-01');
+  });
+
+  it('marca y modelo pasan tal cual: son ids del catalogo, no texto', () => {
+    // Antes eran texto libre y se normalizaban. Ahora normalizarlos romperia
+    // la referencia.
+    const equipo = crearEquipo({
+      nombre: 'Bomba caldera 1',
+      marcaId: 'marca-1',
+      modeloId: 'modelo-1',
+    });
+    expect(equipo.marcaId).toBe('marca-1');
+    expect(equipo.modeloId).toBe('modelo-1');
+  });
+
+  it('sin marca ni modelo, quedan en null', () => {
+    const equipo = crearEquipo({ nombre: 'Bomba caldera 1' });
+    expect(equipo.marcaId).toBeNull();
+    expect(equipo.modeloId).toBeNull();
   });
 
   it('sin nombre no hay equipo', () => {

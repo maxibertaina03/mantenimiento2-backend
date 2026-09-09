@@ -10,6 +10,8 @@ import { REPOSITORIO_UBICACIONES } from '../puertos/repositorio-ubicaciones';
 import { RELOJ, RelojDelSistema } from '../puertos/reloj';
 import {
   CatalogosEquipoService,
+  MarcasEquipoController,
+  ModelosEquipoController,
   TiposEquipoPlantaController,
   UbicacionesEquipoController,
 } from './catalogos.controller';
@@ -38,6 +40,8 @@ import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
     AvisosController,
     UbicacionesEquipoController,
     TiposEquipoPlantaController,
+    MarcasEquipoController,
+    ModelosEquipoController,
   ],
   providers: [
     CatalogosEquipoService,

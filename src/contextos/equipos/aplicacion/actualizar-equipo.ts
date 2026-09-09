@@ -7,8 +7,8 @@ export interface CambiosEquipo {
   nombre?: string;
   codigoInterno?: string | null;
   descripcion?: string | null;
-  marca?: string | null;
-  modelo?: string | null;
+  marcaId?: string | null;
+  modeloId?: string | null;
   numeroSerie?: string | null;
   ubicacionId?: string | null;
   tipoId?: string | null;
@@ -69,11 +69,19 @@ export class ActualizarEquipo {
       parche.horasUso = cambios.horasUso;
     }
 
-    for (const campo of ['descripcion', 'marca', 'modelo', 'numeroSerie'] as const) {
+    for (const campo of ['descripcion', 'numeroSerie'] as const) {
       if (cambios[campo] !== undefined) parche[campo] = normalizarTexto(cambios[campo]);
     }
 
-    for (const campo of ['ubicacionId', 'tipoId', 'proveedorId', 'fotoUrl'] as const) {
+    // marcaId y modeloId van acá y no arriba: son ids del catálogo, no texto.
+    for (const campo of [
+      'ubicacionId',
+      'tipoId',
+      'marcaId',
+      'modeloId',
+      'proveedorId',
+      'fotoUrl',
+    ] as const) {
       if (cambios[campo] !== undefined) parche[campo] = cambios[campo] ?? null;
     }
 

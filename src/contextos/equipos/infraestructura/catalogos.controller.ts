@@ -16,12 +16,22 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { Roles } from '../../../common/auth/decorators/roles.decorator';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 
 /**
- * Los dos catálogos del contexto: dónde está el equipo y qué clase de equipo es.
+ * Los catálogos del contexto: dónde está el equipo, qué clase de equipo es, y
+ * de qué marca y modelo.
  *
  * Van escritos derecho contra Prisma, sin dominio ni puertos. Es deliberado:
  * son ABM de tres campos con una sola regla —no se borra lo que está en uso— y
@@ -239,5 +249,156 @@ export class TiposEquipoPlantaController {
   @ApiOperation({ summary: 'Eliminar un tipo (solo si no lo usa ningún equipo)' })
   eliminar(@Param('id', ParseUUIDPipe) id: string) {
     return this.servicio.eliminar(comoCatalogo(this.prisma.tipoEquipoPlanta), id, 'el tipo');
+  }
+}
+
+@ApiTags('Equipos · Marcas')
+@ApiBearerAuth()
+@Roles(RolUsuario.ADMIN)
+@Controller('marcas-equipo')
+export class MarcasEquipoController {
+  constructor(
+    private readonly servicio: CatalogosEquipoService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar marcas' })
+  listar(@Query('soloActivos') soloActivos?: string) {
+    return this.servicio.listar(comoCatalogo(this.prisma.marcaEquipo), soloActivos === 'true');
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear una marca' })
+  crear(@Body() dto: CrearItemCatalogoDto) {
+    return this.servicio.crear(comoCatalogo(this.prisma.marcaEquipo), dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Editar una marca' })
+  actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
+    return this.servicio.actualizar(comoCatalogo(this.prisma.marcaEquipo), id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Eliminar una marca (solo si no la usa ningún equipo)' })
+  eliminar(@Param('id', ParseUUIDPipe) id: string) {
+    return this.servicio.eliminar(comoCatalogo(this.prisma.marcaEquipo), id, 'la marca');
+  }
+}
+
+export class CrearModeloDto extends CrearItemCatalogoDto {
+  @ApiPropertyOptional({ description: 'La marca a la que pertenece', format: 'uuid' })
+  @IsUUID()
+  marcaId!: string;
+}
+
+/**
+ * Los modelos, que cuelgan de una marca.
+ *
+ * No usa el servicio genérico porque tiene una dimensión más: un modelo sin
+ * marca no significa nada, y el nombre es único DENTRO de cada marca, no en
+ * todo el catálogo. Un "5030" de Grundfos y un "5030" de Siemens conviven sin
+ * pisarse.
+ */
+@ApiTags('Equipos · Modelos')
+@ApiBearerAuth()
+@Roles(RolUsuario.ADMIN)
+@Controller('modelos-equipo')
+export class ModelosEquipoController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private aItem(f: {
+    id: string;
+    marcaId: string;
+    nombre: string;
+    orden: number;
+    activo: boolean;
+    marca?: { nombre: string } | null;
+    _count?: { equipos: number };
+  }) {
+    return {
+      id: f.id,
+      marcaId: f.marcaId,
+      marcaNombre: f.marca?.nombre ?? null,
+      nombre: f.nombre,
+      orden: f.orden,
+      activo: f.activo,
+      equipos: f._count?.equipos ?? 0,
+    };
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'Listar modelos',
+    description: 'Con `marcaId`, solo los de esa marca: es lo que usa el desplegable de la ficha.',
+  })
+  async listar(@Query('marcaId') marcaId?: string, @Query('soloActivos') soloActivos?: string) {
+    const filas = await this.prisma.modeloEquipo.findMany({
+      where: {
+        ...(marcaId ? { marcaId } : {}),
+        ...(soloActivos === 'true' ? { activo: true } : {}),
+      },
+      orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
+      include: { marca: { select: { nombre: true } }, _count: { select: { equipos: true } } },
+    });
+    return filas.map((f) => this.aItem(f));
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un modelo dentro de una marca' })
+  async crear(@Body() dto: CrearModeloDto) {
+    const marca = await this.prisma.marcaEquipo.findUnique({ where: { id: dto.marcaId } });
+    if (!marca) {
+      throw new NotFoundException(`No existe la marca con id ${dto.marcaId}`);
+    }
+    const nombre = dto.nombre.trim();
+
+    // El índice único ya lo garantiza; esto lo convierte en un mensaje que se
+    // entiende, en vez de un error de restricción de la base.
+    const repetido = await this.prisma.modeloEquipo.findFirst({
+      where: { marcaId: dto.marcaId, nombre: { equals: nombre, mode: 'insensitive' } },
+    });
+    if (repetido) {
+      throw new BadRequestException(
+        `${marca.nombre} ya tiene un modelo "${repetido.nombre}". Usá ese en vez de crear otro.`,
+      );
+    }
+
+    const fila = await this.prisma.modeloEquipo.create({
+      data: { marcaId: dto.marcaId, nombre, orden: dto.orden ?? 0, activo: dto.activo ?? true },
+      include: { marca: { select: { nombre: true } }, _count: { select: { equipos: true } } },
+    });
+    return this.aItem(fila);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Editar un modelo, o desactivarlo' })
+  async actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
+    const fila = await this.prisma.modeloEquipo.update({
+      where: { id },
+      data: { nombre: dto.nombre?.trim(), orden: dto.orden, activo: dto.activo },
+      include: { marca: { select: { nombre: true } }, _count: { select: { equipos: true } } },
+    });
+    return this.aItem(fila);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Eliminar un modelo (solo si no lo usa ningún equipo)' })
+  async eliminar(@Param('id', ParseUUIDPipe) id: string) {
+    const fila = await this.prisma.modeloEquipo.findUnique({
+      where: { id },
+      include: { _count: { select: { equipos: true } } },
+    });
+    if (!fila) throw new NotFoundException(`No existe el modelo con id ${id}`);
+    if (fila._count.equipos > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar "${fila.nombre}": lo usan ${fila._count.equipos} equipo(s). ` +
+          'Si ya no se usa, desactivalo en vez de borrarlo.',
+      );
+    }
+    await this.prisma.modeloEquipo.delete({ where: { id } });
   }
 }

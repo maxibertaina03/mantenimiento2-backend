@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBooleanString,
   IsDateString,
   IsIn,
   IsNumber,
@@ -42,8 +43,9 @@ export class CrearEquipoDto {
   @MaxLength(1000)
   descripcion?: string | null;
 
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) marca?: string | null;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) modelo?: string | null;
+  // Marca y modelo salen de catálogos: acá viajan los ids, no el texto.
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() marcaId?: string | null;
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() modeloId?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) numeroSerie?: string | null;
 
   @ApiPropertyOptional({ format: 'uuid' })
@@ -102,6 +104,15 @@ export class ListarEquiposDto extends PaginacionDto {
 
   @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() ubicacionId?: string;
   @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() tipoId?: string;
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() marcaId?: string;
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() modeloId?: string;
+  @ApiPropertyOptional({
+    description: 'true = solo los que todavía no tienen etiqueta QR generada',
+    example: 'true',
+  })
+  @IsOptional()
+  @IsBooleanString()
+  sinQr?: string;
 
   @ApiPropertyOptional({ enum: ESTADOS_EQUIPO })
   @IsOptional()

@@ -5,6 +5,10 @@ import { EstadoEquipo } from '../dominio/estado-equipo';
 export interface EquipoConRelaciones extends Equipo {
   ubicacionNombre: string | null;
   tipoNombre: string | null;
+  /** Cuándo se imprimió su etiqueta QR. null = todavía no tiene. */
+  qrGeneradoEn: Date | null;
+  marcaNombre: string | null;
+  modeloNombre: string | null;
   proveedorNombre: string | null;
 }
 
@@ -13,7 +17,11 @@ export interface FiltroEquipos {
   buscar?: string;
   ubicacionId?: string;
   tipoId?: string;
+  marcaId?: string;
+  modeloId?: string;
   estado?: EstadoEquipo;
+  /** Solo los que todavía no tienen etiqueta QR generada. */
+  sinQr?: boolean;
   /** Solo los que ya no están en garantía, comparando contra esta fecha. */
   garantiaVencidaAl?: Date;
   ordenarPor?: 'nombre' | 'codigo' | 'ubicacion';
@@ -66,6 +74,13 @@ export interface RepositorioEquipos {
    * memoria cada vez que alguien entra al sistema.
    */
   resumen(): Promise<ResumenEquipos>;
+  /**
+   * Deja constancia de que a estos equipos ya se les generó la etiqueta QR.
+   *
+   * En una sola llamada porque las etiquetas se imprimen de a tandas: son 326
+   * máquinas y nadie las va a etiquetar de a una.
+   */
+  marcarQrGenerado(ids: string[], cuando: Date): Promise<number>;
   eliminar(id: string): Promise<void>;
 }
 

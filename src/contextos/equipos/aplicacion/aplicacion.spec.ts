@@ -70,21 +70,21 @@ describe('ActualizarEquipo', () => {
     const { crear, actualizar } = armar();
     const original = await crear.ejecutar({
       nombre: 'Compresor 1',
-      marca: 'Atlas',
-      modelo: 'GA7',
+      marcaId: 'marca-1',
+      modeloId: 'modelo-1',
     });
 
     const editado = await actualizar.ejecutar(original.id, { nombre: 'Compresor uno' });
     expect(editado.nombre).toBe('Compresor uno');
-    expect(editado.marca).toBe('Atlas');
-    expect(editado.modelo).toBe('GA7');
+    expect(editado.marcaId).toBe('marca-1');
+    expect(editado.modeloId).toBe('modelo-1');
   });
 
   it('null si borra el campo', async () => {
     const { crear, actualizar } = armar();
-    const original = await crear.ejecutar({ nombre: 'Compresor', marca: 'Atlas' });
-    const editado = await actualizar.ejecutar(original.id, { marca: null });
-    expect(editado.marca).toBeNull();
+    const original = await crear.ejecutar({ nombre: 'Compresor', marcaId: 'marca-1' });
+    const editado = await actualizar.ejecutar(original.id, { marcaId: null });
+    expect(editado.marcaId).toBeNull();
   });
 
   it('editar sin cambiar el codigo no choca consigo mismo', async () => {

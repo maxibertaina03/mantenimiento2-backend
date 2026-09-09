@@ -49,6 +49,7 @@ import { FiltroErroresDominio } from './filtro-errores-dominio';
 import { DetectarImportacionDto, ImportarEquiposDto } from './importacion.dto';
 import { RegistrarIntervencionDto } from './intervenciones.dto';
 import { ActualizarPlanDto, CrearPlanDto } from './planes.dto';
+import { MarcarQrDto } from './qr.dto';
 
 /**
  * La entrada HTTP del contexto.
@@ -112,7 +113,10 @@ export class EquiposController {
       buscar: query.buscar,
       ubicacionId: query.ubicacionId,
       tipoId: query.tipoId,
+      marcaId: query.marcaId,
+      modeloId: query.modeloId,
       estado: query.estado,
+      sinQr: query.sinQr === 'true',
       // El corte de garantía es "hoy", y hoy lo dice el reloj del contexto.
       garantiaVencidaAl: query.garantiaVencida === 'true' ? new Date() : undefined,
       ordenarPor: query.ordenarPor,
@@ -120,6 +124,18 @@ export class EquiposController {
       skip: query.skip,
       take: query.limite,
     });
+  }
+
+  @Post('qr/marcar-generados')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dejar constancia de que a estos equipos se les imprimió la etiqueta QR',
+    description:
+      'Lo llama la pantalla después de mandar a imprimir. Sirve para no volver a ' +
+      'imprimir las que ya están pegadas: son 326 máquinas y se etiquetan de a tandas.',
+  })
+  marcarQrGenerados(@Body() dto: MarcarQrDto) {
+    return this.repo.marcarQrGenerado(dto.ids, new Date()).then((marcados) => ({ marcados }));
   }
 
   // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
