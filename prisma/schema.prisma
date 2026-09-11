@@ -119,6 +119,13 @@ model Material {
   /// aparecer en los desplegables donde se elige qué cargar.
   activo Boolean @default(true)
 
+  /// Cuándo se generó la etiqueta con el código QR de este material.
+  ///
+  /// Igual que en los equipos: es una fecha y no un sí/no, para poder
+  /// reimprimir si cambia el formato de la etiqueta y para saber cuáles
+  /// quedan sin pegar en el estante.
+  qrGeneradoEn DateTime?
+
   notas         String?
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt

@@ -88,6 +88,9 @@ export class MaterialesService {
       };
     }
 
+    // Los que faltan etiquetar: es la lista que se manda a imprimir.
+    if (query.sinQr === 'true') where.qrGeneradoEn = null;
+
     if (query.bajoStock === 'true') {
       // Compara columna contra columna, así que se resuelve aparte y se cruza
       // por id con el resto de los filtros.
@@ -199,6 +202,16 @@ export class MaterialesService {
   }
 
   /** Cuántos materiales siguen sin unidad: lo muestra la pantalla de unidades. */
+  /**
+   * Deja constancia de que a estos materiales ya se les generó la etiqueta QR.
+   *
+   * En una sola llamada porque las etiquetas se imprimen de a tandas: son 900 y
+   * pico y nadie las va a etiquetar de a una.
+   */
+  async marcarQrGenerado(ids: string[]): Promise<{ marcados: number }> {
+    return { marcados: await this.repo.marcarQrGenerado(ids, new Date()) };
+  }
+
   async contarSinUnidad(): Promise<{ sinUnidad: number }> {
     return { sinUnidad: await this.repo.contarSinUnidad() };
   }

@@ -50,6 +50,12 @@ export class MaterialRespuestaDto {
   })
   activo!: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Cuándo se imprimió su etiqueta QR. null = todavía no tiene.',
+    nullable: true,
+  })
+  qrGeneradoEn!: Date | null;
+
   @ApiPropertyOptional({ nullable: true })
   notas!: string | null;
 
@@ -75,6 +81,7 @@ export class MaterialRespuestaDto {
       // Solo se marca bajo stock si hay un mínimo definido (> 0).
       bajoStock: stockMinimo > 0 && stockActual <= stockMinimo,
       activo: m.activo,
+      qrGeneradoEn: m.qrGeneradoEn,
       notas: m.notas,
       creadoEn: m.creadoEn,
       actualizadoEn: m.actualizadoEn,

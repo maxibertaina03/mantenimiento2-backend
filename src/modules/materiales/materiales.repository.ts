@@ -122,6 +122,14 @@ export class MaterialesRepository {
   }
 
   /** Cuántos materiales todavía no tienen unidad cargada. */
+  async marcarQrGenerado(ids: string[], cuando: Date): Promise<number> {
+    const { count } = await this.prisma.material.updateMany({
+      where: { id: { in: ids } },
+      data: { qrGeneradoEn: cuando },
+    });
+    return count;
+  }
+
   contarSinUnidad(): Promise<number> {
     return this.prisma.material.count({ where: { unidadId: null } });
   }

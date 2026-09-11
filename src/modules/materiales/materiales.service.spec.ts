@@ -39,6 +39,7 @@ function armar() {
     // Nombre libre por defecto: el choque de duplicados se prueba aparte.
     buscarPorNombreParecido: jest.fn<Promise<any>, any[]>(async () => []),
     contarSinStockMinimo: jest.fn<Promise<any>, any[]>(async () => 0),
+    marcarQrGenerado: jest.fn<Promise<any>, any[]>(async (ids: string[]) => ids.length),
     idsBajoStock: jest.fn<Promise<any>, any[]>(async () => ['mat-1', 'mat-2']),
     buscarTodosOrdenado: jest.fn<Promise<any>, any[]>(async () => [material]),
     asignarUnidadMasiva: jest.fn<Promise<any>, any[]>(async () => 831),
@@ -456,5 +457,37 @@ describe('MaterialesService - cobertura de las alertas', () => {
     const r = await service.coberturaDeAlertas();
     expect(r.sinMinimo).toBe(0);
     expect(r.conMinimo).toBe(10);
+  });
+});
+
+describe('MaterialesService - etiquetas QR', () => {
+  /** El `where` que el service le arma al repositorio. */
+  const filtro = (repo: any) => repo.buscarTodosOrdenado.mock.calls[0][2];
+
+  it('el filtro sinQr pide solo los que no tienen etiqueta', async () => {
+    // Es la lista que se manda a imprimir: reimprimir las que ya estan pegadas
+    // en el estante es gasto de papel y confusion.
+    const { service, repo } = armar();
+    await service.listar({ skip: 0, limite: 20, pagina: 1, sinQr: 'true' } as any);
+    expect(filtro(repo).qrGeneradoEn).toBeNull();
+  });
+
+  it('sin el filtro, no se mira la etiqueta', async () => {
+    const { service, repo } = armar();
+    await service.listar({ skip: 0, limite: 20, pagina: 1 } as any);
+    expect(filtro(repo)).not.toHaveProperty('qrGeneradoEn');
+  });
+
+  it('marcar devuelve cuantos quedaron marcados', async () => {
+    const { service } = armar();
+    expect(await service.marcarQrGenerado(['a', 'b', 'c'])).toEqual({ marcados: 3 });
+  });
+
+  it('marcar guarda la fecha, no un si/no', async () => {
+    // Asi se puede reimprimir si cambia el formato de la etiqueta, y se sabe
+    // cuales quedan sin pegar.
+    const { service, repo } = armar();
+    await service.marcarQrGenerado(['a']);
+    expect(repo.marcarQrGenerado.mock.calls[0][1]).toBeInstanceOf(Date);
   });
 });

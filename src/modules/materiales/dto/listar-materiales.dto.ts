@@ -67,6 +67,14 @@ export class ListarMaterialesDto extends PaginacionDto {
   sinUnidad?: string;
 
   @ApiPropertyOptional({
+    description: 'Solo los que todavía no tienen etiqueta QR generada',
+    example: 'true',
+  })
+  @IsOptional()
+  @IsBooleanString()
+  sinQr?: string;
+
+  @ApiPropertyOptional({
     enum: VISTAS_MATERIAL,
     default: 'activos',
     description:

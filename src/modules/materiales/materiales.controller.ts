@@ -16,6 +16,7 @@ import { RolUsuario } from '@prisma/client';
 import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { AsignarUnidadMasivaDto } from './dto/asignar-unidad-masiva.dto';
 import { CrearMaterialDto } from './dto/crear-material.dto';
+import { MarcarQrMaterialesDto } from './dto/marcar-qr.dto';
 import { ActualizarMaterialDto } from './dto/actualizar-material.dto';
 import { ListarMaterialesDto } from './dto/listar-materiales.dto';
 import { MaterialesService } from './materiales.service';
@@ -41,6 +42,18 @@ export class MaterialesController {
   @ApiOperation({ summary: 'Materiales con stock por debajo (o igual) del mínimo' })
   bajoStock() {
     return this.service.listarBajoStock();
+  }
+
+  @Post('qr/marcar-generados')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dejar constancia de que a estos materiales se les imprimió la etiqueta QR',
+    description:
+      'Lo llama la pantalla después de mandar a imprimir. Sirve para no volver a imprimir ' +
+      'las que ya están pegadas en el estante.',
+  })
+  marcarQrGenerados(@Body() dto: MarcarQrMaterialesDto) {
+    return this.service.marcarQrGenerado(dto.ids);
   }
 
   // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
