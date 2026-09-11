@@ -5,6 +5,7 @@ import { AuthModule } from './common/auth/auth.module';
 import { validarEntorno } from './config/env.validation';
 import { ProveedoresModule } from './modules/proveedores/proveedores.module';
 import { CategoriasMaterialModule } from './modules/categorias-material/categorias-material.module';
+import { EstanteriasMaterialModule } from './modules/estanterias-material/estanterias-material.module';
 import { EquiposItModule } from './modules/equipos-it/equipos-it.module';
 import { CorreoModule } from './common/correo/correo.module';
 import { EquiposModule } from './contextos/equipos/infraestructura/equipos.module';
@@ -27,6 +28,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     // Módulos de dominio
     ProveedoresModule,
     CategoriasMaterialModule,
+    EstanteriasMaterialModule,
     MaterialesModule,
     MovimientosStockModule,
     OrdenesCompraModule,

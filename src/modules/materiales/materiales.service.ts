@@ -30,12 +30,27 @@ export class MaterialesService {
    * de memoria, sin mirar el catálogo.
    */
   private async verificarNombreLibre(nombre: string, exceptoId?: string): Promise<void> {
-    const parecidos = await this.repo.buscarPorNombreParecido(nombre);
+    const parecidos = await this.repo.listarNombres();
     const choque = parecidos.find((m) => m.id !== exceptoId && sonElMismoNombre(m.nombre, nombre));
     if (choque) {
       throw new BadRequestException(
         `Ya existe un material llamado "${choque.nombre}". Usá ese en vez de crear otro: ` +
           'dos fichas para lo mismo parten el stock en dos y ninguna queda bien.',
+      );
+    }
+  }
+
+  /**
+   * Una fila sin estantería no significa nada.
+   *
+   * "Fila 3" a secas no ubica a nadie, y guardarlo deja un dato que parece
+   * información y no lo es. Se valida acá y no en el DTO porque es una regla
+   * entre dos campos, no la forma de uno.
+   */
+  private verificarUbicacion(estanteriaId?: string | null, fila?: number | null): void {
+    if (fila !== undefined && fila !== null && !estanteriaId) {
+      throw new BadRequestException(
+        'Para guardar la fila hace falta elegir también la estantería: una fila sola no ubica el material.',
       );
     }
   }
@@ -48,6 +63,7 @@ export class MaterialesService {
 
     const nombre = normalizarNombreMaterial(dto.nombre);
     await this.verificarNombreLibre(nombre);
+    this.verificarUbicacion(dto.estanteriaId, dto.fila);
 
     const creado = await this.repo.crear({
       nombre,
@@ -55,6 +71,9 @@ export class MaterialesService {
       notas: dto.notas,
       categoria: { connect: { id: dto.categoriaId } },
       unidad: { connect: { id: dto.unidadId } },
+      ...(dto.estanteriaId
+        ? { estanteria: { connect: { id: dto.estanteriaId } }, fila: dto.fila ?? null }
+        : {}),
       // stockActual arranca en 0; solo cambia vía movimientos.
     });
     return MaterialRespuestaDto.desde(creado);
@@ -87,6 +106,10 @@ export class MaterialesService {
         ...(query.stockMax !== undefined ? { lte: aDecimal(query.stockMax) } : {}),
       };
     }
+
+    if (query.estanteriaId) where.estanteriaId = query.estanteriaId;
+    // Los que todavía no se ubicaron: es la lista para recorrer el depósito.
+    if (query.sinUbicacion === 'true') where.estanteriaId = null;
 
     // Los que faltan etiquetar: es la lista que se manda a imprimir.
     if (query.sinQr === 'true') where.qrGeneradoEn = null;
@@ -191,12 +214,37 @@ export class MaterialesService {
       await this.unidades.obtener(dto.unidadId);
     }
 
+    // La ubicación se valida contra lo que va a quedar guardado, no solo contra
+    // lo que vino: mandar la fila sola sobre un material sin estantería deja una
+    // fila huérfana, que es un dato que parece información y no lo es.
+    //
+    // Vaciar la estantería NO es ese caso: ahí la fila se vacía con ella, así
+    // que no hay nada que rechazar.
+    const actual = await this.repo.buscarPorId(id);
+    const estanteriaFinal =
+      dto.estanteriaId !== undefined ? dto.estanteriaId : (actual?.estanteriaId ?? null);
+    const filaFinal = estanteriaFinal
+      ? dto.fila !== undefined
+        ? dto.fila
+        : (actual?.fila ?? null)
+      : // Sin estantería no queda fila: o la mandaron suelta (y se rechaza), o
+        // se está vaciando la ubicación entera (y es válido).
+        (dto.fila ?? null);
+    this.verificarUbicacion(estanteriaFinal, filaFinal);
+
     const actualizado = await this.repo.actualizar(id, {
       nombre: dto.nombre,
       stockMinimo: dto.stockMinimo,
       notas: dto.notas,
       ...(dto.categoriaId ? { categoria: { connect: { id: dto.categoriaId } } } : {}),
       ...(dto.unidadId ? { unidad: { connect: { id: dto.unidadId } } } : {}),
+      // Vaciar la estantería vacía también la fila: sin estantería no ubica nada.
+      ...(dto.estanteriaId !== undefined
+        ? dto.estanteriaId
+          ? { estanteria: { connect: { id: dto.estanteriaId } } }
+          : { estanteria: { disconnect: true }, fila: null }
+        : {}),
+      ...(dto.fila !== undefined && estanteriaFinal ? { fila: dto.fila } : {}),
     });
     return MaterialRespuestaDto.desde(actualizado);
   }

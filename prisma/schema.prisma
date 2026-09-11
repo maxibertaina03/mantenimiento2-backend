@@ -95,6 +95,32 @@ model UnidadMedida {
   @@map("unidades_medida")
 }
 
+/// Dónde está guardado un material en el depósito.
+///
+/// Va como catálogo y no como texto libre por lo mismo que las unidades: si
+/// cada uno escribe "Estantería A", "estanteria a" y "Est. A", la pregunta
+/// "qué hay en la estantería A" deja de tener una sola respuesta.
+///
+/// La fila NO es un catálogo aparte: es un número, y un número ya es un dato
+/// analizable. Cargar cada fila de cada estantería como una fila de tabla sería
+/// trabajo de carga sin ninguna garantía a cambio.
+model EstanteriaMaterial {
+  id     String  @id @default(uuid())
+  nombre String  @unique
+  orden  Int     @default(0)
+
+  /// Las estanterías en desuso se ocultan en vez de borrarse, para no perder la
+  /// referencia de los materiales que ya las tienen.
+  activo Boolean @default(true)
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  materiales Material[]
+
+  @@map("estanterias_material")
+}
+
 model Material {
   id          String @id @default(uuid())
   nombre      String
@@ -119,6 +145,17 @@ model Material {
   /// aparecer en los desplegables donde se elige qué cargar.
   activo Boolean @default(true)
 
+  /// Dónde está guardado: en qué estantería y en qué fila de esa estantería.
+  ///
+  /// Las dos son opcionales porque los 924 materiales ya cargados no tienen
+  /// ubicación: forzarla habría obligado a inventar un valor. Se completan a
+  /// medida que alguien recorre el depósito.
+  estanteriaId String?
+
+  /// Número de fila dentro de la estantería. No significa nada sin la
+  /// estantería, y el servicio no deja guardar una sin la otra.
+  fila Int?
+
   /// Cuándo se generó la etiqueta con el código QR de este material.
   ///
   /// Igual que en los equipos: es una fecha y no un sí/no, para poder
@@ -132,12 +169,14 @@ model Material {
 
   categoria        CategoriaMaterial    @relation(fields: [categoriaId], references: [id])
   unidad           UnidadMedida?        @relation(fields: [unidadId], references: [id])
+  estanteria       EstanteriaMaterial?  @relation(fields: [estanteriaId], references: [id])
   movimientos      MovimientoStock[]
   renglonesOrdenes RenglonOrdenCompra[]
 
   @@index([categoriaId])
   @@index([unidadId])
   @@index([activo])
+  @@index([estanteriaId])
   @@map("materiales")
 }
 

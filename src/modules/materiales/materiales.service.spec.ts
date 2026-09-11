@@ -37,7 +37,7 @@ function armar() {
     contarMovimientos: jest.fn<Promise<any>, any[]>(async () => 0),
     contarSinUnidad: jest.fn<Promise<any>, any[]>(async () => 0),
     // Nombre libre por defecto: el choque de duplicados se prueba aparte.
-    buscarPorNombreParecido: jest.fn<Promise<any>, any[]>(async () => []),
+    listarNombres: jest.fn<Promise<any>, any[]>(async () => []),
     contarSinStockMinimo: jest.fn<Promise<any>, any[]>(async () => 0),
     marcarQrGenerado: jest.fn<Promise<any>, any[]>(async (ids: string[]) => ids.length),
     idsBajoStock: jest.fn<Promise<any>, any[]>(async () => ['mat-1', 'mat-2']),
@@ -356,7 +356,7 @@ describe('MaterialesService - nombres duplicados', () => {
   it('REGRESION: no deja crear un material que ya existe con otras mayusculas', async () => {
     // Dos fichas para lo mismo parten el stock en dos y ninguna queda bien.
     const { service, repo } = armar();
-    repo.buscarPorNombreParecido.mockResolvedValue([{ id: 'otro', nombre: 'Rodamiento 6204' }]);
+    repo.listarNombres.mockResolvedValue([{ id: 'otro', nombre: 'Rodamiento 6204' }]);
 
     await expect(
       service.crear({
@@ -371,7 +371,7 @@ describe('MaterialesService - nombres duplicados', () => {
   it('el mensaje muestra como esta escrito el que ya existe', async () => {
     // Para que la persona pueda ir a buscarlo, en vez de adivinar.
     const { service, repo } = armar();
-    repo.buscarPorNombreParecido.mockResolvedValue([{ id: 'otro', nombre: 'Rodamiento 6204' }]);
+    repo.listarNombres.mockResolvedValue([{ id: 'otro', nombre: 'Rodamiento 6204' }]);
 
     let mensaje = '';
     try {
@@ -413,7 +413,7 @@ describe('MaterialesService - nombres duplicados', () => {
   it('renombrar un material a lo que ya se llamaba sigue funcionando', async () => {
     // Se excluye a si mismo: si no, corregirle una mayuscula seria imposible.
     const { service, repo } = armar();
-    repo.buscarPorNombreParecido.mockResolvedValue([{ id: 'mat-1', nombre: 'Cable NYA' }]);
+    repo.listarNombres.mockResolvedValue([{ id: 'mat-1', nombre: 'Cable NYA' }]);
 
     await service.actualizar('mat-1', { nombre: 'Cable nya' } as any);
 
@@ -422,7 +422,7 @@ describe('MaterialesService - nombres duplicados', () => {
 
   it('pero no se lo puede renombrar al nombre de OTRO material', async () => {
     const { service, repo } = armar();
-    repo.buscarPorNombreParecido.mockResolvedValue([{ id: 'otro', nombre: 'Cable NYA' }]);
+    repo.listarNombres.mockResolvedValue([{ id: 'otro', nombre: 'Cable NYA' }]);
 
     await expect(service.actualizar('mat-1', { nombre: 'cable nya' } as any)).rejects.toThrow(
       BadRequestException,
@@ -489,5 +489,126 @@ describe('MaterialesService - etiquetas QR', () => {
     const { service, repo } = armar();
     await service.marcarQrGenerado(['a']);
     expect(repo.marcarQrGenerado.mock.calls[0][1]).toBeInstanceOf(Date);
+  });
+});
+
+describe('MaterialesService - ubicacion en el deposito', () => {
+  const filtro = (repo: any) => repo.buscarTodosOrdenado.mock.calls[0][2];
+  const nuevo = { nombre: 'Rodamiento 6204', categoriaId: 'cat-1', unidadId: 'uni-1' };
+
+  it('guarda estanteria y fila juntas', async () => {
+    const { service, repo } = armar();
+    await service.crear({ ...nuevo, estanteriaId: 'est-1', fila: 3 } as any);
+
+    const datos = repo.crear.mock.calls[0][0];
+    expect(datos.estanteria).toEqual({ connect: { id: 'est-1' } });
+    expect(datos.fila).toBe(3);
+  });
+
+  it('se puede guardar la estanteria sin decir la fila', async () => {
+    // Ubicar "en la estanteria A" ya sirve, aunque no se sepa la fila.
+    const { service, repo } = armar();
+    await service.crear({ ...nuevo, estanteriaId: 'est-1' } as any);
+    expect(repo.crear.mock.calls[0][0].fila).toBeNull();
+  });
+
+  it('REGRESION: una fila sin estanteria se rechaza', async () => {
+    // "Fila 3" a secas no ubica a nadie, y guardarlo deja un dato que parece
+    // informacion y no lo es.
+    const { service, repo } = armar();
+
+    await expect(service.crear({ ...nuevo, fila: 3 } as any)).rejects.toThrow(BadRequestException);
+    expect(repo.crear).not.toHaveBeenCalled();
+  });
+
+  it('el mensaje explica por que, no solo que fallo', async () => {
+    const { service } = armar();
+    let mensaje = '';
+    try {
+      await service.crear({ ...nuevo, fila: 3 } as any);
+    } catch (e) {
+      mensaje = (e as BadRequestException).message;
+    }
+    expect(mensaje).toMatch(/estanter/i);
+    expect(mensaje).toMatch(/no ubica/i);
+  });
+
+  it('sin ubicacion, el material se crea igual', async () => {
+    // Los 924 ya cargados no tienen: la ubicacion es opcional.
+    const { service, repo } = armar();
+    await service.crear(nuevo as any);
+    expect(repo.crear).toHaveBeenCalled();
+    expect(repo.crear.mock.calls[0][0].estanteria).toBeUndefined();
+  });
+
+  it('REGRESION: vaciar la estanteria vacia tambien la fila', async () => {
+    // Si no, queda una fila huerfana: el mismo dato sin sentido.
+    const { service, repo } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...material, estanteriaId: 'est-1', fila: 3 });
+
+    await service.actualizar('mat-1', { estanteriaId: null } as any);
+
+    const cambios = repo.actualizar.mock.calls[0][1];
+    expect(cambios.estanteria).toEqual({ disconnect: true });
+    expect(cambios.fila).toBeNull();
+  });
+
+  it('REGRESION: no se puede dejar la fila cargada quitando la estanteria', async () => {
+    // La regla mira lo que va a QUEDAR guardado, no solo lo que vino en el
+    // pedido: mandar la fila sola sobre un material sin estanteria es el mismo
+    // dato sin sentido.
+    const { service, repo } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...material, estanteriaId: null, fila: null });
+
+    await expect(service.actualizar('mat-1', { fila: 5 } as any)).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('cambiar solo la fila de un material ya ubicado funciona', async () => {
+    const { service, repo } = armar();
+    repo.buscarPorId.mockResolvedValue({ ...material, estanteriaId: 'est-1', fila: 3 });
+
+    await service.actualizar('mat-1', { fila: 5 } as any);
+    expect(repo.actualizar.mock.calls[0][1].fila).toBe(5);
+  });
+
+  it('el filtro por estanteria llega al where', async () => {
+    const { service, repo } = armar();
+    await service.listar({ skip: 0, limite: 20, pagina: 1, estanteriaId: 'est-1' } as any);
+    expect(filtro(repo).estanteriaId).toBe('est-1');
+  });
+
+  it('sinUbicacion pide los que faltan ubicar', async () => {
+    // Es la lista para recorrer el deposito con el celular en la mano.
+    const { service, repo } = armar();
+    await service.listar({ skip: 0, limite: 20, pagina: 1, sinUbicacion: 'true' } as any);
+    expect(filtro(repo).estanteriaId).toBeNull();
+  });
+});
+
+describe('MaterialesService - duplicados con acentos', () => {
+  it('REGRESION: "Valvula" y "Válvula" son el mismo material', async () => {
+    // Postgres no compara sin acentos sin la extension `unaccent`, que no esta
+    // instalada. Preguntando a la base por "Valvula" nunca volvia "Válvula", y
+    // el duplicado se colaba: quedaban dos fichas y el stock partido en dos.
+    const { service, repo } = armar();
+    repo.listarNombres.mockResolvedValue([{ id: 'otro', nombre: 'Válvula esférica 2"' }]);
+
+    await expect(
+      service.crear({
+        nombre: 'Valvula esferica 2"',
+        categoriaId: 'cat-1',
+        unidadId: 'uni-1',
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('se piden TODOS los nombres, no solo los que coinciden', async () => {
+    // Es lo que hace posible comparar sin acentos: filtrar en la consulta
+    // volvia a dejar afuera justo el caso que hay que detectar.
+    const { service, repo } = armar();
+    await service.crear({ nombre: 'Algo nuevo', categoriaId: 'cat-1', unidadId: 'uni-1' } as any);
+    expect(repo.listarNombres).toHaveBeenCalledWith();
   });
 });

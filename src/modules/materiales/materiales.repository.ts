@@ -13,20 +13,26 @@ export class MaterialesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   /** La unidad viene del catálogo; el DTO expone su símbolo junto a la cantidad. */
-  private readonly relaciones = { categoria: true, unidad: true } as const;
+  private readonly relaciones = {
+    categoria: true,
+    unidad: true,
+    // Solo el nombre: es lo único que se muestra de la estantería.
+    estanteria: { select: { nombre: true } },
+  } as const;
 
   /**
-   * Materiales cuyo nombre coincide sin distinguir mayúsculas.
+   * Los nombres de todos los materiales, para detectar duplicados.
    *
-   * La comparación fina (acentos, espacios repetidos) se hace después en
-   * memoria: Postgres no compara sin acentos sin la extensión `unaccent`, que
-   * no está instalada, y son a lo sumo un puñado de filas.
+   * Trae el padrón entero y no solo los que coinciden sin mayúsculas, porque
+   * Postgres tampoco compara sin acentos: sin la extensión `unaccent`, que no
+   * está instalada, una consulta por «Valvula» nunca devuelve «Válvula» y el
+   * duplicado se cuela. La comparación fina se hace después en memoria.
+   *
+   * Son dos columnas cortas de novecientas filas y solo se pide al crear o
+   * renombrar, que no es una operación frecuente.
    */
-  buscarPorNombreParecido(nombre: string): Promise<{ id: string; nombre: string }[]> {
-    return this.prisma.material.findMany({
-      where: { nombre: { equals: nombre, mode: 'insensitive' } },
-      select: { id: true, nombre: true },
-    });
+  listarNombres(): Promise<{ id: string; nombre: string }[]> {
+    return this.prisma.material.findMany({ select: { id: true, nombre: true } });
   }
 
   crear(data: Prisma.MaterialCreateInput): Promise<MaterialConCategoria> {

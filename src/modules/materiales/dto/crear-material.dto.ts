@@ -1,6 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength } from 'class-validator';
+import {
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CrearMaterialDto {
   @ApiProperty({ example: 'Tornillo autorroscante 6x40' })
@@ -26,6 +36,19 @@ export class CrearMaterialDto {
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
   stockMinimo?: number;
+
+  @ApiPropertyOptional({ description: 'En qué estantería del depósito está', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  estanteriaId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Número de fila dentro de la estantería', example: 3 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(99)
+  fila?: number | null;
 
   @ApiPropertyOptional({ example: 'Caja x 500' })
   @IsOptional()

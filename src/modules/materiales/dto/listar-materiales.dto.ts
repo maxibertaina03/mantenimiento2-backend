@@ -66,6 +66,19 @@ export class ListarMaterialesDto extends PaginacionDto {
   @IsBooleanString()
   sinUnidad?: string;
 
+  @ApiPropertyOptional({ description: 'Filtra por estantería', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  estanteriaId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Solo los que todavía no tienen ubicación cargada',
+    example: 'true',
+  })
+  @IsOptional()
+  @IsBooleanString()
+  sinUbicacion?: string;
+
   @ApiPropertyOptional({
     description: 'Solo los que todavía no tienen etiqueta QR generada',
     example: 'true',

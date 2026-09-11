@@ -4,6 +4,7 @@ import { CategoriaMaterial, Material, UnidadMedida } from '@prisma/client';
 type MaterialConRelaciones = Material & {
   categoria?: CategoriaMaterial | null;
   unidad?: UnidadMedida | null;
+  estanteria?: { nombre: string } | null;
 };
 
 /**
@@ -50,6 +51,15 @@ export class MaterialRespuestaDto {
   })
   activo!: boolean;
 
+  @ApiPropertyOptional({ description: 'Id de la estantería donde está', nullable: true })
+  estanteriaId!: string | null;
+
+  @ApiPropertyOptional({ description: 'Nombre de la estantería', nullable: true })
+  estanteriaNombre!: string | null;
+
+  @ApiPropertyOptional({ description: 'Fila dentro de la estantería', nullable: true })
+  fila!: number | null;
+
   @ApiPropertyOptional({
     description: 'Cuándo se imprimió su etiqueta QR. null = todavía no tiene.',
     nullable: true,
@@ -81,6 +91,9 @@ export class MaterialRespuestaDto {
       // Solo se marca bajo stock si hay un mínimo definido (> 0).
       bajoStock: stockMinimo > 0 && stockActual <= stockMinimo,
       activo: m.activo,
+      estanteriaId: m.estanteriaId,
+      estanteriaNombre: m.estanteria?.nombre ?? null,
+      fila: m.fila,
       qrGeneradoEn: m.qrGeneradoEn,
       notas: m.notas,
       creadoEn: m.creadoEn,
