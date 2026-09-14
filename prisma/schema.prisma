@@ -600,11 +600,24 @@ model ContadorDocumento {
 
 /// Dónde está el equipo. El catálogo sale de las carpetas de fotos de la
 /// planta: Caldera, Tinas, Drenoprensa, Saladero, Recibo, etc.
+/// Dónde se ofrece un item del catálogo.
+///
+/// La tabla es una sola porque hay lugares y marcas que valen para los dos
+/// módulos, pero los desplegables no se mezclan: en el de equipos de planta no
+/// tiene sentido ofrecer "Abajo de las escaleras oficina", y en el de
+/// informática no tiene sentido ofrecer "PRETRATAMIENTO DE SUERO".
+enum AmbitoCatalogo {
+  PLANTA
+  IT
+  AMBAS
+}
+
 model UbicacionEquipo {
-  id     String  @id @default(uuid())
-  nombre String  @unique
-  orden  Int     @default(0)
-  activo Boolean @default(true)
+  id     String         @id @default(uuid())
+  nombre String         @unique
+  orden  Int            @default(0)
+  activo Boolean        @default(true)
+  ambito AmbitoCatalogo @default(PLANTA)
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
@@ -637,10 +650,11 @@ model TipoEquipoPlanta {
 /// eran tres marcas distintas para cualquier reporte. Como catálogo, la
 /// pregunta "cuántos equipos Grundfos tenemos" tiene una sola respuesta.
 model MarcaEquipo {
-  id     String  @id @default(uuid())
-  nombre String  @unique
-  orden  Int     @default(0)
-  activo Boolean @default(true)
+  id     String         @id @default(uuid())
+  nombre String         @unique
+  orden  Int            @default(0)
+  activo Boolean        @default(true)
+  ambito AmbitoCatalogo @default(PLANTA)
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt

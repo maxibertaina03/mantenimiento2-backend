@@ -38,6 +38,31 @@ describe('CatalogosEquipoService', () => {
     expect(d.create.mock.calls[0][0].data.nombre).toBe('Pretratamiento');
   });
 
+  it('REGRESION: el desplegable de planta no muestra las ubicaciones de informatica', async () => {
+    // La tabla es una sola porque hay lugares que valen para los dos modulos,
+    // pero mezclar los desplegables llenaria el de planta con "Contaduria" y
+    // "Abajo de las escaleras oficina".
+    const d = delegadoFalso([]);
+    await servicio().listar(d as any, true, 'PLANTA');
+
+    expect(d.findMany.mock.calls[0][0].where).toEqual({
+      activo: true,
+      ambito: { in: ['PLANTA', 'AMBAS'] },
+    });
+  });
+
+  it('lo que vale para los dos aparece en las dos listas', async () => {
+    const d = delegadoFalso([]);
+    await servicio().listar(d as any, false, 'IT');
+    expect(d.findMany.mock.calls[0][0].where.ambito.in).toContain('AMBAS');
+  });
+
+  it('un item creado desde informatica nace en el ambito de informatica', async () => {
+    const d = delegadoFalso([]);
+    await servicio().crear(d as any, { nombre: 'Contaduría' }, 'la ubicación', 'IT');
+    expect(d.create.mock.calls[0][0].data.ambito).toBe('IT');
+  });
+
   it('REGRESION: no deja crear un item que ya existe', async () => {
     const d = delegadoFalso([item('u-1', 'Sala de máquinas')]);
     await expect(

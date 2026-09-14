@@ -124,9 +124,25 @@ export class CatalogosEquipoService {
     };
   }
 
-  async listar(delegado: DelegadoCatalogo, soloActivos: boolean): Promise<ItemCatalogo[]> {
+  /**
+   * Lista un catálogo, opcionalmente solo lo que corresponde a un ámbito.
+   *
+   * Ubicaciones y marcas son una sola tabla para los dos módulos, porque hay
+   * lugares que valen para ambos: "Laboratorio", "Envase", "Saladero" y "Tinas"
+   * tienen equipos de planta y de informática. Pero los desplegables no se
+   * mezclan: en el de planta no tiene sentido ofrecer "Abajo de las escaleras
+   * oficina", y en el de informática no tiene sentido "PRETRATAMIENTO DE SUERO".
+   */
+  async listar(
+    delegado: DelegadoCatalogo,
+    soloActivos: boolean,
+    ambito?: 'PLANTA' | 'IT',
+  ): Promise<ItemCatalogo[]> {
     const filas = await delegado.findMany({
-      where: soloActivos ? { activo: true } : {},
+      where: {
+        ...(soloActivos ? { activo: true } : {}),
+        ...(ambito ? { ambito: { in: [ambito, 'AMBAS'] } } : {}),
+      },
       orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
       include: this.conUso,
     });
@@ -163,12 +179,20 @@ export class CatalogosEquipoService {
     delegado: DelegadoCatalogo,
     dto: CrearItemCatalogoDto,
     que: string,
+    ambito?: 'PLANTA' | 'IT',
   ): Promise<ItemCatalogo> {
     const nombre = dto.nombre.trim();
     await this.verificarNombreLibre(delegado, nombre, que);
 
     const fila = await delegado.create({
-      data: { nombre, orden: dto.orden ?? 0, activo: dto.activo ?? true },
+      // Nace en el ámbito de la pantalla desde la que se creó: quien carga una
+      // ubicación desde informática no quiere verla en el módulo de planta.
+      data: {
+        nombre,
+        orden: dto.orden ?? 0,
+        activo: dto.activo ?? true,
+        ...(ambito ? { ambito } : {}),
+      },
       include: this.conUso,
     });
     return this.aItem(fila);
@@ -223,16 +247,28 @@ export class UbicacionesEquipoController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar ubicaciones' })
-  listar(@Query('soloActivos') soloActivos?: string) {
-    return this.servicio.listar(comoCatalogo(this.prisma.ubicacionEquipo), soloActivos === 'true');
+  @ApiOperation({
+    summary: 'Listar ubicaciones',
+    description: 'Con `ambito=IT` devuelve las de informática; por defecto, las de planta.',
+  })
+  listar(@Query('soloActivos') soloActivos?: string, @Query('ambito') ambito?: string) {
+    return this.servicio.listar(
+      comoCatalogo(this.prisma.ubicacionEquipo),
+      soloActivos === 'true',
+      ambito === 'IT' ? 'IT' : 'PLANTA',
+    );
   }
 
   @Post()
   @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Crear una ubicación' })
-  crear(@Body() dto: CrearItemCatalogoDto) {
-    return this.servicio.crear(comoCatalogo(this.prisma.ubicacionEquipo), dto, 'la ubicación');
+  crear(@Body() dto: CrearItemCatalogoDto, @Query('ambito') ambito?: string) {
+    return this.servicio.crear(
+      comoCatalogo(this.prisma.ubicacionEquipo),
+      dto,
+      'la ubicación',
+      ambito === 'IT' ? 'IT' : 'PLANTA',
+    );
   }
 
   @Patch(':id')
@@ -306,15 +342,27 @@ export class MarcasEquipoController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar marcas' })
-  listar(@Query('soloActivos') soloActivos?: string) {
-    return this.servicio.listar(comoCatalogo(this.prisma.marcaEquipo), soloActivos === 'true');
+  @ApiOperation({
+    summary: 'Listar marcas',
+    description: 'Con `ambito=IT` devuelve las de informática; por defecto, las de planta.',
+  })
+  listar(@Query('soloActivos') soloActivos?: string, @Query('ambito') ambito?: string) {
+    return this.servicio.listar(
+      comoCatalogo(this.prisma.marcaEquipo),
+      soloActivos === 'true',
+      ambito === 'IT' ? 'IT' : 'PLANTA',
+    );
   }
 
   @Post()
   @ApiOperation({ summary: 'Crear una marca' })
-  crear(@Body() dto: CrearItemCatalogoDto) {
-    return this.servicio.crear(comoCatalogo(this.prisma.marcaEquipo), dto, 'la marca');
+  crear(@Body() dto: CrearItemCatalogoDto, @Query('ambito') ambito?: string) {
+    return this.servicio.crear(
+      comoCatalogo(this.prisma.marcaEquipo),
+      dto,
+      'la marca',
+      ambito === 'IT' ? 'IT' : 'PLANTA',
+    );
   }
 
   @Patch(':id')
