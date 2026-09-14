@@ -17,6 +17,17 @@ services:
         value: "false"
       - key: DATABASE_URL
         sync: false
+      # ── Baúl de credenciales ──
+      # La clave con la que se cifran las contraseñas guardadas: 32 bytes en
+      # base64. Se carga en el dashboard de Render, NUNCA acá, y tiene que
+      # quedar fuera de la base y fuera del backup: si viajaran juntas, el
+      # cifrado no protegería de nada.
+      #
+      # Si se pierde, las contraseñas guardadas no se recuperan por ningún
+      # medio. Sin la variable, el baúl queda deshabilitado y el resto del
+      # sistema funciona igual; lo que nunca pasa es que se guarden en claro.
+      - key: CLAVE_SECRETOS
+        sync: false
       # ── Envío automático de órdenes por correo ──
       # Render BLOQUEA los puertos SMTP salientes: el envío va por la API HTTP
       # de Brevo. Las SMTP_* quedan para desarrollo local.
