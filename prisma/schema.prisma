@@ -105,9 +105,9 @@ model UnidadMedida {
 /// analizable. Cargar cada fila de cada estantería como una fila de tabla sería
 /// trabajo de carga sin ninguna garantía a cambio.
 model EstanteriaMaterial {
-  id     String  @id @default(uuid())
-  nombre String  @unique
-  orden  Int     @default(0)
+  id     String @id @default(uuid())
+  nombre String @unique
+  orden  Int    @default(0)
 
   /// Las estanterías en desuso se ocultan en vez de borrarse, para no perder la
   /// referencia de los materiales que ya las tienen.
@@ -259,9 +259,12 @@ model Usuario {
 
   intervencionesEjecutadas Intervencion[] @relation("IntervencionEjecutor")
   intervencionesCargadas   Intervencion[] @relation("IntervencionRegistro")
-  ordenesCreadas          OrdenCompra[]        @relation("OrdenesCreadas")
-  ordenesRecibidas        OrdenCompra[]        @relation("OrdenesRecibidas")
-  enviosDeOrden           EnvioOrden[]         @relation("EnviosDeOrden")
+  ordenesCreadas           OrdenCompra[]  @relation("OrdenesCreadas")
+  ordenesRecibidas         OrdenCompra[]  @relation("OrdenesRecibidas")
+  enviosDeOrden            EnvioOrden[]   @relation("EnviosDeOrden")
+
+  rotacionesDeCredencial RotacionCredencial[] @relation("RotacionesDeCredencial")
+  vistasDeCredencial     VistaCredencial[]    @relation("VistasDeCredencial")
 
   @@map("usuarios")
 }
@@ -376,6 +379,8 @@ model EquipoIT {
   proveedor    Proveedor?           @relation(fields: [proveedorId], references: [id])
   asignadoA    Usuario?             @relation("EquiposAsignados", fields: [asignadoAId], references: [id])
   asignaciones AsignacionEquipoIT[]
+  credenciales Credencial[]
+
   @@index([tipoId])
   @@index([estado])
   @@index([asignadoAId])
@@ -599,7 +604,7 @@ model MarcaEquipo {
 /// de Siemens. Por eso cuelga de la marca en vez de ser una lista aparte, y por
 /// eso el nombre es único DENTRO de cada marca y no en todo el catálogo.
 model ModeloEquipo {
-  id      String @id @default(uuid())
+  id      String  @id @default(uuid())
   marcaId String
   nombre  String
   orden   Int     @default(0)
@@ -662,11 +667,11 @@ model Equipo {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  ubicacion     UbicacionEquipo?  @relation(fields: [ubicacionId], references: [id])
-  tipo          TipoEquipoPlanta? @relation(fields: [tipoId], references: [id])
-  marca         MarcaEquipo?      @relation(fields: [marcaId], references: [id])
-  modelo        ModeloEquipo?     @relation(fields: [modeloId], references: [id])
-  proveedor      Proveedor?        @relation(fields: [proveedorId], references: [id])
+  ubicacion      UbicacionEquipo?    @relation(fields: [ubicacionId], references: [id])
+  tipo           TipoEquipoPlanta?   @relation(fields: [tipoId], references: [id])
+  marca          MarcaEquipo?        @relation(fields: [marcaId], references: [id])
+  modelo         ModeloEquipo?       @relation(fields: [modeloId], references: [id])
+  proveedor      Proveedor?          @relation(fields: [proveedorId], references: [id])
   intervenciones Intervencion[]
   planes         PlanMantenimiento[]
 
@@ -703,7 +708,7 @@ model Intervencion {
   ejecutor String
 
   /// Quién lo hizo, si fue en fábrica.
-  usuarioId String?
+  usuarioId   String?
   /// Quién lo hizo, si fue un tercero.
   proveedorId String?
 
@@ -725,9 +730,9 @@ model Intervencion {
 
   equipo        Equipo             @relation(fields: [equipoId], references: [id], onDelete: Cascade)
   plan          PlanMantenimiento? @relation(fields: [planId], references: [id], onDelete: SetNull)
-  usuario       Usuario?   @relation("IntervencionEjecutor", fields: [usuarioId], references: [id])
-  proveedor     Proveedor? @relation(fields: [proveedorId], references: [id])
-  registradoPor Usuario?   @relation("IntervencionRegistro", fields: [registradoPorId], references: [id])
+  usuario       Usuario?           @relation("IntervencionEjecutor", fields: [usuarioId], references: [id])
+  proveedor     Proveedor?         @relation(fields: [proveedorId], references: [id])
+  registradoPor Usuario?           @relation("IntervencionRegistro", fields: [registradoPorId], references: [id])
 
   @@index([equipoId, fecha])
   @@index([tipo])
@@ -799,4 +804,118 @@ model AvisoEnviado {
   @@unique([planId, fechaService])
   @@index([enviadoEn])
   @@map("avisos_enviados")
+}
+
+// ---------------------------------------------------------------------------
+// Baúl de credenciales
+// ---------------------------------------------------------------------------
+
+/// Qué clase de acceso guarda la credencial. Sirve para filtrar y para saber
+/// qué campos tienen sentido: una casilla de correo tiene servidor, una clave
+/// de AnyDesk no.
+enum TipoCredencial {
+  CORREO
+  ACCESO_REMOTO
+  EQUIPO
+  SERVICIO
+  RED
+  OTRO
+}
+
+/// Un acceso guardado: una casilla de correo, la clave de un router, el usuario
+/// de un servicio.
+///
+/// El secreto se guarda cifrado con una clave que vive en el entorno y NO en la
+/// base. Un volcado de la base, como el backup que se guarda en disco, no
+/// alcanza para leer ninguna contraseña. Ver `modules/credenciales/cofre.ts`.
+model Credencial {
+  id String @id @default(uuid())
+
+  /// Cómo la llama la gente: "Correo administración", "AnyDesk PC1".
+  nombre String
+  tipo   TipoCredencial @default(OTRO)
+
+  /// El login, o la dirección de correo. No es secreto y se muestra siempre.
+  usuario String?
+
+  /// La contraseña, cifrada. Nunca sale en un listado: para verla hay que
+  /// pedirla aparte, y ese pedido queda registrado en `VistaCredencial`.
+  secretoCifrado String
+
+  /// La huella de la contraseña ACTUAL, para poder decir "esa ya la usaste"
+  /// sin guardar ninguna vieja en claro.
+  huella String
+
+  /// Dónde se usa: el webmail, el panel del router.
+  url   String?
+  notas String?
+
+  /// Opcional: la credencial puede colgar de un equipo de IT, o vivir sola.
+  /// Las casillas de correo son el caso de vivir solas.
+  equipoItId String?
+
+  /// Cada cuántos días hay que rotarla. Sin esto, no se avisa nada.
+  rotarCadaDias   Int?
+  rotadaEn        DateTime  @default(now())
+  /// Se calcula al guardar, a partir de `rotadaEn` y `rotarCadaDias`. Se guarda
+  /// en vez de calcularse al leer para poder filtrar y ordenar por vencimiento
+  /// en la base, igual que `ordenClave` en los equipos.
+  proximaRotacion DateTime?
+
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  equipoIt   EquipoIT?            @relation(fields: [equipoItId], references: [id], onDelete: SetNull)
+  rotaciones RotacionCredencial[]
+  vistas     VistaCredencial[]
+
+  @@index([tipo])
+  @@index([equipoItId])
+  @@index([proximaRotacion])
+  @@map("credenciales")
+}
+
+/// Cuándo se rotó una credencial y quién la rotó.
+///
+/// NO guarda la contraseña anterior, solo su huella. Guardar las viejas
+/// multiplicaría el daño de una filtración: en vez de perder la clave vigente,
+/// se perderían todas las que se usaron. La huella alcanza para lo que importa,
+/// que es impedir volver a una clave ya usada.
+model RotacionCredencial {
+  id           String   @id @default(uuid())
+  credencialId String
+  rotadaEn     DateTime @default(now())
+  rotadaPorId  String?
+
+  /// La huella de la clave que se dejó de usar.
+  huellaAnterior String
+
+  /// Por qué se rotó: vencimiento, sospecha, alguien que se fue.
+  motivo String?
+
+  credencial Credencial @relation(fields: [credencialId], references: [id], onDelete: Cascade)
+  rotadaPor  Usuario?   @relation("RotacionesDeCredencial", fields: [rotadaPorId], references: [id])
+
+  @@index([credencialId, rotadaEn])
+  @@map("rotaciones_credencial")
+}
+
+/// Quién vio una contraseña y cuándo.
+///
+/// Esto es lo que separa un gestor de una planilla: la contraseña no viaja en
+/// el listado, hay que pedirla, y el pedido queda anotado. Si alguna vez hay
+/// que preguntar "quién tuvo acceso a esto", la respuesta existe.
+model VistaCredencial {
+  id           String   @id @default(uuid())
+  credencialId String
+  usuarioId    String
+  vistaEn      DateTime @default(now())
+
+  credencial Credencial @relation(fields: [credencialId], references: [id], onDelete: Cascade)
+  usuario    Usuario    @relation("VistasDeCredencial", fields: [usuarioId], references: [id])
+
+  @@index([credencialId, vistaEn])
+  @@index([usuarioId, vistaEn])
+  @@map("vistas_credencial")
 }

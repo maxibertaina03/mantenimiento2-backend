@@ -33,6 +33,21 @@ class VariablesEntorno {
   @IsOptional()
   @IsString()
   AUTH_DISABLED?: string;
+
+  /**
+   * La clave del baúl de credenciales: 32 bytes en base64 o hexadecimal.
+   *
+   * Opcional a propósito. Sin ella el baúl queda deshabilitado y el resto del
+   * sistema funciona igual, como pasa con el almacén de fotos. Un servidor
+   * caído por una variable que falta es peor que una pantalla que explica qué
+   * falta. Lo que NO pasa nunca es que se guarde en claro.
+   *
+   * Si se pierde, las contraseñas guardadas no se recuperan. Va fuera de la
+   * base y fuera del backup.
+   */
+  @IsOptional()
+  @IsString()
+  CLAVE_SECRETOS?: string;
 }
 
 export function validarEntorno(config: Record<string, unknown>) {
