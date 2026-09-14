@@ -75,7 +75,7 @@ export class CredencialesController {
       'Queda registrado quién la vio y cuándo. Es POST y no GET a propósito: un GET termina ' +
       'en el historial del navegador y en los registros de acceso del servidor.',
   })
-  revelar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() usuario: Usuario) {
+  revelar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() usuario?: Usuario) {
     return this.service.revelar(id, usuario);
   }
 
@@ -88,7 +88,7 @@ export class CredencialesController {
   rotar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RotarCredencialDto,
-    @UsuarioActual() usuario: Usuario,
+    @UsuarioActual() usuario?: Usuario,
   ) {
     return this.service.rotar(id, dto, usuario);
   }

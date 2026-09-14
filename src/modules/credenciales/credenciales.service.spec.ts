@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Cofre, generarClave, leerClave } from './cofre';
 import { CofreService } from './cofre.service';
 import { CredencialesRepository } from './credenciales.repository';
@@ -201,6 +201,18 @@ describe('CredencialesService', () => {
       repo.buscarPorId.mockResolvedValue(null);
       await expect(service.revelar('nope', ADMIN)).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('REGRESION: sin saber quien pide, no la entrega', async () => {
+      // Aparecio de verdad probando por HTTP contra el servidor local, que
+      // corre con AUTH_DISABLED: el endpoint reventaba con un 500 al leer el id
+      // de un usuario que no existia. La proteccion real de este baul, ademas
+      // del cifrado, es poder decir despues quien miro que. Entregarla sin
+      // poder anotarlo deja un registro incompleto, que da una seguridad que no
+      // existe.
+      const { service, repo } = armar();
+      await expect(service.revelar('cred-1', undefined)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(repo.registrarVista).not.toHaveBeenCalled();
+    });
   });
 
   describe('rotar', () => {
@@ -241,6 +253,14 @@ describe('CredencialesService', () => {
       await expect(service.rotar('cred-1', { secreto: 'Clave1' }, ADMIN)).rejects.toThrow(
         /ya se usó/,
       );
+    });
+
+    it('se puede rotar aunque no se sepa quien, y queda anotado como tal', async () => {
+      // Bloquear la rotacion por no saber quien la hizo seria peor: una clave
+      // que hay que cambiar ya, sin cambiar. El historial lo muestra sin autor.
+      const { service, repo } = armar();
+      await service.rotar('cred-1', { secreto: 'Nueva!' }, undefined);
+      expect(repo.rotar.mock.calls[0][0].rotadaPorId).toBeNull();
     });
 
     it('anota quien roto y por que', async () => {

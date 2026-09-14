@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, TipoCredencial, Usuario } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
 import { buscarNombreRepetido, normalizarNombre } from '../../common/dominio/nombres';
@@ -167,7 +172,7 @@ export class CredencialesService {
   async rotar(
     id: string,
     dto: RotarCredencialDto,
-    quien: Usuario,
+    quien?: Usuario,
   ): Promise<CredencialRespuestaDto> {
     const actual = await this.repo.buscarPorId(id);
     if (!actual) throw new NotFoundException(`No existe la credencial con id ${id}`);
@@ -191,7 +196,7 @@ export class CredencialesService {
       huellaAnterior: secreto.huella,
       rotadaEn,
       proximaRotacion: calcularProximaRotacion(rotadaEn, actual.rotarCadaDias),
-      rotadaPorId: quien.id,
+      rotadaPorId: quien?.id ?? null,
       motivo: dto.motivo?.trim() || null,
     });
     return CredencialRespuestaDto.desde(fila, rotadaEn);
@@ -204,7 +209,18 @@ export class CredencialesService {
    * algo fallara en el medio, el secreto ya habría salido y la anotación no
    * existiría, que es la única forma en que este registro serviría de poco.
    */
-  async revelar(id: string, quien: Usuario): Promise<SecretoReveladoDto> {
+  async revelar(id: string, quien?: Usuario): Promise<SecretoReveladoDto> {
+    if (!quien) {
+      // La única protección real de este baúl, además del cifrado, es poder
+      // decir después quién miró qué. Entregar la contraseña sin poder anotar
+      // quién la pidió convierte el registro en una lista incompleta, que es
+      // peor que no tener registro: da una seguridad que no existe.
+      throw new ForbiddenException(
+        'El baúl necesita saber quién está pidiendo la contraseña, y este servidor tiene la ' +
+          'autenticación desactivada (AUTH_DISABLED). Entrá con tu usuario para poder verla.',
+      );
+    }
+
     const fila = await this.repo.buscarPorId(id);
     if (!fila) throw new NotFoundException(`No existe la credencial con id ${id}`);
 
