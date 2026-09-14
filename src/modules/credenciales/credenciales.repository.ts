@@ -23,7 +23,13 @@ const CAMPOS_VISIBLES = {
   proximaRotacion: true,
   activo: true,
   creadoEn: true,
-  equipoIt: { select: { codigoInterno: true, marca: true, modelo: true } },
+  equipoIt: {
+    select: {
+      codigoInterno: true,
+      marca: { select: { nombre: true } },
+      modelo: { select: { nombre: true } },
+    },
+  },
   _count: { select: { rotaciones: true, vistas: true } },
 } satisfies Prisma.CredencialSelect;
 

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EstadoEquipoIT, Usuario } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
-import { UsuariosService } from '../usuarios/usuarios.service';
+import { ResponsablesService } from '../responsables/responsables.controller';
 import { ActualizarEquipoDto } from './dto/actualizar-equipo.dto';
 import { AsignarEquipoDto } from './dto/asignar-equipo.dto';
 import { CrearEquipoDto } from './dto/crear-equipo.dto';
@@ -13,14 +13,14 @@ import { EquiposItRepository, FiltroEquipos } from './equipos-it.repository';
 export class EquiposItService {
   constructor(
     private readonly repo: EquiposItRepository,
-    private readonly usuarios: UsuariosService,
+    private readonly responsables: ResponsablesService,
   ) {}
 
   /** Un equipo dado de baja no puede estar en manos de nadie. */
-  private validarBajaSinTenedor(estado: EstadoEquipoIT, asignadoAId?: string | null): void {
-    if (estado === EstadoEquipoIT.DADO_DE_BAJA && asignadoAId) {
+  private validarBajaSinTenedor(estado: EstadoEquipoIT, responsableId?: string | null): void {
+    if (estado === EstadoEquipoIT.DADO_DE_BAJA && responsableId) {
       throw new BadRequestException(
-        'Un equipo dado de baja no puede quedar asignado a un usuario. Devolvelo a depósito primero.',
+        'Un equipo dado de baja no puede quedar a cargo de alguien. Devolvelo a depósito primero.',
       );
     }
   }
@@ -29,31 +29,34 @@ export class EquiposItService {
   private async validarCodigoLibre(codigoInterno: string, idPropio?: string): Promise<void> {
     const existente = await this.repo.buscarPorCodigoInterno(codigoInterno);
     if (existente && existente.id !== idPropio) {
+      const comoSeLlama =
+        [existente.marca?.nombre, existente.modelo?.nombre].filter(Boolean).join(' ') ||
+        'sin marca cargada';
       throw new BadRequestException(
-        `Ya existe un equipo con el código interno "${codigoInterno}" (${existente.marca} ${existente.modelo}).`,
+        `Ya existe un equipo con el código interno "${codigoInterno}" (${comoSeLlama}).`,
       );
     }
   }
 
-  private async validarUsuarioExiste(usuarioId: string): Promise<void> {
-    // Lanza 404 con un mensaje claro si el usuario no existe.
-    await this.usuarios.obtener(usuarioId);
+  private async validarResponsableExiste(responsableId: string): Promise<void> {
+    // Lanza 404 con un mensaje claro si el responsable no existe.
+    await this.responsables.obtener(responsableId);
   }
 
   async crear(dto: CrearEquipoDto): Promise<EquipoRespuestaDto> {
     if (dto.codigoInterno) await this.validarCodigoLibre(dto.codigoInterno);
-    if (dto.asignadoAId) await this.validarUsuarioExiste(dto.asignadoAId);
+    if (dto.responsableId) await this.validarResponsableExiste(dto.responsableId);
 
     const estado =
-      dto.estado ?? (dto.asignadoAId ? EstadoEquipoIT.EN_USO : EstadoEquipoIT.EN_DEPOSITO);
-    this.validarBajaSinTenedor(estado, dto.asignadoAId);
+      dto.estado ?? (dto.responsableId ? EstadoEquipoIT.EN_USO : EstadoEquipoIT.EN_DEPOSITO);
+    this.validarBajaSinTenedor(estado, dto.responsableId);
 
     const creado = await this.repo.crear({
       codigoInterno: dto.codigoInterno,
-      tipo: { connect: { id: dto.tipoId } },
+      tipoId: dto.tipoId,
       estado,
-      marca: dto.marca,
-      modelo: dto.modelo,
+      marcaId: dto.marcaId,
+      modeloId: dto.modeloId,
       numeroSerie: dto.numeroSerie,
       procesador: dto.procesador,
       memoriaRamGb: dto.memoriaRamGb,
@@ -65,19 +68,19 @@ export class EquiposItService {
       nombreEnRed: dto.nombreEnRed,
       accesoRemoto: dto.accesoRemoto,
       accesoRemotoId: dto.accesoRemotoId,
-      ubicacion: dto.ubicacion,
+      ubicacionId: dto.ubicacionId,
       fechaCompra: dto.fechaCompra ? new Date(dto.fechaCompra) : undefined,
       garantiaHasta: dto.garantiaHasta ? new Date(dto.garantiaHasta) : undefined,
       notas: dto.notas,
-      ...(dto.proveedorId ? { proveedor: { connect: { id: dto.proveedorId } } } : {}),
-      ...(dto.asignadoAId ? { asignadoA: { connect: { id: dto.asignadoAId } } } : {}),
+      proveedorId: dto.proveedorId,
+      responsableId: dto.responsableId,
     });
 
-    // Si nace asignado, el historial tiene que arrancar con ese tramo.
-    if (dto.asignadoAId) {
+    // Si nace a cargo de alguien, el historial arranca con ese tramo.
+    if (dto.responsableId) {
       await this.repo.reasignar({
         equipoId: creado.id,
-        usuarioId: dto.asignadoAId,
+        responsableId: dto.responsableId,
         registradoPorId: null,
         motivo: 'Alta del equipo',
         estadoResultante: estado,
@@ -93,7 +96,10 @@ export class EquiposItService {
       buscar: query.buscar,
       tipoId: query.tipoId,
       estado: query.estado,
-      asignadoAId: query.asignadoAId,
+      responsableId: query.responsableId,
+      marcaId: query.marcaId,
+      ubicacionId: query.ubicacionId,
+      sinResponsable: query.sinResponsable === 'true',
     };
 
     const [items, total] = await Promise.all([
@@ -126,14 +132,14 @@ export class EquiposItService {
     if (dto.codigoInterno) await this.validarCodigoLibre(dto.codigoInterno, id);
 
     const estado = dto.estado ?? actual.estado;
-    this.validarBajaSinTenedor(estado, actual.asignadoAId);
+    this.validarBajaSinTenedor(estado, actual.responsableId);
 
     const actualizado = await this.repo.actualizar(id, {
       codigoInterno: dto.codigoInterno,
-      tipo: { connect: { id: dto.tipoId } },
+      tipoId: dto.tipoId,
       estado: dto.estado,
-      marca: dto.marca,
-      modelo: dto.modelo,
+      marcaId: dto.marcaId,
+      modeloId: dto.modeloId,
       numeroSerie: dto.numeroSerie,
       procesador: dto.procesador,
       memoriaRamGb: dto.memoriaRamGb,
@@ -145,19 +151,19 @@ export class EquiposItService {
       nombreEnRed: dto.nombreEnRed,
       accesoRemoto: dto.accesoRemoto,
       accesoRemotoId: dto.accesoRemotoId,
-      ubicacion: dto.ubicacion,
+      ubicacionId: dto.ubicacionId,
       fechaCompra: dto.fechaCompra ? new Date(dto.fechaCompra) : undefined,
       garantiaHasta: dto.garantiaHasta ? new Date(dto.garantiaHasta) : undefined,
       notas: dto.notas,
-      ...(dto.proveedorId ? { proveedor: { connect: { id: dto.proveedorId } } } : {}),
+      proveedorId: dto.proveedorId,
     });
 
     return EquipoRespuestaDto.desde(actualizado);
   }
 
   /**
-   * Asigna el equipo a un usuario o lo devuelve a depósito (usuarioId null).
-   * Deja el tramo anterior cerrado en el historial.
+   * Pone el equipo a cargo de un responsable, o lo devuelve a depósito
+   * (`responsableId` en null). Deja el tramo anterior cerrado en el historial.
    */
   async asignar(
     id: string,
@@ -175,22 +181,24 @@ export class EquiposItService {
       );
     }
 
-    const usuarioId = dto.usuarioId ?? null;
-    if (usuarioId) await this.validarUsuarioExiste(usuarioId);
+    const responsableId = dto.responsableId ?? null;
+    if (responsableId) await this.validarResponsableExiste(responsableId);
 
-    if (equipo.asignadoAId === usuarioId) {
+    if (equipo.responsableId === responsableId) {
       throw new BadRequestException(
-        usuarioId ? 'El equipo ya está asignado a ese usuario.' : 'El equipo ya está en depósito.',
+        responsableId
+          ? 'El equipo ya está a cargo de esa persona.'
+          : 'El equipo ya está en depósito.',
       );
     }
 
     // Entregarlo lo pone EN_USO; devolverlo, EN_DEPOSITO. Si estaba en
     // reparación, se respeta ese estado (volvió del service, no cambió de mano).
-    const estadoResultante = usuarioId ? EstadoEquipoIT.EN_USO : EstadoEquipoIT.EN_DEPOSITO;
+    const estadoResultante = responsableId ? EstadoEquipoIT.EN_USO : EstadoEquipoIT.EN_DEPOSITO;
 
     const actualizado = await this.repo.reasignar({
       equipoId: id,
-      usuarioId,
+      responsableId,
       registradoPorId: usuarioActual?.id ?? null,
       motivo: dto.motivo,
       notas: dto.notas,
@@ -210,19 +218,14 @@ export class EquiposItService {
     return this.repo.resumen();
   }
 
-  /** Ubicaciones ya usadas, para sugerirlas en el formulario. */
-  ubicaciones(): Promise<string[]> {
-    return this.repo.ubicacionesUsadas();
-  }
-
   async eliminar(id: string): Promise<void> {
     const equipo = await this.repo.buscarPorId(id);
     if (!equipo) {
       throw new NotFoundException(`No existe el equipo con id ${id}`);
     }
-    if (equipo.asignadoAId) {
+    if (equipo.responsableId) {
       throw new BadRequestException(
-        'No se puede eliminar un equipo asignado. Devolvelo a depósito primero.',
+        'No se puede eliminar un equipo que está a cargo de alguien. Devolvelo a depósito primero.',
       );
     }
     await this.repo.eliminar(id);

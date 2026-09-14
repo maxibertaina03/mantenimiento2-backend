@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AuthModule } from './common/auth/auth.module';
 import { validarEntorno } from './config/env.validation';
+import { ResponsablesModule } from './modules/responsables/responsables.module';
 import { ProveedoresModule } from './modules/proveedores/proveedores.module';
 import { CategoriasMaterialModule } from './modules/categorias-material/categorias-material.module';
 import { EstanteriasMaterialModule } from './modules/estanterias-material/estanterias-material.module';
@@ -35,6 +36,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     OrdenesCompraModule,
     EquiposItModule,
     CredencialesModule,
+    ResponsablesModule,
     CorreoModule,
     EquiposModule,
     TiposEquipoModule,

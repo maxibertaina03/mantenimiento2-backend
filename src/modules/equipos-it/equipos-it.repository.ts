@@ -9,12 +9,16 @@ export interface FiltroEquipos {
   buscar?: string;
   tipoId?: string;
   estado?: EstadoEquipoIT;
-  asignadoAId?: string;
+  responsableId?: string;
+  marcaId?: string;
+  ubicacionId?: string;
+  /** `true` trae solo los que no tienen responsable asignado. */
+  sinResponsable?: boolean;
 }
 
 export interface DatosAsignacion {
   equipoId: string;
-  usuarioId: string | null;
+  responsableId: string | null;
   registradoPorId: string | null;
   motivo?: string | null;
   notas?: string | null;
@@ -29,7 +33,10 @@ export class EquiposItRepository {
   private readonly relaciones = {
     tipo: { select: { nombre: true, llevaEspecificaciones: true } },
     proveedor: { select: { nombre: true } },
-    asignadoA: { select: { nombre: true } },
+    marca: { select: { nombre: true } },
+    modelo: { select: { nombre: true } },
+    ubicacion: { select: { nombre: true } },
+    responsable: { select: { nombre: true, activo: true } },
   };
 
   /** Traduce el filtro de dominio al `where` de Prisma. */
@@ -38,18 +45,29 @@ export class EquiposItRepository {
     return {
       ...(filtro.tipoId ? { tipoId: filtro.tipoId } : {}),
       ...(filtro.estado ? { estado: filtro.estado } : {}),
-      ...(filtro.asignadoAId ? { asignadoAId: filtro.asignadoAId } : {}),
-      // Busca en todos los campos por los que alguien buscaría un equipo.
+      ...(filtro.marcaId ? { marcaId: filtro.marcaId } : {}),
+      ...(filtro.ubicacionId ? { ubicacionId: filtro.ubicacionId } : {}),
+      // `sinResponsable` gana sobre `responsableId`: pedir las dos cosas es
+      // contradictorio, y dejar las dos devolvería siempre vacío sin explicar
+      // por qué.
+      ...(filtro.sinResponsable
+        ? { responsableId: null }
+        : filtro.responsableId
+          ? { responsableId: filtro.responsableId }
+          : {}),
+      // Busca en todos los campos por los que alguien buscaría un equipo. Marca,
+      // modelo y ubicación ahora son catálogos, así que se busca por su nombre.
       ...(texto
         ? {
             OR: [
               { codigoInterno: { contains: texto, mode: 'insensitive' as const } },
-              { marca: { contains: texto, mode: 'insensitive' as const } },
-              { modelo: { contains: texto, mode: 'insensitive' as const } },
               { numeroSerie: { contains: texto, mode: 'insensitive' as const } },
               { direccionIp: { contains: texto, mode: 'insensitive' as const } },
               { nombreEnRed: { contains: texto, mode: 'insensitive' as const } },
-              { ubicacion: { contains: texto, mode: 'insensitive' as const } },
+              { marca: { nombre: { contains: texto, mode: 'insensitive' as const } } },
+              { modelo: { nombre: { contains: texto, mode: 'insensitive' as const } } },
+              { ubicacion: { nombre: { contains: texto, mode: 'insensitive' as const } } },
+              { responsable: { nombre: { contains: texto, mode: 'insensitive' as const } } },
             ],
           }
         : {}),
@@ -61,7 +79,7 @@ export class EquiposItRepository {
    * de escritura pueda olvidarse de actualizarla (alta manual, edicion,
    * importacion masiva).
    */
-  crear(data: Prisma.EquipoITCreateInput): Promise<EquipoConRelaciones> {
+  crear(data: Prisma.EquipoITUncheckedCreateInput): Promise<EquipoConRelaciones> {
     return this.prisma.equipoIT.create({
       data: { ...data, ordenClave: claveDeOrden(data.codigoInterno) },
       include: this.relaciones,
@@ -81,8 +99,8 @@ export class EquiposItRepository {
       // ("PC2" antes que "PC10"). Los equipos sin codigo van al final.
       orderBy: [
         { ordenClave: { sort: 'asc', nulls: 'last' } },
-        { marca: 'asc' },
-        { modelo: 'asc' },
+        { marca: { nombre: 'asc' } },
+        { modelo: { nombre: 'asc' } },
       ],
       include: this.relaciones,
     });
@@ -103,7 +121,7 @@ export class EquiposItRepository {
     });
   }
 
-  actualizar(id: string, data: Prisma.EquipoITUpdateInput): Promise<EquipoConRelaciones> {
+  actualizar(id: string, data: Prisma.EquipoITUncheckedUpdateInput): Promise<EquipoConRelaciones> {
     // Solo se recalcula si la edicion toca el codigo interno.
     const conClave =
       data.codigoInterno !== undefined
@@ -121,8 +139,8 @@ export class EquiposItRepository {
   }
 
   /**
-   * Registra un cambio de asignación: cierra el tramo vigente y abre uno nuevo,
-   * y deja el equipo apuntando a su tenedor actual. Todo en una transacción
+   * Registra un cambio de responsable: cierra el tramo vigente y abre uno nuevo,
+   * y deja el equipo apuntando a quien lo tiene ahora. Todo en una transacción
    * para que no queden dos tramos abiertos a la vez.
    */
   async reasignar(datos: DatosAsignacion): Promise<EquipoConRelaciones> {
@@ -136,7 +154,7 @@ export class EquiposItRepository {
       await tx.asignacionEquipoIT.create({
         data: {
           equipoId: datos.equipoId,
-          usuarioId: datos.usuarioId,
+          responsableId: datos.responsableId,
           registradoPorId: datos.registradoPorId,
           motivo: datos.motivo ?? null,
           notas: datos.notas ?? null,
@@ -145,7 +163,7 @@ export class EquiposItRepository {
 
       return tx.equipoIT.update({
         where: { id: datos.equipoId },
-        data: { asignadoAId: datos.usuarioId, estado: datos.estadoResultante },
+        data: { responsableId: datos.responsableId, estado: datos.estadoResultante },
         include: this.relaciones,
       });
     });
@@ -156,25 +174,10 @@ export class EquiposItRepository {
       where: { equipoId },
       orderBy: { desde: 'desc' },
       include: {
-        usuario: { select: { nombre: true } },
+        responsable: { select: { nombre: true } },
         registradoPor: { select: { nombre: true } },
       },
     });
-  }
-
-  /**
-   * Ubicaciones ya usadas, para sugerirlas al cargar un equipo. No es un
-   * catálogo cerrado: el campo sigue siendo texto libre y se puede escribir
-   * una ubicación nueva.
-   */
-  async ubicacionesUsadas(): Promise<string[]> {
-    const filas = await this.prisma.equipoIT.findMany({
-      where: { ubicacion: { not: null } },
-      select: { ubicacion: true },
-      distinct: ['ubicacion'],
-      orderBy: { ubicacion: 'asc' },
-    });
-    return filas.map((f) => f.ubicacion).filter((u): u is string => !!u && u.trim() !== '');
   }
 
   /** Conteo por tipo y por estado, para el panel del módulo. */

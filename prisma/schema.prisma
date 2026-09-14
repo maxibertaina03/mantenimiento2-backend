@@ -253,9 +253,9 @@ model Usuario {
   movimientos         MovimientoStock[]
   edicionesMovimiento EdicionMovimiento[]
 
-  equiposAsignados        EquipoIT[]           @relation("EquiposAsignados")
-  asignacionesRecibidas   AsignacionEquipoIT[] @relation("AsignacionesRecibidas")
   asignacionesRegistradas AsignacionEquipoIT[] @relation("AsignacionesRegistradas")
+  /// Si esta persona ademas es responsable de equipos, se enlaza desde alla.
+  responsable             Responsable?         @relation("UsuarioDelResponsable")
 
   intervencionesEjecutadas Intervencion[] @relation("IntervencionEjecutor")
   intervencionesCargadas   Intervencion[] @relation("IntervencionRegistro")
@@ -328,6 +328,46 @@ model TipoEquipo {
   @@map("tipos_equipo")
 }
 
+/// Quien tiene un equipo de IT a su cargo.
+///
+/// NO es un usuario del sistema. Se planteo mal al principio: cada persona a la
+/// que se le asignaba una notebook entraba como `Usuario` con un correo
+/// inventado que terminaba en `@sin-acceso.local` y un rol que nunca usaba. De
+/// 35 usuarios, 31 existian solo para figurar en una asignacion.
+///
+/// Ademas varios responsables no son personas: "Operarios de expedicion",
+/// "Queco y German", "Jose Luis y Monica". Un sector, o dos personas
+/// compartiendo una maquina, nunca van a poder ser un usuario con clave.
+///
+/// Quien REGISTRA la asignacion si sigue siendo un `Usuario`: eso es una accion
+/// de alguien que entro al sistema.
+model Responsable {
+  id     String  @id @default(uuid())
+  nombre String
+  /// En que sector esta. Texto libre por ahora: no hay suficientes datos para
+  /// saber si conviene un catalogo.
+  sector String?
+  notas  String?
+
+  /// Los que dejaron la empresa se desactivan, no se borran: sus asignaciones
+  /// pasadas tienen que seguir diciendo quien tenia el equipo.
+  activo Boolean @default(true)
+
+  /// Si esta persona ademas entra al sistema, se enlaza con su usuario. Casi
+  /// ninguno lo hace, por eso es opcional.
+  usuarioId String? @unique
+
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  usuario      Usuario?             @relation("UsuarioDelResponsable", fields: [usuarioId], references: [id], onDelete: SetNull)
+  equiposIt    EquipoIT[]
+  asignaciones AsignacionEquipoIT[]
+
+  @@index([activo])
+  @@map("responsables")
+}
+
 model EquipoIT {
   id String @id @default(uuid())
 
@@ -336,8 +376,11 @@ model EquipoIT {
   tipoId        String
   estado        EstadoEquipoIT @default(EN_DEPOSITO)
 
-  marca       String
-  modelo      String
+  /// Marca y modelo salen de los catalogos que ya usan los equipos de planta:
+  /// una sola lista de marcas para toda la empresa. Antes eran texto libre y
+  /// convivian "Tp Link" y "Tplink" como dos marcas distintas.
+  marcaId     String?
+  modeloId    String?
   numeroSerie String?
 
   // Especificaciones técnicas. Todas opcionales a propósito: una cámara de
@@ -355,7 +398,11 @@ model EquipoIT {
   accesoRemoto   TipoAccesoRemoto @default(NINGUNO)
   accesoRemotoId String? // ID de AnyDesk / TeamViewer / host de RDP
 
-  ubicacion String?
+  /// La ubicacion tambien sale del catalogo compartido: "Laboratorio",
+  /// "Envase", "Expedicion", "Saladero" y "Tinas" ya estaban en las dos listas.
+  /// Antes eran texto libre y habia 39 valores para 65 equipos, con
+  /// "Oficina deposito" junto a "Oficina Deposito".
+  ubicacionId String?
 
   // Compra y garantía
   proveedorId   String?
@@ -364,8 +411,8 @@ model EquipoIT {
 
   notas String?
 
-  // Usuario que tiene el equipo AHORA. El histórico vive en asignaciones.
-  asignadoAId String?
+  /// Quien tiene el equipo AHORA. El historico vive en asignaciones.
+  responsableId String?
 
   // Clave para ordenar como los nombra la gente: "PC2" antes que "PC10".
   // Se calcula al guardar (ver clave-orden.ts) y se ordena por acá en la base,
@@ -377,13 +424,18 @@ model EquipoIT {
 
   tipo         TipoEquipo           @relation(fields: [tipoId], references: [id])
   proveedor    Proveedor?           @relation(fields: [proveedorId], references: [id])
-  asignadoA    Usuario?             @relation("EquiposAsignados", fields: [asignadoAId], references: [id])
+  marca        MarcaEquipo?         @relation(fields: [marcaId], references: [id], onDelete: SetNull)
+  modelo       ModeloEquipo?        @relation(fields: [modeloId], references: [id], onDelete: SetNull)
+  ubicacion    UbicacionEquipo?     @relation(fields: [ubicacionId], references: [id], onDelete: SetNull)
+  responsable  Responsable?         @relation(fields: [responsableId], references: [id], onDelete: SetNull)
   asignaciones AsignacionEquipoIT[]
   credenciales Credencial[]
 
   @@index([tipoId])
   @@index([estado])
-  @@index([asignadoAId])
+  @@index([responsableId])
+  @@index([marcaId])
+  @@index([ubicacionId])
   @@index([ordenClave])
   @@map("equipos_it")
 }
@@ -393,9 +445,9 @@ model EquipoIT {
 model AsignacionEquipoIT {
   id              String  @id @default(uuid())
   equipoId        String
-  // A quién se asignó. Null = se devolvió a depósito.
-  usuarioId       String?
-  // Quién registró el movimiento.
+  /// A quien se asigno. Null = se devolvio a deposito.
+  responsableId   String?
+  /// Quien registro el movimiento: ese si es un usuario del sistema.
   registradoPorId String?
 
   desde  DateTime  @default(now())
@@ -405,12 +457,12 @@ model AsignacionEquipoIT {
 
   creadoEn DateTime @default(now())
 
-  equipo        EquipoIT @relation(fields: [equipoId], references: [id], onDelete: Cascade)
-  usuario       Usuario? @relation("AsignacionesRecibidas", fields: [usuarioId], references: [id])
-  registradoPor Usuario? @relation("AsignacionesRegistradas", fields: [registradoPorId], references: [id])
+  equipo        EquipoIT     @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  responsable   Responsable? @relation(fields: [responsableId], references: [id])
+  registradoPor Usuario?     @relation("AsignacionesRegistradas", fields: [registradoPorId], references: [id])
 
   @@index([equipoId])
-  @@index([usuarioId])
+  @@index([responsableId])
   @@map("asignaciones_equipo_it")
 }
 
@@ -557,7 +609,8 @@ model UbicacionEquipo {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  equipos Equipo[]
+  equipos   Equipo[]
+  equiposIt EquipoIT[]
 
   @@map("ubicaciones_equipo")
 }
@@ -592,8 +645,9 @@ model MarcaEquipo {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  equipos Equipo[]
-  modelos ModeloEquipo[]
+  equipos   Equipo[]
+  equiposIt EquipoIT[]
+  modelos   ModeloEquipo[]
 
   @@map("marcas_equipo")
 }
@@ -613,8 +667,9 @@ model ModeloEquipo {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  marca   MarcaEquipo @relation(fields: [marcaId], references: [id], onDelete: Cascade)
-  equipos Equipo[]
+  marca     MarcaEquipo @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  equipos   Equipo[]
+  equiposIt EquipoIT[]
 
   @@unique([marcaId, nombre])
   @@index([marcaId])

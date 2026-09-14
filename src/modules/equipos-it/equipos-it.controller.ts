@@ -49,15 +49,11 @@ export class EquiposItController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar equipos con filtros (tipo, estado, asignado, búsqueda libre)' })
+  @ApiOperation({
+    summary: 'Listar equipos con filtros (tipo, estado, responsable, marca, ubicación, búsqueda)',
+  })
   listar(@Query() query: ListarEquiposDto) {
     return this.service.listar(query);
-  }
-
-  @Get('ubicaciones')
-  @ApiOperation({ summary: 'Ubicaciones ya usadas, para sugerirlas al cargar un equipo' })
-  ubicaciones() {
-    return this.service.ubicaciones();
   }
 
   @Get('resumen')

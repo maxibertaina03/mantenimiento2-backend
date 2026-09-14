@@ -10,11 +10,14 @@ import {
 export type EquipoConRelaciones = EquipoIT & {
   tipo?: { nombre: string; llevaEspecificaciones: boolean } | null;
   proveedor?: { nombre: string } | null;
-  asignadoA?: { nombre: string } | null;
+  marca?: { nombre: string } | null;
+  modelo?: { nombre: string } | null;
+  ubicacion?: { nombre: string } | null;
+  responsable?: { nombre: string; activo?: boolean } | null;
 };
 
 export type AsignacionConRelaciones = AsignacionEquipoIT & {
-  usuario?: { nombre: string } | null;
+  responsable?: { nombre: string } | null;
   registradoPor?: { nombre: string } | null;
 };
 
@@ -27,8 +30,12 @@ export class EquipoRespuestaDto {
   llevaEspecificaciones!: boolean;
   @ApiProperty({ enum: EstadoEquipoIT }) estado!: EstadoEquipoIT;
 
-  @ApiProperty() marca!: string;
-  @ApiProperty() modelo!: string;
+  // Marca, modelo y ubicación salen de catálogos. Se devuelve el id, para el
+  // desplegable, y el nombre, para mostrarlo sin una consulta más.
+  @ApiPropertyOptional({ nullable: true }) marcaId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) marcaNombre!: string | null;
+  @ApiPropertyOptional({ nullable: true }) modeloId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) modeloNombre!: string | null;
   @ApiPropertyOptional({ nullable: true }) numeroSerie!: string | null;
 
   @ApiPropertyOptional({ nullable: true }) procesador!: string | null;
@@ -43,7 +50,8 @@ export class EquipoRespuestaDto {
   @ApiProperty({ enum: TipoAccesoRemoto }) accesoRemoto!: TipoAccesoRemoto;
   @ApiPropertyOptional({ nullable: true }) accesoRemotoId!: string | null;
 
-  @ApiPropertyOptional({ nullable: true }) ubicacion!: string | null;
+  @ApiPropertyOptional({ nullable: true }) ubicacionId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) ubicacionNombre!: string | null;
 
   @ApiPropertyOptional({ nullable: true }) proveedorId!: string | null;
   @ApiPropertyOptional({ nullable: true }) proveedorNombre!: string | null;
@@ -55,8 +63,10 @@ export class EquipoRespuestaDto {
 
   @ApiPropertyOptional({ nullable: true }) notas!: string | null;
 
-  @ApiPropertyOptional({ nullable: true }) asignadoAId!: string | null;
-  @ApiPropertyOptional({ nullable: true }) asignadoANombre!: string | null;
+  // Quién tiene el equipo. Es un responsable, no un usuario del sistema: ver
+  // el modelo `Responsable` en el esquema.
+  @ApiPropertyOptional({ nullable: true }) responsableId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) responsableNombre!: string | null;
 
   @ApiProperty() creadoEn!: Date;
 
@@ -68,8 +78,10 @@ export class EquipoRespuestaDto {
       tipoNombre: e.tipo?.nombre ?? null,
       llevaEspecificaciones: e.tipo?.llevaEspecificaciones ?? true,
       estado: e.estado,
-      marca: e.marca,
-      modelo: e.modelo,
+      marcaId: e.marcaId,
+      marcaNombre: e.marca?.nombre ?? null,
+      modeloId: e.modeloId,
+      modeloNombre: e.modelo?.nombre ?? null,
       numeroSerie: e.numeroSerie,
       procesador: e.procesador,
       memoriaRamGb: e.memoriaRamGb,
@@ -81,7 +93,8 @@ export class EquipoRespuestaDto {
       nombreEnRed: e.nombreEnRed,
       accesoRemoto: e.accesoRemoto,
       accesoRemotoId: e.accesoRemotoId,
-      ubicacion: e.ubicacion,
+      ubicacionId: e.ubicacionId,
+      ubicacionNombre: e.ubicacion?.nombre ?? null,
       proveedorId: e.proveedorId,
       proveedorNombre: e.proveedor?.nombre ?? null,
       fechaCompra: e.fechaCompra,
@@ -89,8 +102,8 @@ export class EquipoRespuestaDto {
       // Se calcula acá para que la UI no tenga que repetir la regla.
       garantiaVencida: e.garantiaHasta ? e.garantiaHasta.getTime() < Date.now() : false,
       notas: e.notas,
-      asignadoAId: e.asignadoAId,
-      asignadoANombre: e.asignadoA?.nombre ?? null,
+      responsableId: e.responsableId,
+      responsableNombre: e.responsable?.nombre ?? null,
       creadoEn: e.creadoEn,
     };
   }
@@ -99,9 +112,9 @@ export class EquipoRespuestaDto {
 /** Un tramo del historial: quién tuvo el equipo y en qué período. */
 export class AsignacionRespuestaDto {
   @ApiProperty() id!: string;
-  @ApiPropertyOptional({ nullable: true }) usuarioId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) responsableId!: string | null;
   @ApiPropertyOptional({ description: 'null = depósito', nullable: true })
-  usuarioNombre!: string | null;
+  responsableNombre!: string | null;
   @ApiPropertyOptional({ nullable: true }) registradoPorNombre!: string | null;
   @ApiProperty() desde!: Date;
   @ApiPropertyOptional({ description: 'null = asignación vigente', nullable: true })
@@ -113,8 +126,8 @@ export class AsignacionRespuestaDto {
   static desde(a: AsignacionConRelaciones): AsignacionRespuestaDto {
     return {
       id: a.id,
-      usuarioId: a.usuarioId,
-      usuarioNombre: a.usuario?.nombre ?? null,
+      responsableId: a.responsableId,
+      responsableNombre: a.responsable?.nombre ?? null,
       registradoPorNombre: a.registradoPor?.nombre ?? null,
       desde: a.desde,
       hasta: a.hasta,

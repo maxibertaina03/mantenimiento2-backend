@@ -20,8 +20,25 @@ export class ListarEquiposDto extends PaginacionDto {
   @IsEnum(EstadoEquipoIT)
   estado?: EstadoEquipoIT;
 
-  @ApiPropertyOptional({ description: 'Equipos asignados a este usuario', format: 'uuid' })
+  @ApiPropertyOptional({ description: 'Equipos a cargo de este responsable', format: 'uuid' })
   @IsOptional()
   @IsUUID()
-  asignadoAId?: string;
+  responsableId?: string;
+
+  @ApiPropertyOptional({ description: 'Filtrar por marca del catálogo', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  marcaId?: string;
+
+  @ApiPropertyOptional({ description: 'Filtrar por ubicación del catálogo', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  ubicacionId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Solo los que no tienen responsable. Gana sobre `responsableId`.',
+  })
+  @IsOptional()
+  @IsString()
+  sinResponsable?: string;
 }

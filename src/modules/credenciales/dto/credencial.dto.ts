@@ -148,7 +148,11 @@ interface FilaCredencial {
   proximaRotacion: Date | null;
   activo: boolean;
   creadoEn: Date;
-  equipoIt?: { codigoInterno: string | null; marca: string; modelo: string } | null;
+  equipoIt?: {
+    codigoInterno: string | null;
+    marca: { nombre: string } | null;
+    modelo: { nombre: string } | null;
+  } | null;
   _count?: { rotaciones: number; vistas: number };
 }
 
@@ -191,7 +195,9 @@ export class CredencialRespuestaDto {
       notas: f.notas,
       equipoItId: f.equipoItId,
       equipoItNombre: equipo
-        ? [equipo.codigoInterno, equipo.marca, equipo.modelo].filter(Boolean).join(' ')
+        ? [equipo.codigoInterno, equipo.marca?.nombre, equipo.modelo?.nombre]
+            .filter(Boolean)
+            .join(' ') || null
         : null,
       rotarCadaDias: f.rotarCadaDias,
       rotadaEn: f.rotadaEn,

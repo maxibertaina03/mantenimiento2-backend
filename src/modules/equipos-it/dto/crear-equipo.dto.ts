@@ -13,7 +13,6 @@ import {
   Max,
   MaxLength,
   Min,
-  MinLength,
 } from 'class-validator';
 
 /** Formato MAC: 6 pares hexadecimales separados por ":" o "-". */
@@ -38,17 +37,15 @@ export class CrearEquipoDto {
   @IsEnum(EstadoEquipoIT)
   estado?: EstadoEquipoIT;
 
-  @ApiProperty({ example: 'Dell' })
-  @IsString()
-  @MinLength(2)
-  @MaxLength(60)
-  marca!: string;
+  @ApiPropertyOptional({ description: 'Marca del catálogo', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  marcaId?: string;
 
-  @ApiProperty({ example: 'OptiPlex 3080' })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(80)
-  modelo!: string;
+  @ApiPropertyOptional({ description: 'Modelo del catálogo, dentro de la marca', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  modeloId?: string;
 
   @ApiPropertyOptional({ example: 'SN-8F3K2P' })
   @IsOptional()
@@ -123,11 +120,10 @@ export class CrearEquipoDto {
   @MaxLength(80)
   accesoRemotoId?: string;
 
-  @ApiPropertyOptional({ example: 'Oficina administración' })
+  @ApiPropertyOptional({ description: 'Ubicación del catálogo', format: 'uuid' })
   @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  ubicacion?: string;
+  @IsUUID()
+  ubicacionId?: string;
 
   // ── Compra y garantía ──
 
@@ -152,8 +148,11 @@ export class CrearEquipoDto {
   @MaxLength(1000)
   notas?: string;
 
-  @ApiPropertyOptional({ description: 'Usuario al que se asigna el equipo', format: 'uuid' })
+  @ApiPropertyOptional({
+    description: 'Quién queda a cargo del equipo. Es un responsable, no un usuario del sistema.',
+    format: 'uuid',
+  })
   @IsOptional()
   @IsUUID()
-  asignadoAId?: string;
+  responsableId?: string;
 }
