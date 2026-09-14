@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, UnidadMedida } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UnidadConUso } from './dto/unidad-medida.dto';
 
@@ -23,19 +23,16 @@ export class UnidadesMedidaRepository {
   }
 
   /**
-   * Busca por nombre o por símbolo, sin distinguir mayúsculas. Es la consulta
-   * que evita que "lt", "Lt" y "LT" entren como tres unidades distintas: ese
-   * desdoblamiento es justamente lo que el catálogo viene a resolver.
+   * Nombre y símbolo de todas las unidades, para detectar repetidas.
+   *
+   * Antes esto era una consulta con `mode: 'insensitive'`, que resuelve las
+   * mayúsculas y nada más: Postgres sin la extensión `unaccent` no ignora los
+   * acentos, así que la comparación se hace en memoria. Son decenas de filas.
+   * Ver `common/dominio/nombres`.
    */
-  buscarPorNombreOSimbolo(valor: string): Promise<UnidadMedida | null> {
-    const v = valor.trim();
-    return this.prisma.unidadMedida.findFirst({
-      where: {
-        OR: [
-          { nombre: { equals: v, mode: 'insensitive' } },
-          { simbolo: { equals: v, mode: 'insensitive' } },
-        ],
-      },
+  listarNombresYSimbolos(): Promise<{ id: string; nombre: string; simbolo: string }[]> {
+    return this.prisma.unidadMedida.findMany({
+      select: { id: true, nombre: true, simbolo: true },
     });
   }
 

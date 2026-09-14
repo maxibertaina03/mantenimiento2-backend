@@ -26,6 +26,17 @@ export class CategoriasMaterialRepository {
     return this.prisma.categoriaMaterial.delete({ where: { id } });
   }
 
+  /**
+   * Los nombres de todas las categorías, para detectar repetidas.
+   *
+   * Se traen todas y se comparan en memoria: Postgres, sin la extensión
+   * `unaccent`, no puede ignorar los acentos, así que una consulta por
+   * «Tornilleria» nunca devuelve «Tornillería». Son decenas de filas.
+   */
+  listarNombres(): Promise<{ id: string; nombre: string }[]> {
+    return this.prisma.categoriaMaterial.findMany({ select: { id: true, nombre: true } });
+  }
+
   /** Cuántos materiales usan esta categoría (para impedir borrado con dependencias). */
   contarMateriales(id: string): Promise<number> {
     return this.prisma.material.count({ where: { categoriaId: id } });

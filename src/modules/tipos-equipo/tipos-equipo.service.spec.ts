@@ -18,7 +18,7 @@ function armar(tipo: any = tipoBase) {
   const repo = {
     buscarTodos: jest.fn<Promise<any>, any[]>(async () => [tipo]),
     buscarPorId: jest.fn<Promise<any>, any[]>(async () => tipo),
-    buscarPorNombre: jest.fn<Promise<any>, any[]>(async () => null),
+    listarNombres: jest.fn<Promise<any>, any[]>(async () => []),
     crear: jest.fn<Promise<any>, any[]>(async (d: any) => ({ ...tipoBase, ...d })),
     actualizar: jest.fn<Promise<any>, any[]>(async () => tipo),
     eliminar: jest.fn<Promise<any>, any[]>(async () => undefined),
@@ -52,11 +52,31 @@ describe('TiposEquipoService', () => {
     it('REGRESION: rechaza un nombre repetido', async () => {
       // El nombre identifica al tipo en la UI: repetirlo confunde.
       const { service, repo } = armar();
-      repo.buscarPorNombre.mockResolvedValue({ id: 'otro', nombre: 'Notebook' });
+      repo.listarNombres.mockResolvedValue([{ id: 'otro', nombre: 'Notebook' }]);
       await expect(service.crear({ nombre: 'notebook' } as any)).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(repo.crear).not.toHaveBeenCalled();
+    });
+
+    it('REGRESION: los acentos tampoco hacen un tipo nuevo', async () => {
+      // Este pasaba de largo. La consulta comparaba sin distinguir mayusculas,
+      // pero «Camara de seguridad» y «Cámara de seguridad» son dos textos
+      // distintos para Postgres, asi que no encontraba nada y quedaban los dos
+      // tipos. Desde ahi, la mitad de los equipos cuelga de cada uno.
+      const { service, repo } = armar();
+      repo.listarNombres.mockResolvedValue([{ id: 'otro', nombre: 'Cámara de seguridad' }]);
+      await expect(service.crear({ nombre: 'Camara de seguridad' } as any)).rejects.toThrow(
+        /Cámara de seguridad/,
+      );
+      expect(repo.crear).not.toHaveBeenCalled();
+    });
+
+    it('un tipo que de verdad es nuevo entra sin problema', async () => {
+      const { service, repo } = armar();
+      repo.listarNombres.mockResolvedValue([{ id: 'otro', nombre: 'Notebook' }]);
+      await service.crear({ nombre: 'Proyector' } as any);
+      expect(repo.crear).toHaveBeenCalled();
     });
   });
 
@@ -69,7 +89,7 @@ describe('TiposEquipoService', () => {
 
     it('renombrarse a sí mismo no choca con la validación de duplicados', async () => {
       const { service, repo } = armar();
-      repo.buscarPorNombre.mockResolvedValue({ id: 't-1', nombre: 'Cámara de seguridad' });
+      repo.listarNombres.mockResolvedValue([{ id: 't-1', nombre: 'Cámara de seguridad' }]);
       await expect(
         service.actualizar('t-1', { nombre: 'Cámara de seguridad' } as any),
       ).resolves.toBeDefined();
@@ -77,7 +97,7 @@ describe('TiposEquipoService', () => {
 
     it('rechaza tomar el nombre de otro tipo', async () => {
       const { service, repo } = armar();
-      repo.buscarPorNombre.mockResolvedValue({ id: 'otro', nombre: 'Notebook' });
+      repo.listarNombres.mockResolvedValue([{ id: 'otro', nombre: 'Notebook' }]);
       await expect(service.actualizar('t-1', { nombre: 'Notebook' } as any)).rejects.toThrow(
         /Ya existe/,
       );

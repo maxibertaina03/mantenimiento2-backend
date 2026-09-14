@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, TipoEquipo } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { TipoConUso } from './dto/tipo-equipo.dto';
 
@@ -22,10 +22,15 @@ export class TiposEquipoRepository {
     return this.prisma.tipoEquipo.findUnique({ where: { id }, include: this.conUso });
   }
 
-  buscarPorNombre(nombre: string): Promise<TipoEquipo | null> {
-    return this.prisma.tipoEquipo.findFirst({
-      where: { nombre: { equals: nombre, mode: 'insensitive' } },
-    });
+  /**
+   * Los nombres de todos los tipos, para detectar repetidos.
+   *
+   * Se comparan en memoria, no en la consulta: Postgres sin la extensión
+   * `unaccent` no ignora los acentos, así que buscar «Camara» nunca devolvía
+   * «Cámara» y el repetido entraba igual. Ver `common/dominio/nombres`.
+   */
+  listarNombres(): Promise<{ id: string; nombre: string }[]> {
+    return this.prisma.tipoEquipo.findMany({ select: { id: true, nombre: true } });
   }
 
   crear(data: Prisma.TipoEquipoCreateInput): Promise<TipoConUso> {

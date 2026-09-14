@@ -5,6 +5,7 @@ import {
   TipoEquipoRespuestaDto,
 } from './dto/tipo-equipo.dto';
 import { TiposEquipoRepository } from './tipos-equipo.repository';
+import { buscarNombreRepetido } from '../../common/dominio/nombres';
 
 /**
  * Catálogo de tipos de equipo, administrable desde el sistema.
@@ -18,8 +19,8 @@ export class TiposEquipoService {
 
   /** El nombre identifica al tipo en la UI: repetirlo confunde. */
   private async validarNombreLibre(nombre: string, idPropio?: string): Promise<void> {
-    const existente = await this.repo.buscarPorNombre(nombre);
-    if (existente && existente.id !== idPropio) {
+    const existente = buscarNombreRepetido(await this.repo.listarNombres(), nombre, idPropio);
+    if (existente) {
       throw new BadRequestException(`Ya existe un tipo de equipo llamado "${existente.nombre}".`);
     }
   }

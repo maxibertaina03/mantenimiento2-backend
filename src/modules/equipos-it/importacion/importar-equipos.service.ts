@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { TipoEquipo, Usuario } from '@prisma/client';
 import { TiposEquipoRepository } from '../../tipos-equipo/tipos-equipo.repository';
 import { UsuariosService } from '../../usuarios/usuarios.service';
+import { claveDeComparacion } from '../../../common/dominio/nombres';
 import {
   FilaImportacionDto,
   ImportarEquiposDto,
@@ -54,7 +55,10 @@ export class ImportarEquiposService {
     cache: Map<string, Usuario>,
     creados: string[],
   ): Promise<Usuario> {
-    const clave = nombre.toLowerCase();
+    // La misma clave que usa la base para decidir si dos nombres son la misma
+    // persona: con `toLowerCase()` a secas, «José» y «Jose» eran dos entradas
+    // distintas del cache y la misma planilla creaba dos personas.
+    const clave = claveDeComparacion(nombre);
     const enCache = cache.get(clave);
     if (enCache) return enCache;
 

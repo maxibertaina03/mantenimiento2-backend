@@ -21,7 +21,7 @@ function armar() {
       ...litro,
       _count: { materiales: 0 },
     })),
-    buscarPorNombreOSimbolo: jest.fn<Promise<any>, any[]>(async () => null),
+    listarNombresYSimbolos: jest.fn<Promise<any>, any[]>(async () => []),
     crear: jest.fn<Promise<any>, any[]>(async (data) => ({
       ...litro,
       ...data,
@@ -50,17 +50,35 @@ describe('UnidadesMedidaService', () => {
       // Es el problema que el catalogo viene a resolver: si dejara entrar "Lt"
       // teniendo "lt", volveria a haber dos unidades para la misma cosa.
       const { service, repo } = armar();
-      repo.buscarPorNombreOSimbolo.mockResolvedValue(litro);
+      repo.listarNombresYSimbolos.mockResolvedValue([litro]);
       await expect(service.crear({ nombre: 'LITRO', simbolo: 'Lt' })).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(repo.crear).not.toHaveBeenCalled();
     });
 
+    it('REGRESION: los acentos tampoco hacen una unidad nueva', async () => {
+      // «Kilogramo» no lleva acento, pero «Micrón» si, y la consulta vieja no
+      // lo encontraba: comparaba sin distinguir mayusculas y nada mas.
+      const { service, repo } = armar();
+      repo.listarNombresYSimbolos.mockResolvedValue([
+        { id: 'uni-9', nombre: 'Micrón', simbolo: 'µm' },
+      ]);
+      await expect(service.crear({ nombre: 'Micron', simbolo: 'um' })).rejects.toThrow(/Micrón/);
+      expect(repo.crear).not.toHaveBeenCalled();
+    });
+
+    it('una unidad que de verdad es nueva entra sin problema', async () => {
+      const { service, repo } = armar();
+      repo.listarNombresYSimbolos.mockResolvedValue([litro]);
+      await service.crear({ nombre: 'Metro', simbolo: 'm' });
+      expect(repo.crear).toHaveBeenCalled();
+    });
+
     it('el simbolo tambien se valida contra el catalogo, no solo el nombre', async () => {
       const { service, repo } = armar();
       // El nombre esta libre, pero el simbolo ya lo usa otra unidad.
-      repo.buscarPorNombreOSimbolo.mockResolvedValueOnce(null).mockResolvedValueOnce(litro);
+      repo.listarNombresYSimbolos.mockResolvedValue([litro]);
       await expect(
         service.crear({ nombre: 'Litros de agua', simbolo: 'lt' }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -76,7 +94,7 @@ describe('UnidadesMedidaService', () => {
   describe('actualizar()', () => {
     it('no se queja de chocar consigo misma al editar', async () => {
       const { service, repo } = armar();
-      repo.buscarPorNombreOSimbolo.mockResolvedValue(litro); // se encuentra a si misma
+      repo.listarNombresYSimbolos.mockResolvedValue([litro]); // se encuentra a si misma
       await expect(
         service.actualizar('uni-1', { nombre: 'Litro', simbolo: 'lt', orden: 5 }),
       ).resolves.toMatchObject({ id: 'uni-1' });
@@ -84,7 +102,7 @@ describe('UnidadesMedidaService', () => {
 
     it('sigue rechazando el choque con OTRA unidad', async () => {
       const { service, repo } = armar();
-      repo.buscarPorNombreOSimbolo.mockResolvedValue({ ...litro, id: 'otra' });
+      repo.listarNombresYSimbolos.mockResolvedValue([{ ...litro, id: 'otra' }]);
       await expect(service.actualizar('uni-1', { nombre: 'Litro' })).rejects.toBeInstanceOf(
         BadRequestException,
       );

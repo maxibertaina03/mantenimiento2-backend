@@ -5,6 +5,7 @@ import {
   UnidadMedidaRespuestaDto,
 } from './dto/unidad-medida.dto';
 import { UnidadesMedidaRepository } from './unidades-medida.repository';
+import { sonElMismoNombre } from '../../common/dominio/nombres';
 
 /**
  * Catálogo de unidades de medida.
@@ -24,8 +25,13 @@ export class UnidadesMedidaService {
    * vino a resolver.
    */
   private async validarLibre(valor: string, idPropia?: string): Promise<void> {
-    const existente = await this.repo.buscarPorNombreOSimbolo(valor);
-    if (existente && existente.id !== idPropia) {
+    const unidades = await this.repo.listarNombresYSimbolos();
+    const existente = unidades.find(
+      (u) =>
+        u.id !== idPropia &&
+        (sonElMismoNombre(u.nombre, valor) || sonElMismoNombre(u.simbolo, valor)),
+    );
+    if (existente) {
       throw new BadRequestException(
         `Ya existe la unidad "${existente.nombre}" (${existente.simbolo}).`,
       );

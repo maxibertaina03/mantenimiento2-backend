@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { sonElMismoNombre } from '../../../common/dominio/nombres';
 import { Equipo } from '../dominio/equipo';
 import { EstadoEquipo } from '../dominio/estado-equipo';
 import {
@@ -98,11 +99,26 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
     return fila === null ? null : this.aDominio(fila);
   }
 
+  /**
+   * El equipo que ya se llama así en esa ubicación. Es lo que hace que
+   * reimportar la misma planilla no cree todo de nuevo.
+   *
+   * Se resuelve en dos pasos, comparando en memoria: "Bomba caldera 1" y
+   * "BOMBA CALDERA 1" son el mismo equipo, y «Compresor Atlas» y «Compresór
+   * Atlas» también, pero Postgres sin la extensión `unaccent` solo resuelve lo
+   * primero. Se filtra por ubicación primero, así lo que se trae son los
+   * equipos de un sector y no los de la planta entera.
+   */
   async buscarPorNombreYUbicacion(nombre: string, ubicacionId: string): Promise<Equipo | null> {
-    const fila = await this.prisma.equipo.findFirst({
-      // insensitive a propósito: "Bomba caldera 1" y "BOMBA CALDERA 1" son el
-      // mismo equipo, y sin esto reimportar crearía el segundo.
-      where: { nombre: { equals: nombre, mode: 'insensitive' }, ubicacionId },
+    const enLaUbicacion = await this.prisma.equipo.findMany({
+      where: { ubicacionId },
+      select: { id: true, nombre: true },
+    });
+    const encontrado = enLaUbicacion.find((e) => sonElMismoNombre(e.nombre, nombre));
+    if (!encontrado) return null;
+
+    const fila = await this.prisma.equipo.findUnique({
+      where: { id: encontrado.id },
       include: this.relaciones,
     });
     return fila === null ? null : this.aDominio(fila);

@@ -17,7 +17,7 @@ import { ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { sonElMismoNombre } from '../materiales/nombre-material';
+import { buscarNombreRepetido } from '../../common/dominio/nombres';
 
 /**
  * Las estanterías del depósito.
@@ -87,22 +87,26 @@ export class EstanteriasMaterialService {
     return filas.map((f) => this.aItem(f));
   }
 
-  async crear(dto: CrearEstanteriaDto): Promise<EstanteriaConUso> {
-    const nombre = dto.nombre.trim();
-
-    // Se traen todas y se comparan en memoria: Postgres no compara sin acentos
-    // sin la extensión `unaccent`, que no está instalada, así que una consulta
-    // por «Estanteria A» nunca devuelve «Estantería A» y el duplicado se cuela.
-    // Son un puñado de filas.
+  /**
+   * Rechaza un nombre que ya está en uso, salvo que sea el de la propia
+   * estantería. Se compara en memoria porque Postgres, sin la extensión
+   * `unaccent`, no ignora los acentos: ver `common/dominio/nombres`.
+   */
+  private async verificarNombreLibre(nombre: string, exceptoId?: string): Promise<void> {
     const todas = await this.prisma.estanteriaMaterial.findMany({
       select: { id: true, nombre: true },
     });
-    const repetida = todas.find((e) => sonElMismoNombre(e.nombre, nombre));
+    const repetida = buscarNombreRepetido(todas, nombre, exceptoId);
     if (repetida) {
       throw new BadRequestException(
         `Ya existe una estantería llamada "${repetida.nombre}". Usá esa en vez de crear otra.`,
       );
     }
+  }
+
+  async crear(dto: CrearEstanteriaDto): Promise<EstanteriaConUso> {
+    const nombre = dto.nombre.trim();
+    await this.verificarNombreLibre(nombre);
 
     const fila = await this.prisma.estanteriaMaterial.create({
       data: { nombre, orden: dto.orden ?? 0 },
@@ -112,6 +116,10 @@ export class EstanteriasMaterialService {
   }
 
   async actualizar(id: string, dto: ActualizarEstanteriaDto): Promise<EstanteriaConUso> {
+    // También al renombrar: sin esto, «Estantería B» se puede pasar a llamar
+    // «Estanteria A» y quedan dos, que es el mismo problema por la otra puerta.
+    if (dto.nombre) await this.verificarNombreLibre(dto.nombre.trim(), id);
+
     const fila = await this.prisma.estanteriaMaterial.update({
       where: { id },
       data: { nombre: dto.nombre?.trim(), orden: dto.orden, activo: dto.activo },

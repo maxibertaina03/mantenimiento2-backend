@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, RolUsuario, Usuario } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { sonElMismoNombre } from '../../common/dominio/nombres';
 
 @Injectable()
 export class UsuariosRepository {
@@ -34,11 +35,19 @@ export class UsuariosRepository {
     return this.prisma.usuario.findMany({ skip, take, orderBy: { nombre: 'asc' } });
   }
 
-  /** Busca por nombre exacto, sin distinguir mayúsculas. Lo usa la importación. */
-  buscarPorNombre(nombre: string): Promise<Usuario | null> {
-    return this.prisma.usuario.findFirst({
-      where: { nombre: { equals: nombre, mode: 'insensitive' } },
-    });
+  /**
+   * Busca a una persona por su nombre. Lo usa la importación de equipos de IT
+   * para reutilizar a quien ya está cargado en vez de duplicarlo.
+   *
+   * La comparación se hace en memoria y no en la consulta: Postgres, sin la
+   * extensión `unaccent`, no ignora los acentos, así que buscar «Jose Perez»
+   * no encontraba a «José Pérez» y la importación creaba una segunda persona
+   * con el mismo nombre. Desde ahí, los equipos de alguien quedan repartidos
+   * entre dos fichas. Son decenas de filas: traerlas todas no cuesta nada.
+   */
+  async buscarPorNombre(nombre: string): Promise<Usuario | null> {
+    const todos = await this.prisma.usuario.findMany();
+    return todos.find((u) => sonElMismoNombre(u.nombre, nombre)) ?? null;
   }
 
   /** Cuántos usuarios tienen ese rol. Se usa para no quedarse sin ADMIN. */

@@ -28,6 +28,7 @@ import {
 } from 'class-validator';
 import { Roles } from '../../../common/auth/decorators/roles.decorator';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { buscarNombreRepetido } from '../../../common/dominio/nombres';
 
 /**
  * Los catálogos del contexto: dónde está el equipo, qué clase de equipo es, y
@@ -132,9 +133,42 @@ export class CatalogosEquipoService {
     return filas.map((f) => this.aItem(f));
   }
 
-  async crear(delegado: DelegadoCatalogo, dto: CrearItemCatalogoDto): Promise<ItemCatalogo> {
+  /**
+   * Rechaza un nombre que ya está en el catálogo, salvo que sea el del propio
+   * item.
+   *
+   * No había ningún control: se podía cargar «Sala de máquinas» dos veces, y el
+   * desplegable quedaba con dos filas iguales y los equipos repartidos entre
+   * las dos. Desde ahí, filtrar por ubicación nunca vuelve a dar el total.
+   *
+   * Se comparan en memoria porque Postgres, sin la extensión `unaccent`, no
+   * ignora los acentos: ver `common/dominio/nombres`. Son decenas de filas.
+   */
+  private async verificarNombreLibre(
+    delegado: DelegadoCatalogo,
+    nombre: string,
+    que: string,
+    exceptoId?: string,
+  ): Promise<void> {
+    const filas = await delegado.findMany({ where: {}, orderBy: { nombre: 'asc' } });
+    const repetido = buscarNombreRepetido(filas, nombre, exceptoId);
+    if (repetido) {
+      throw new BadRequestException(
+        `Ya existe ${que} con el nombre "${repetido.nombre}". Usá ese en vez de crear otro.`,
+      );
+    }
+  }
+
+  async crear(
+    delegado: DelegadoCatalogo,
+    dto: CrearItemCatalogoDto,
+    que: string,
+  ): Promise<ItemCatalogo> {
+    const nombre = dto.nombre.trim();
+    await this.verificarNombreLibre(delegado, nombre, que);
+
     const fila = await delegado.create({
-      data: { nombre: dto.nombre.trim(), orden: dto.orden ?? 0, activo: dto.activo ?? true },
+      data: { nombre, orden: dto.orden ?? 0, activo: dto.activo ?? true },
       include: this.conUso,
     });
     return this.aItem(fila);
@@ -144,7 +178,11 @@ export class CatalogosEquipoService {
     delegado: DelegadoCatalogo,
     id: string,
     dto: ActualizarItemCatalogoDto,
+    que: string,
   ): Promise<ItemCatalogo> {
+    // También al renombrar: si no, el duplicado entra por la otra puerta.
+    if (dto.nombre) await this.verificarNombreLibre(delegado, dto.nombre.trim(), que, id);
+
     const fila = await delegado.update({
       where: { id },
       data: { nombre: dto.nombre?.trim(), orden: dto.orden, activo: dto.activo },
@@ -194,14 +232,19 @@ export class UbicacionesEquipoController {
   @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Crear una ubicación' })
   crear(@Body() dto: CrearItemCatalogoDto) {
-    return this.servicio.crear(comoCatalogo(this.prisma.ubicacionEquipo), dto);
+    return this.servicio.crear(comoCatalogo(this.prisma.ubicacionEquipo), dto, 'la ubicación');
   }
 
   @Patch(':id')
   @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Editar una ubicación' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
-    return this.servicio.actualizar(comoCatalogo(this.prisma.ubicacionEquipo), id, dto);
+    return this.servicio.actualizar(
+      comoCatalogo(this.prisma.ubicacionEquipo),
+      id,
+      dto,
+      'la ubicación',
+    );
   }
 
   @Delete(':id')
@@ -233,14 +276,14 @@ export class TiposEquipoPlantaController {
   @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Crear un tipo' })
   crear(@Body() dto: CrearItemCatalogoDto) {
-    return this.servicio.crear(comoCatalogo(this.prisma.tipoEquipoPlanta), dto);
+    return this.servicio.crear(comoCatalogo(this.prisma.tipoEquipoPlanta), dto, 'el tipo');
   }
 
   @Patch(':id')
   @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Editar un tipo' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
-    return this.servicio.actualizar(comoCatalogo(this.prisma.tipoEquipoPlanta), id, dto);
+    return this.servicio.actualizar(comoCatalogo(this.prisma.tipoEquipoPlanta), id, dto, 'el tipo');
   }
 
   @Delete(':id')
@@ -271,13 +314,13 @@ export class MarcasEquipoController {
   @Post()
   @ApiOperation({ summary: 'Crear una marca' })
   crear(@Body() dto: CrearItemCatalogoDto) {
-    return this.servicio.crear(comoCatalogo(this.prisma.marcaEquipo), dto);
+    return this.servicio.crear(comoCatalogo(this.prisma.marcaEquipo), dto, 'la marca');
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Editar una marca' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
-    return this.servicio.actualizar(comoCatalogo(this.prisma.marcaEquipo), id, dto);
+    return this.servicio.actualizar(comoCatalogo(this.prisma.marcaEquipo), id, dto, 'la marca');
   }
 
   @Delete(':id')
@@ -355,16 +398,7 @@ export class ModelosEquipoController {
     }
     const nombre = dto.nombre.trim();
 
-    // El índice único ya lo garantiza; esto lo convierte en un mensaje que se
-    // entiende, en vez de un error de restricción de la base.
-    const repetido = await this.prisma.modeloEquipo.findFirst({
-      where: { marcaId: dto.marcaId, nombre: { equals: nombre, mode: 'insensitive' } },
-    });
-    if (repetido) {
-      throw new BadRequestException(
-        `${marca.nombre} ya tiene un modelo "${repetido.nombre}". Usá ese en vez de crear otro.`,
-      );
-    }
+    await this.verificarNombreLibre(dto.marcaId, marca.nombre, nombre);
 
     const fila = await this.prisma.modeloEquipo.create({
       data: { marcaId: dto.marcaId, nombre, orden: dto.orden ?? 0, activo: dto.activo ?? true },
@@ -373,9 +407,47 @@ export class ModelosEquipoController {
     return this.aItem(fila);
   }
 
+  /**
+   * Rechaza un modelo que la marca ya tiene.
+   *
+   * El índice único de la base lo garantiza, pero solo con el texto exacto:
+   * «5030» y «5030 » son dos filas distintas para el índice, y «Rotátil» y
+   * «Rotatil» también, porque Postgres sin la extensión `unaccent` no ignora
+   * los acentos. Comparando acá el mensaje además se entiende, en vez de salir
+   * como un error de restricción.
+   */
+  private async verificarNombreLibre(
+    marcaId: string,
+    marcaNombre: string,
+    nombre: string,
+    exceptoId?: string,
+  ) {
+    const modelos = await this.prisma.modeloEquipo.findMany({
+      where: { marcaId },
+      select: { id: true, nombre: true },
+    });
+    const repetido = buscarNombreRepetido(modelos, nombre, exceptoId);
+    if (repetido) {
+      throw new BadRequestException(
+        `${marcaNombre} ya tiene un modelo "${repetido.nombre}". Usá ese en vez de crear otro.`,
+      );
+    }
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Editar un modelo, o desactivarlo' })
   async actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
+    if (dto.nombre) {
+      const actual = await this.prisma.modeloEquipo.findUnique({
+        where: { id },
+        include: { marca: { select: { nombre: true } } },
+      });
+      if (!actual) throw new NotFoundException(`No existe el modelo con id ${id}`);
+      // Se compara contra los de SU marca: un "5030" de Grundfos y uno de
+      // Siemens conviven, y bloquearlo seria inventar un choque que no existe.
+      await this.verificarNombreLibre(actual.marcaId, actual.marca.nombre, dto.nombre.trim(), id);
+    }
+
     const fila = await this.prisma.modeloEquipo.update({
       where: { id },
       data: { nombre: dto.nombre?.trim(), orden: dto.orden, activo: dto.activo },
