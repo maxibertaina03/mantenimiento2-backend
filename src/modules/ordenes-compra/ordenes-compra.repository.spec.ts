@@ -113,3 +113,23 @@ describe('OrdenesCompraRepository.recibir()', () => {
     );
   });
 });
+
+/**
+ * Buscar una orden por el comprobante con el que llego.
+ *
+ * El caso real es al reves de como uno lo imagina: se tiene el papel en la mano
+ * y se quiere encontrar la orden, no la orden para ver el papel.
+ */
+describe('OrdenesCompraRepository - buscar por comprobante', () => {
+  it('REGRESION: el buscador tambien mira remito y factura', () => {
+    const repo = new OrdenesCompraRepository({} as never);
+    const where = (repo as never as { aWhere(f: unknown): { OR?: unknown[] } }).aWhere({
+      buscar: 'R-0001-00045678',
+    });
+
+    const campos = (where.OR ?? []).map((o) => Object.keys(o as object)[0]);
+    expect(campos).toContain('remito');
+    expect(campos).toContain('factura');
+    expect(campos).toContain('numero');
+  });
+});

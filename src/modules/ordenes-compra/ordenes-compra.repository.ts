@@ -69,6 +69,10 @@ export class OrdenesCompraRepository {
             OR: [
               { numero: { contains: texto, mode: 'insensitive' as const } },
               { proveedor: { nombre: { contains: texto, mode: 'insensitive' as const } } },
+              // Por el comprobante: el caso real es tener el papel en la mano y
+              // querer encontrar la orden, no al revés.
+              { remito: { contains: texto, mode: 'insensitive' as const } },
+              { factura: { contains: texto, mode: 'insensitive' as const } },
             ],
           }
         : {}),
