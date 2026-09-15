@@ -56,6 +56,12 @@ services:
         sync: false
       - key: SUPABASE_BUCKET
         value: equipos
+      # Los remitos y facturas adjuntos a las ordenes. Va en un bucket aparte y
+      # PRIVADO: un remito lleva proveedor, cantidades y precios, asi que se
+      # entrega con enlaces firmados que vencen, no con una direccion publica.
+      # El sistema lo crea solo la primera vez que alguien adjunta algo.
+      - key: SUPABASE_BUCKET_COMPROBANTES
+        value: comprobantes
       # Copia interna de las órdenes. Vacía a propósito: el servidor de correo
       # de la empresa rechaza lo que sale por Brevo con "550 Blacklisted
       # [France, Europe]", un bloqueo por IP europea del hosting que ningún

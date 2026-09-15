@@ -19,6 +19,8 @@ import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
 import { EnviarOrdenDto, RegistrarWhatsappDto } from './dto/enviar-orden.dto';
+import { AdjuntarComprobanteDto } from './comprobantes/comprobantes.dto';
+import { ComprobantesService } from './comprobantes/comprobantes.service';
 import { OrdenesCompraService } from './ordenes-compra.service';
 import { Permisos } from '../../common/auth/decorators/permisos.decorator';
 import { PERMISOS } from '../../common/auth/permisos';
@@ -27,7 +29,61 @@ import { PERMISOS } from '../../common/auth/permisos';
 @ApiBearerAuth()
 @Controller('ordenes-compra')
 export class OrdenesCompraController {
-  constructor(private readonly service: OrdenesCompraService) {}
+  constructor(
+    private readonly service: OrdenesCompraService,
+    private readonly comprobantes: ComprobantesService,
+  ) {}
+
+  // ── Comprobantes adjuntos ─────────────────────────────────────────────────
+  // El numero de remito o factura ya se guardaba; esto guarda el papel.
+
+  @Permisos(PERMISOS.ORDENES_VER)
+  @Get(':id/comprobantes')
+  @ApiOperation({
+    summary: 'Los remitos y facturas adjuntos a una orden',
+    description: 'No devuelve el archivo: para verlo se pide un enlace, que vence.',
+  })
+  listarComprobantes(@Param('id', ParseUUIDPipe) id: string) {
+    return this.comprobantes.listar(id);
+  }
+
+  @Permisos(PERMISOS.ORDENES_VER)
+  @Get(':id/comprobantes/:comprobanteId/enlace')
+  @ApiOperation({
+    summary: 'Un enlace para abrir el archivo',
+    description:
+      'Vence a los cinco minutos. Un remito lleva proveedor, cantidades y precios: no puede ' +
+      'quedar en una direccion que sirve para siempre y que cualquiera puede reenviar.',
+  })
+  enlaceComprobante(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('comprobanteId', ParseUUIDPipe) comprobanteId: string,
+  ) {
+    return this.comprobantes.enlace(id, comprobanteId);
+  }
+
+  @Permisos(PERMISOS.ORDENES_RECIBIR)
+  @Post(':id/comprobantes')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Adjuntar el PDF o la foto de un remito o una factura' })
+  adjuntarComprobante(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdjuntarComprobanteDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.comprobantes.adjuntar(id, dto, usuario);
+  }
+
+  @Permisos(PERMISOS.ORDENES_RECIBIR)
+  @Delete(':id/comprobantes/:comprobanteId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Borrar un comprobante adjunto' })
+  borrarComprobante(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('comprobanteId', ParseUUIDPipe) comprobanteId: string,
+  ) {
+    return this.comprobantes.borrar(id, comprobanteId);
+  }
 
   @Permisos(PERMISOS.ORDENES_EDITAR)
   @Post()

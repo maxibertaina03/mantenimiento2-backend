@@ -52,6 +52,44 @@ enum RolUsuario {
 /// La lista de permisos POSIBLES vive en el codigo (`common/auth/permisos.ts`),
 /// porque cada uno corresponde a endpoints concretos: inventar uno desde una
 /// pantalla no haria que ningun endpoint empezara a pedirlo.
+/// Con que papel llego la mercaderia de una orden.
+enum TipoComprobante {
+  REMITO
+  FACTURA
+  OTRO
+}
+
+/// El PDF o la foto del remito o la factura de una orden de compra.
+///
+/// Van varios por orden a proposito: un remito de dos hojas son dos fotos, y
+/// una entrega puede venir con remito Y factura. Obligar a elegir uno solo
+/// llevaria a sacarle una foto al monton de papeles para que entren todos.
+///
+/// El archivo NO queda en una direccion publica, al reves que las fotos de los
+/// equipos. Un remito lleva el proveedor, las cantidades y los precios: se
+/// entrega con un enlace firmado que vence a los pocos minutos.
+model ComprobanteOrden {
+  id      String          @id @default(uuid())
+  ordenId String
+  tipo    TipoComprobante @default(REMITO)
+
+  /// Como se llamaba el archivo que subieron, para mostrarlo.
+  nombre      String
+  /// Donde quedo en el almacen. Es lo que hace falta para verlo y para borrarlo.
+  ruta        String
+  contentType String
+  tamanoBytes Int
+
+  subidoEn    DateTime @default(now())
+  subidoPorId String?
+
+  orden     OrdenCompra @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  subidoPor Usuario?    @relation("ComprobantesSubidos", fields: [subidoPorId], references: [id])
+
+  @@index([ordenId])
+  @@map("comprobantes_orden")
+}
+
 model PermisoRol {
   rol     RolUsuario
   permiso String
@@ -294,6 +332,7 @@ model Usuario {
   enviosDeOrden            EnvioOrden[]   @relation("EnviosDeOrden")
 
   rotacionesDeCredencial RotacionCredencial[] @relation("RotacionesDeCredencial")
+  comprobantesSubidos    ComprobanteOrden[]   @relation("ComprobantesSubidos")
   vistasDeCredencial     VistaCredencial[]    @relation("VistasDeCredencial")
 
   @@map("usuarios")
@@ -574,11 +613,12 @@ model OrdenCompra {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  proveedor   Proveedor            @relation(fields: [proveedorId], references: [id])
-  creadoPor   Usuario?             @relation("OrdenesCreadas", fields: [creadoPorId], references: [id])
-  recibidaPor Usuario?             @relation("OrdenesRecibidas", fields: [recibidaPorId], references: [id])
-  renglones   RenglonOrdenCompra[]
-  envios      EnvioOrden[]
+  proveedor    Proveedor            @relation(fields: [proveedorId], references: [id])
+  creadoPor    Usuario?             @relation("OrdenesCreadas", fields: [creadoPorId], references: [id])
+  recibidaPor  Usuario?             @relation("OrdenesRecibidas", fields: [recibidaPorId], references: [id])
+  renglones    RenglonOrdenCompra[]
+  envios       EnvioOrden[]
+  comprobantes ComprobanteOrden[]
 
   @@index([estado])
   @@index([proveedorId])

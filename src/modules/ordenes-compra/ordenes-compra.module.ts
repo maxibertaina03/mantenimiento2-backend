@@ -4,6 +4,7 @@ import { MovimientosStockModule } from '../movimientos-stock/movimientos-stock.m
 import { ProveedoresModule } from '../proveedores/proveedores.module';
 import { OrdenesCompraController } from './ordenes-compra.controller';
 import { OrdenesCompraRepository } from './ordenes-compra.repository';
+import { ComprobantesService } from './comprobantes/comprobantes.service';
 import { OrdenesCompraService } from './ordenes-compra.service';
 
 @Module({
@@ -12,7 +13,7 @@ import { OrdenesCompraService } from './ordenes-compra.service';
   // una orden genera movimientos de stock y le toca la misma regla.
   imports: [ProveedoresModule, MaterialesModule, MovimientosStockModule],
   controllers: [OrdenesCompraController],
-  providers: [OrdenesCompraService, OrdenesCompraRepository],
+  providers: [ComprobantesService, OrdenesCompraService, OrdenesCompraRepository],
   exports: [OrdenesCompraService],
 })
 export class OrdenesCompraModule {}
