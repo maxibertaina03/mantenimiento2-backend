@@ -83,17 +83,30 @@ describe('los roles con los que arranca', () => {
     expect(puede(PRESETS.ADMINISTRATIVO, [PERMISOS.CREDENCIALES_VER])).toBe(false);
   });
 
-  it('mantenimiento puede cargar movimientos y mirar lo que necesita', () => {
-    expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.MOVIMIENTOS_CREAR])).toBe(true);
-    expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.MATERIALES_VER])).toBe(true);
-    expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.ORDENES_VER])).toBe(true);
+  it('mantenimiento maneja el deposito de punta a punta', () => {
+    for (const p of [
+      PERMISOS.MOVIMIENTOS_CREAR,
+      PERMISOS.MATERIALES_VER,
+      PERMISOS.ORDENES_VER,
+      PERMISOS.ORDENES_EDITAR,
+      PERMISOS.ORDENES_RECIBIR,
+    ]) {
+      expect(puede(PRESETS.MANTENIMIENTO, [p])).toBe(true);
+    }
+  });
+
+  it('REGRESION: el circuito de compras no se corta a la mitad', () => {
+    // Una orden se le carga a un proveedor y con materiales del catalogo. Sin
+    // poder dar de alta ninguno de los dos, la primera compra a alguien nuevo
+    // se frena y hay que pedirle al administrador que la destrabe.
+    expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.PROVEEDORES_EDITAR])).toBe(true);
+    expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.MATERIALES_EDITAR])).toBe(true);
   });
 
   it('REGRESION: mantenimiento no administra ni ve contrasenas', () => {
     expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.USUARIOS_ADMINISTRAR])).toBe(false);
     expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.CREDENCIALES_VER])).toBe(false);
     expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.IT_VER])).toBe(false);
-    expect(puede(PRESETS.MANTENIMIENTO, [PERMISOS.MATERIALES_EDITAR])).toBe(false);
   });
 
   it('REGRESION: solo el administrador puede cambiar los permisos', () => {

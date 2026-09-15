@@ -159,15 +159,29 @@ export const PRESETS: Record<string, Permiso[]> = {
   // Administración de la empresa: solo las órdenes de compra, para mirarlas.
   ADMINISTRATIVO: [PERMISOS.ORDENES_VER],
 
-  // Mantenimiento: lo que necesita para trabajar en el depósito. Ve las órdenes
-  // para saber qué está pedido, y carga los movimientos de stock.
+  // Mantenimiento maneja el depósito de punta a punta: el stock y las compras
+  // que lo alimentan. Las órdenes impactan directo en el stock cuando se
+  // reciben, así que el circuito entero es de ellos y no queda partido entre
+  // dos áreas.
   MANTENIMIENTO: [
     PERMISOS.MATERIALES_VER,
     PERMISOS.MOVIMIENTOS_VER,
     PERMISOS.MOVIMIENTOS_CREAR,
     PERMISOS.MOVIMIENTOS_EDITAR,
-    PERMISOS.ORDENES_VER,
+
+    // Dar de alta un material y un proveedor son parte del mismo circuito: una
+    // orden se le carga a un proveedor y con materiales del catálogo. Sin
+    // estos dos, el circuito se corta a la mitad la primera vez que hay que
+    // comprarle a alguien nuevo.
+    PERMISOS.MATERIALES_EDITAR,
     PERMISOS.PROVEEDORES_VER,
+    PERMISOS.PROVEEDORES_EDITAR,
+
+    PERMISOS.ORDENES_VER,
+    PERMISOS.ORDENES_EDITAR,
+    PERMISOS.ORDENES_RECIBIR,
+    PERMISOS.ORDENES_ENVIAR,
+
     // Sin esto, la ficha de un material no puede mostrar su categoría ni su
     // unidad, y el formulario de un movimiento queda sin desplegables.
     PERMISOS.CATALOGOS_VER,

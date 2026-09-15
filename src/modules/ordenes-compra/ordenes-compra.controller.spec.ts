@@ -44,13 +44,13 @@ describe('OrdenesCompraController — permisos', () => {
       expect(puede(PRESETS.ADMINISTRATIVO, permisosDe('enviarCorreo'))).toBe(false);
     });
 
-    it('CAMBIO: mantenimiento ahora ve las órdenes pero no las carga', () => {
-      // Antes podía crearlas, emitirlas y recibirlas. El usuario pidió que
-      // mantenimiento solo las vea; recibir mercadería mueve el stock y ahora
-      // es una decisión del administrador.
-      expect(puede(PRESETS.MANTENIMIENTO, permisosDe('listar'))).toBe(true);
-      expect(puede(PRESETS.MANTENIMIENTO, permisosDe('crear'))).toBe(false);
-      expect(puede(PRESETS.MANTENIMIENTO, permisosDe('recibir'))).toBe(false);
+    it('mantenimiento maneja el circuito de compras completo', () => {
+      // Las órdenes impactan directo en el stock cuando se reciben, y el stock
+      // es de ellos: partir el circuito entre dos áreas dejaba la mercadería
+      // esperando a que otro la diera por recibida.
+      for (const metodo of ['listar', 'crear', 'emitir', 'recibir', 'enviarCorreo'] as const) {
+        expect(puede(PRESETS.MANTENIMIENTO, permisosDe(metodo))).toBe(true);
+      }
     });
 
     it('gerencia mira y no toca', () => {
