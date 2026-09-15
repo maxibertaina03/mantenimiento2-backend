@@ -18,6 +18,8 @@ import { Type } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { buscarNombreRepetido } from '../../common/dominio/nombres';
+import { Permisos } from '../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../common/auth/permisos';
 
 /**
  * Las estanterías del depósito.
@@ -156,24 +158,28 @@ export class EstanteriasMaterialService {
 export class EstanteriasMaterialController {
   constructor(private readonly service: EstanteriasMaterialService) {}
 
+  @Permisos(PERMISOS.CATALOGOS_VER)
   @Get()
   @ApiOperation({ summary: 'Listar estanterías del depósito' })
   listar(@Query('soloActivas') soloActivas?: string) {
     return this.service.listar(soloActivas === 'true');
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Post()
   @ApiOperation({ summary: 'Crear una estantería' })
   crear(@Body() dto: CrearEstanteriaDto) {
     return this.service.crear(dto);
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Patch(':id')
   @ApiOperation({ summary: 'Editar una estantería, o desactivarla' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarEstanteriaDto) {
     return this.service.actualizar(id, dto);
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Eliminar una estantería (solo si no la usa ningún material)' })

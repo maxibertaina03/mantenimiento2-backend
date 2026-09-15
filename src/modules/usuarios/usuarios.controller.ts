@@ -15,13 +15,14 @@ import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 import type { Usuario } from '@prisma/client';
-import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decorator';
 import { PaginacionDto } from '../../common/dto/paginacion.dto';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { UsuarioRespuestaDto } from './dto/usuario-respuesta.dto';
 import { UsuariosService } from './usuarios.service';
+import { Permisos, SoloAutenticado } from '../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../common/auth/permisos';
 
 /**
  * Los endpoints van marcados uno por uno y NO a nivel de clase, porque `me`
@@ -40,20 +41,21 @@ export class UsuariosController {
     private readonly config: ConfigService,
   ) {}
 
+  @Permisos(PERMISOS.USUARIOS_ADMINISTRAR)
   @Post()
   @ApiOperation({ summary: 'Crear un usuario' })
-  @Roles(RolUsuario.ADMIN)
   crear(@Body() dto: CrearUsuarioDto) {
     return this.service.crear(dto);
   }
 
+  @Permisos(PERMISOS.USUARIOS_ADMINISTRAR)
   @Get()
   @ApiOperation({ summary: 'Listar usuarios (paginado)' })
-  @Roles(RolUsuario.ADMIN)
   listar(@Query() paginacion: PaginacionDto) {
     return this.service.listar(paginacion);
   }
 
+  @SoloAutenticado()
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Usuario autenticado actual (o null si no hay sesión)' })
@@ -82,24 +84,24 @@ export class UsuariosController {
     return null;
   }
 
+  @Permisos(PERMISOS.USUARIOS_ADMINISTRAR)
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un usuario por id' })
-  @Roles(RolUsuario.ADMIN)
   obtener(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.obtener(id);
   }
 
+  @Permisos(PERMISOS.USUARIOS_ADMINISTRAR)
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar un usuario' })
-  @Roles(RolUsuario.ADMIN)
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarUsuarioDto) {
     return this.service.actualizar(id, dto);
   }
 
+  @Permisos(PERMISOS.USUARIOS_ADMINISTRAR)
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar un usuario' })
-  @Roles(RolUsuario.ADMIN)
   eliminar(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.eliminar(id);
   }

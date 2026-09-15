@@ -14,11 +14,11 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { RolUsuario } from '@prisma/client';
 import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { buscarNombreRepetido, normalizarNombre } from '../../common/dominio/nombres';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { Permisos } from '../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../common/auth/permisos';
 
 /**
  * Quién tiene a cargo cada equipo de informática.
@@ -225,11 +225,11 @@ export class ResponsablesService {
 
 @ApiTags('Responsables de equipos')
 @ApiBearerAuth()
-@Roles(RolUsuario.ADMIN)
 @Controller('responsables')
 export class ResponsablesController {
   constructor(private readonly service: ResponsablesService) {}
 
+  @Permisos(PERMISOS.IT_VER)
   @Get()
   @ApiOperation({
     summary: 'Listar responsables',
@@ -239,18 +239,21 @@ export class ResponsablesController {
     return this.service.listar(soloActivos === 'true');
   }
 
+  @Permisos(PERMISOS.IT_VER)
   @Get(':id')
   @ApiOperation({ summary: 'La ficha de un responsable' })
   obtener(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.obtener(id);
   }
 
+  @Permisos(PERMISOS.IT_EDITAR)
   @Post()
   @ApiOperation({ summary: 'Cargar un responsable' })
   crear(@Body() dto: CrearResponsableDto) {
     return this.service.crear(dto);
   }
 
+  @Permisos(PERMISOS.IT_EDITAR)
   @Post(':id/unificar/:otroId')
   @HttpCode(200)
   @ApiOperation({
@@ -262,12 +265,14 @@ export class ResponsablesController {
     return this.service.unificar(id, otroId);
   }
 
+  @Permisos(PERMISOS.IT_EDITAR)
   @Patch(':id')
   @ApiOperation({ summary: 'Editar un responsable, o desactivarlo' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarResponsableDto) {
     return this.service.actualizar(id, dto);
   }
 
+  @Permisos(PERMISOS.IT_EDITAR)
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Eliminar un responsable sin equipos ni historial' })

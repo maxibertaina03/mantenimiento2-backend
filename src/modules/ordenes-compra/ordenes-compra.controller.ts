@@ -17,11 +17,11 @@ import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decor
 import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
-import { RolUsuario } from '@prisma/client';
-import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
 import { EnviarOrdenDto, RegistrarWhatsappDto } from './dto/enviar-orden.dto';
 import { OrdenesCompraService } from './ordenes-compra.service';
+import { Permisos } from '../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../common/auth/permisos';
 
 @ApiTags('Órdenes de compra')
 @ApiBearerAuth()
@@ -29,12 +29,14 @@ import { OrdenesCompraService } from './ordenes-compra.service';
 export class OrdenesCompraController {
   constructor(private readonly service: OrdenesCompraService) {}
 
+  @Permisos(PERMISOS.ORDENES_EDITAR)
   @Post()
   @ApiOperation({ summary: 'Crear una orden de compra (queda en BORRADOR con número asignado)' })
   crear(@Body() dto: CrearOrdenDto, @UsuarioActual() usuario?: Usuario) {
     return this.service.crear(dto, usuario);
   }
 
+  @Permisos(PERMISOS.ORDENES_VER)
   @Get()
   @ApiOperation({ summary: 'Listar órdenes con filtros (estado, proveedor, rango de fechas)' })
   listar(@Query() query: ListarOrdenesDto) {
@@ -42,30 +44,35 @@ export class OrdenesCompraController {
   }
 
   // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
+  @Permisos(PERMISOS.ORDENES_VER)
   @Get('configuracion-envio')
   @ApiOperation({ summary: 'Casilla y WhatsApp de administración, y si el correo está andando' })
   configuracionEnvio() {
     return this.service.configuracionDeEnvio();
   }
 
+  @Permisos(PERMISOS.ORDENES_VER)
   @Get(':id')
   @ApiOperation({ summary: 'Obtener una orden con su detalle completo' })
   obtener(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.obtener(id);
   }
 
+  @Permisos(PERMISOS.ORDENES_EDITAR)
   @Patch(':id')
   @ApiOperation({ summary: 'Editar una orden (solo en BORRADOR)' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarOrdenDto) {
     return this.service.actualizar(id, dto);
   }
 
+  @Permisos(PERMISOS.ORDENES_EDITAR)
   @Patch(':id/emitir')
   @ApiOperation({ summary: 'Marcar la orden como emitida (enviada al proveedor)' })
   emitir(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.emitir(id);
   }
 
+  @Permisos(PERMISOS.ORDENES_RECIBIR)
   @Patch(':id/recibir')
   @ApiOperation({
     summary: 'Recibir la mercadería: genera un movimiento de ENTRADA por renglón y suma el stock',
@@ -78,11 +85,11 @@ export class OrdenesCompraController {
     return this.service.recibir(id, dto, usuario);
   }
 
+  @Permisos(PERMISOS.ORDENES_ENVIAR)
   @Post(':id/enviar-correo')
   // El envío automático está en prueba: por ahora solo admin. Ocultar el botón
   // no alcanza —cualquiera con una sesión podría llamar al endpoint— y esto usa
   // la casilla de la empresa para escribirle a terceros.
-  @Roles(RolUsuario.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Enviar la orden por correo al proveedor, con el PDF adjunto',
@@ -99,10 +106,10 @@ export class OrdenesCompraController {
     return this.service.enviarPorCorreo(id, dto, usuario);
   }
 
+  @Permisos(PERMISOS.ORDENES_ENVIAR)
   @Post(':id/registrar-whatsapp')
   // Mismo criterio que el correo: deja constancia y emite la orden, así que no
   // es algo que deba poder disparar cualquiera con una sesión.
-  @Roles(RolUsuario.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Dejar constancia de que la orden se mandó por WhatsApp',
@@ -119,18 +126,21 @@ export class OrdenesCompraController {
     return this.service.registrarEnvioWhatsapp(id, dto.numero, usuario);
   }
 
+  @Permisos(PERMISOS.ORDENES_VER)
   @Get(':id/envios')
   @ApiOperation({ summary: 'Por dónde y cuándo salió esta orden' })
   envios(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.listarEnvios(id);
   }
 
+  @Permisos(PERMISOS.ORDENES_EDITAR)
   @Patch(':id/anular')
   @ApiOperation({ summary: 'Anular la orden (conserva el registro)' })
   anular(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.anular(id);
   }
 
+  @Permisos(PERMISOS.ORDENES_EDITAR)
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Eliminar una orden en BORRADOR' })

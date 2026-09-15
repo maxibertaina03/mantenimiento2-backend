@@ -79,7 +79,7 @@ describe('PaginacionDto', () => {
 });
 
 describe('CacheUsuarios', () => {
-  const usuario = { id: 'u-1', nombre: 'maxi', rol: RolUsuario.OPERARIO } as Usuario;
+  const usuario = { id: 'u-1', nombre: 'maxi', rol: RolUsuario.MANTENIMIENTO } as Usuario;
 
   it('devuelve undefined si no hay nada cacheado', () => {
     expect(new CacheUsuarios().obtener('clerk_1')).toBeUndefined();

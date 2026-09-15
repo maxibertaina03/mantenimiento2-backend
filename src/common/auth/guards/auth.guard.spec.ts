@@ -13,7 +13,7 @@ const usuario = {
   id: 'u-1',
   nombre: 'maxi',
   email: 'maxi@example.com',
-  rol: RolUsuario.OPERARIO,
+  rol: RolUsuario.MANTENIMIENTO,
 } as Usuario;
 
 function contextoCon(headers: Record<string, string> = {}) {

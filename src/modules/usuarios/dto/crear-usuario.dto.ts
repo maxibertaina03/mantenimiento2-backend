@@ -20,7 +20,7 @@ export class CrearUsuarioDto {
   @IsString()
   idExterno?: string;
 
-  @ApiPropertyOptional({ enum: RolUsuario, default: RolUsuario.OPERARIO })
+  @ApiPropertyOptional({ enum: RolUsuario, default: RolUsuario.MANTENIMIENTO })
   @IsOptional()
   @IsEnum(RolUsuario)
   rol?: RolUsuario;

@@ -219,8 +219,8 @@ describe('MovimientosStockService', () => {
   });
 
   describe('editar() - permisos', () => {
-    const creador = { id: 'user-1', rol: RolUsuario.OPERARIO } as Usuario;
-    const otro = { id: 'user-2', rol: RolUsuario.OPERARIO } as Usuario;
+    const creador = { id: 'user-1', rol: RolUsuario.MANTENIMIENTO } as Usuario;
+    const otro = { id: 'user-2', rol: RolUsuario.MANTENIMIENTO } as Usuario;
     const admin = { id: 'user-3', rol: RolUsuario.ADMIN } as Usuario;
 
     function servicioConMovimiento(mov: any = movimientoBase) {
@@ -243,7 +243,7 @@ describe('MovimientosStockService', () => {
       ).resolves.toBeDefined();
     });
 
-    it('otro OPERARIO no puede editar', async () => {
+    it('otro MANTENIMIENTO no puede editar', async () => {
       const { service } = servicioConMovimiento();
       await expect(
         service.editar('mov-1', { motivoEdicion: 'x' } as any, otro),

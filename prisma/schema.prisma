@@ -28,9 +28,39 @@ enum MotivoMovimiento {
   OTRO
 }
 
+/// Los roles del sistema.
+///
+/// El rol NO decide por si mismo lo que se puede hacer: decide que permisos
+/// tiene, y esos se editan desde la pantalla de administracion. Por eso agregar
+/// un rol nuevo es agregar un valor aca, y despues repartirle permisos sin
+/// tocar codigo.
 enum RolUsuario {
   ADMIN
-  OPERARIO
+  /// Mira todo, no toca nada.
+  GERENCIA
+  /// Administracion de la empresa: solo las ordenes de compra.
+  ADMINISTRATIVO
+  /// Antes se llamaba OPERARIO. Es quien trabaja en el deposito.
+  MANTENIMIENTO
+}
+
+/// Que puede hacer cada rol.
+///
+/// Una fila por permiso concedido. Se edita desde el sistema, asi que cambiar
+/// lo que ve gerencia no necesita una version nueva.
+///
+/// La lista de permisos POSIBLES vive en el codigo (`common/auth/permisos.ts`),
+/// porque cada uno corresponde a endpoints concretos: inventar uno desde una
+/// pantalla no haria que ningun endpoint empezara a pedirlo.
+model PermisoRol {
+  rol     RolUsuario
+  permiso String
+
+  creadoEn DateTime @default(now())
+
+  @@id([rol, permiso])
+  @@index([rol])
+  @@map("permisos_rol")
 }
 
 // ───────────────────────── Catálogo ─────────────────────────
@@ -246,7 +276,7 @@ model Usuario {
   // Futuro ID de Clerk. Hoy null (auth desactivada).
   idExterno String? @unique
 
-  rol           RolUsuario @default(OPERARIO)
+  rol           RolUsuario @default(MANTENIMIENTO)
   creadoEn      DateTime   @default(now())
   actualizadoEn DateTime   @updatedAt
 

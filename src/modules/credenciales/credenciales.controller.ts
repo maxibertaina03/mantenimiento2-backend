@@ -11,9 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { RolUsuario } from '@prisma/client';
 import type { Usuario } from '@prisma/client';
-import { Roles } from '../../common/auth/decorators/roles.decorator';
 import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decorator';
 import { CredencialesService } from './credenciales.service';
 import {
@@ -22,6 +20,8 @@ import {
   ListarCredencialesDto,
   RotarCredencialDto,
 } from './dto/credencial.dto';
+import { Permisos } from '../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../common/auth/permisos';
 
 /**
  * El baúl de credenciales.
@@ -31,11 +31,11 @@ import {
  */
 @ApiTags('Credenciales')
 @ApiBearerAuth()
-@Roles(RolUsuario.ADMIN)
 @Controller('credenciales')
 export class CredencialesController {
   constructor(private readonly service: CredencialesService) {}
 
+  @Permisos(PERMISOS.CREDENCIALES_VER)
   @Get()
   @ApiOperation({
     summary: 'Listar credenciales',
@@ -46,12 +46,14 @@ export class CredencialesController {
     return this.service.listar(query);
   }
 
+  @Permisos(PERMISOS.CREDENCIALES_VER)
   @Get(':id')
   @ApiOperation({ summary: 'La ficha de una credencial, sin la contraseña' })
   obtener(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.obtener(id);
   }
 
+  @Permisos(PERMISOS.CREDENCIALES_VER)
   @Get(':id/historial')
   @ApiOperation({
     summary: 'Cuándo se rotó y quién vio la contraseña',
@@ -61,12 +63,14 @@ export class CredencialesController {
     return this.service.historial(id);
   }
 
+  @Permisos(PERMISOS.CREDENCIALES_EDITAR)
   @Post()
   @ApiOperation({ summary: 'Guardar un acceso nuevo' })
   crear(@Body() dto: CrearCredencialDto) {
     return this.service.crear(dto);
   }
 
+  @Permisos(PERMISOS.CREDENCIALES_REVELAR)
   @Post(':id/revelar')
   @HttpCode(200)
   @ApiOperation({
@@ -79,6 +83,7 @@ export class CredencialesController {
     return this.service.revelar(id, usuario);
   }
 
+  @Permisos(PERMISOS.CREDENCIALES_EDITAR)
   @Post(':id/rotar')
   @HttpCode(200)
   @ApiOperation({
@@ -93,6 +98,7 @@ export class CredencialesController {
     return this.service.rotar(id, dto, usuario);
   }
 
+  @Permisos(PERMISOS.CREDENCIALES_EDITAR)
   @Patch(':id')
   @ApiOperation({
     summary: 'Editar la ficha, o desactivarla',
@@ -102,6 +108,7 @@ export class CredencialesController {
     return this.service.actualizar(id, dto);
   }
 
+  @Permisos(PERMISOS.CREDENCIALES_EDITAR)
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({

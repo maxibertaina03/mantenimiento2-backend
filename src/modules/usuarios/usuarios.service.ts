@@ -22,7 +22,7 @@ export class UsuariosService {
    * - Si ya existe un usuario con ese idExterno, lo devuelve.
    * - Si existe uno con el mismo email (p. ej. el admin del seed) pero sin idExterno,
    *   lo vincula al id de Clerk.
-   * - Si no existe, lo crea con rol OPERARIO por defecto.
+   * - Si no existe, lo crea con rol MANTENIMIENTO por defecto.
    * Devuelve la entidad (no el DTO) porque la usa el guard de autenticación.
    */
   async buscarOCrearPorClerk(datos: DatosUsuarioClerk): Promise<Usuario> {
@@ -44,7 +44,7 @@ export class UsuariosService {
       idExterno: datos.idExterno,
       email: datos.email,
       nombre: datos.nombre,
-      rol: RolUsuario.OPERARIO,
+      rol: RolUsuario.MANTENIMIENTO,
     });
   }
 
@@ -82,13 +82,13 @@ export class UsuariosService {
   /**
    * Da de alta a una persona que NO usa el sistema (personal al que se le
    * asignan equipos). Sin `idExterno` no puede iniciar sesión, y entra como
-   * OPERARIO: nunca como administrador.
+   * MANTENIMIENTO: nunca como administrador.
    */
   crearSinAcceso(datos: { nombre: string; email: string }): Promise<Usuario> {
     return this.repo.crear({
       nombre: datos.nombre,
       email: datos.email,
-      rol: RolUsuario.OPERARIO,
+      rol: RolUsuario.MANTENIMIENTO,
     });
   }
 

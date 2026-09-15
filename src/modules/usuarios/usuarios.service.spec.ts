@@ -8,7 +8,7 @@ const usuario = {
   nombre: 'maxi',
   email: 'maxi@example.com',
   idExterno: 'clerk_123',
-  rol: RolUsuario.OPERARIO,
+  rol: RolUsuario.MANTENIMIENTO,
   creadoEn: new Date(),
   actualizadoEn: new Date(),
 };
@@ -77,7 +77,7 @@ describe('UsuariosService.buscarOCrearPorClerk()', () => {
       idExterno: 'clerk_123',
       email: 'maxi@example.com',
       nombre: 'maxi',
-      rol: RolUsuario.OPERARIO,
+      rol: RolUsuario.MANTENIMIENTO,
     });
   });
 
@@ -95,13 +95,13 @@ describe('UsuariosService.buscarOCrearPorClerk()', () => {
     expect(repo.upsertPorEmail).toHaveBeenCalledTimes(2);
   });
 
-  it('los usuarios nuevos entran como OPERARIO, nunca como ADMIN', async () => {
+  it('los usuarios nuevos entran como MANTENIMIENTO, nunca como ADMIN', async () => {
     const { repo, service } = armar();
     repo.buscarPorIdExterno.mockResolvedValue(null);
 
     await service.buscarOCrearPorClerk(datosClerk);
 
-    expect(repo.upsertPorEmail.mock.calls[0][0].rol).toBe(RolUsuario.OPERARIO);
+    expect(repo.upsertPorEmail.mock.calls[0][0].rol).toBe(RolUsuario.MANTENIMIENTO);
   });
 });
 
@@ -134,7 +134,7 @@ describe('UsuariosService - CRUD', () => {
     repo.contarPorRol.mockResolvedValue(1);
 
     await expect(
-      service.actualizar('u-1', { rol: RolUsuario.OPERARIO } as any),
+      service.actualizar('u-1', { rol: RolUsuario.MANTENIMIENTO } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.actualizar).not.toHaveBeenCalled();
   });
@@ -144,13 +144,13 @@ describe('UsuariosService - CRUD', () => {
     repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.ADMIN });
     repo.contarPorRol.mockResolvedValue(2);
 
-    await service.actualizar('u-1', { rol: RolUsuario.OPERARIO } as any);
+    await service.actualizar('u-1', { rol: RolUsuario.MANTENIMIENTO } as any);
     expect(repo.actualizar).toHaveBeenCalled();
   });
 
   it('promover a ADMIN nunca se bloquea', async () => {
     const { repo, service } = armar();
-    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.OPERARIO });
+    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.MANTENIMIENTO });
     repo.contarPorRol.mockResolvedValue(1);
 
     await service.actualizar('u-1', { rol: RolUsuario.ADMIN } as any);
@@ -177,7 +177,7 @@ describe('UsuariosService - CRUD', () => {
 
   it('eliminar un operario no toca la validacion de admins', async () => {
     const { repo, service } = armar();
-    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.OPERARIO });
+    repo.buscarPorId.mockResolvedValue({ ...usuario, rol: RolUsuario.MANTENIMIENTO });
 
     await service.eliminar('u-1');
     expect(repo.eliminar).toHaveBeenCalledWith('u-1');

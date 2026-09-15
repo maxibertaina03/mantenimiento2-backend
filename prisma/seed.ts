@@ -29,7 +29,7 @@ async function main() {
     },
   });
   const operario = await prisma.usuario.create({
-    data: { nombre: 'Juan Operario', email: 'juan@mantenimiento.local', rol: RolUsuario.OPERARIO },
+    data: { nombre: 'Juan Operario', email: 'juan@mantenimiento.local', rol: RolUsuario.MANTENIMIENTO },
   });
 
   // ── Proveedores ──

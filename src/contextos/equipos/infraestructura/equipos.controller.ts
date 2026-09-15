@@ -14,9 +14,7 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { RolUsuario } from '@prisma/client';
 import type { Usuario } from '@prisma/client';
-import { Roles } from '../../../common/auth/decorators/roles.decorator';
 import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.decorator';
 import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { ConsultarEquipos, aEquipoParaMostrar } from '../aplicacion/consultar-equipos';
@@ -50,6 +48,8 @@ import { DetectarImportacionDto, ImportarEquiposDto } from './importacion.dto';
 import { RegistrarIntervencionDto } from './intervenciones.dto';
 import { ActualizarPlanDto, CrearPlanDto } from './planes.dto';
 import { MarcarQrDto } from './qr.dto';
+import { Permisos } from '../../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../../common/auth/permisos';
 
 /**
  * La entrada HTTP del contexto.
@@ -65,7 +65,6 @@ import { MarcarQrDto } from './qr.dto';
 // Todo el módulo es de admin, igual que Equipos IT. Va a nivel de clase y no
 // endpoint por endpoint: así un endpoint nuevo nace protegido, en vez de nacer
 // abierto y depender de que alguien se acuerde de agregarle el decorador.
-@Roles(RolUsuario.ADMIN)
 @Controller('equipos')
 export class EquiposController {
   private readonly crear: CrearEquipo;
@@ -106,6 +105,7 @@ export class EquiposController {
     return valor === null ? null : new Date(valor);
   }
 
+  @Permisos(PERMISOS.EQUIPOS_VER)
   @Get()
   @ApiOperation({ summary: 'Listar equipos (paginado, con filtros)' })
   listar(@Query() query: ListarEquiposDto) {
@@ -126,6 +126,7 @@ export class EquiposController {
     });
   }
 
+  @Permisos(PERMISOS.EQUIPOS_EDITAR)
   @Post('qr/marcar-generados')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -139,18 +140,21 @@ export class EquiposController {
   }
 
   // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
+  @Permisos(PERMISOS.EQUIPOS_VER)
   @Get('resumen')
   @ApiOperation({ summary: 'Cuántos equipos hay, en qué estado, y cuántos sin plan' })
   resumen() {
     return this.repo.resumen();
   }
 
+  @Permisos(PERMISOS.EQUIPOS_VER)
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un equipo' })
   obtener(@Param('id', ParseUUIDPipe) id: string) {
     return this.consultar.obtener(id);
   }
 
+  @Permisos(PERMISOS.EQUIPOS_EDITAR)
   @Post()
   @ApiOperation({ summary: 'Dar de alta un equipo' })
   async crearEquipo(@Body() dto: CrearEquipoDto) {
@@ -164,6 +168,7 @@ export class EquiposController {
     return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
+  @Permisos(PERMISOS.EQUIPOS_EDITAR)
   @Post('detectar-importacion')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -180,6 +185,7 @@ export class EquiposController {
     );
   }
 
+  @Permisos(PERMISOS.EQUIPOS_EDITAR)
   @Post('importar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -193,6 +199,7 @@ export class EquiposController {
     return this.importar.ejecutar(dto.filas);
   }
 
+  @Permisos(PERMISOS.EQUIPOS_VER)
   @Get('almacen/estado')
   @ApiOperation({
     summary: 'Si la carga de fotos está disponible',
@@ -202,6 +209,7 @@ export class EquiposController {
     return { disponible: this.almacen.estaConfigurado() };
   }
 
+  @Permisos(PERMISOS.EQUIPOS_EDITAR)
   @Post(':id/foto')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cambiar la foto de un equipo' })
@@ -214,6 +222,7 @@ export class EquiposController {
     return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
+  @Permisos(PERMISOS.SERVICIOS_VER)
   @Get('planes/vencen')
   @ApiOperation({
     summary: 'Los servicios que vencen, de lo más urgente a lo menos',
@@ -225,12 +234,14 @@ export class EquiposController {
     return this.planes.listarQueVencen(dias ? Number(dias) : 7);
   }
 
+  @Permisos(PERMISOS.EQUIPOS_VER)
   @Get(':id/planes')
   @ApiOperation({ summary: 'Planes de mantenimiento de un equipo' })
   planesDelEquipo(@Param('id', ParseUUIDPipe) id: string) {
     return this.planes.listarPorEquipo(id);
   }
 
+  @Permisos(PERMISOS.SERVICIOS_EDITAR)
   @Post(':id/planes')
   @ApiOperation({ summary: 'Definir un plan de mantenimiento' })
   crearPlan(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CrearPlanDto) {
@@ -241,6 +252,7 @@ export class EquiposController {
     });
   }
 
+  @Permisos(PERMISOS.SERVICIOS_EDITAR)
   @Patch('planes/:planId')
   @ApiOperation({ summary: 'Editar un plan, o desactivarlo' })
   actualizarPlan(@Param('planId', ParseUUIDPipe) planId: string, @Body() dto: ActualizarPlanDto) {
@@ -250,6 +262,7 @@ export class EquiposController {
     });
   }
 
+  @Permisos(PERMISOS.SERVICIOS_EDITAR)
   @Delete('planes/:planId')
   @HttpCode(204)
   @ApiOperation({
@@ -262,6 +275,7 @@ export class EquiposController {
     return this.planes.eliminar(planId);
   }
 
+  @Permisos(PERMISOS.EQUIPOS_VER)
   @Get(':id/historial')
   @ApiOperation({
     summary: 'Historial de intervenciones de un equipo, con su resumen',
@@ -273,6 +287,7 @@ export class EquiposController {
     return this.historial.ejecutar(id);
   }
 
+  @Permisos(PERMISOS.EQUIPOS_EDITAR)
   @Post(':id/intervenciones')
   @ApiOperation({
     summary: 'Registrar un trabajo hecho sobre el equipo',
@@ -294,6 +309,7 @@ export class EquiposController {
     });
   }
 
+  @Permisos(PERMISOS.EQUIPOS_EDITAR)
   @Patch(':id')
   @ApiOperation({ summary: 'Editar un equipo o cambiar su estado' })
   async actualizarEquipo(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarEquipoDto) {
@@ -305,6 +321,7 @@ export class EquiposController {
     return aEquipoParaMostrar(equipo, this.reloj.ahora());
   }
 
+  @Permisos(PERMISOS.EQUIPOS_EDITAR)
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({

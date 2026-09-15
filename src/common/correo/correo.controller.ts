@@ -1,8 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { RolUsuario } from '@prisma/client';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { CorreoService } from './correo.service';
+import { Permisos } from '../auth/decorators/permisos.decorator';
+import { PERMISOS } from '../auth/permisos';
 
 @ApiTags('Correo')
 @ApiBearerAuth()
@@ -17,8 +17,8 @@ export class CorreoController {
    * las credenciales, o que el hosting bloquee el puerto SMTP saliente. Sin
    * esto, la segunda recién aparecería al intentar mandar una orden real.
    */
+  @Permisos(PERMISOS.ORDENES_ENVIAR)
   @Get('estado')
-  @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Verificar que el envío automático de correo esté funcionando' })
   async estado() {
     if (!this.correo.estaConfigurado()) {

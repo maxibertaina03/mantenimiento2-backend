@@ -14,7 +14,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { RolUsuario } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -26,9 +25,10 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { Roles } from '../../../common/auth/decorators/roles.decorator';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { buscarNombreRepetido } from '../../../common/dominio/nombres';
+import { Permisos } from '../../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../../common/auth/permisos';
 
 /**
  * Los catálogos del contexto: dónde está el equipo, qué clase de equipo es, y
@@ -238,7 +238,6 @@ export class CatalogosEquipoService {
 
 @ApiTags('Equipos · Ubicaciones')
 @ApiBearerAuth()
-@Roles(RolUsuario.ADMIN)
 @Controller('ubicaciones-equipo')
 export class UbicacionesEquipoController {
   constructor(
@@ -246,6 +245,7 @@ export class UbicacionesEquipoController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Permisos(PERMISOS.CATALOGOS_VER)
   @Get()
   @ApiOperation({
     summary: 'Listar ubicaciones',
@@ -259,8 +259,8 @@ export class UbicacionesEquipoController {
     );
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Post()
-  @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Crear una ubicación' })
   crear(@Body() dto: CrearItemCatalogoDto, @Query('ambito') ambito?: string) {
     return this.servicio.crear(
@@ -271,8 +271,8 @@ export class UbicacionesEquipoController {
     );
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Patch(':id')
-  @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Editar una ubicación' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
     return this.servicio.actualizar(
@@ -283,8 +283,8 @@ export class UbicacionesEquipoController {
     );
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Delete(':id')
-  @Roles(RolUsuario.ADMIN)
   @HttpCode(204)
   @ApiOperation({ summary: 'Eliminar una ubicación (solo si no la usa ningún equipo)' })
   eliminar(@Param('id', ParseUUIDPipe) id: string) {
@@ -294,7 +294,6 @@ export class UbicacionesEquipoController {
 
 @ApiTags('Equipos · Tipos')
 @ApiBearerAuth()
-@Roles(RolUsuario.ADMIN)
 @Controller('tipos-equipo-planta')
 export class TiposEquipoPlantaController {
   constructor(
@@ -302,28 +301,29 @@ export class TiposEquipoPlantaController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Permisos(PERMISOS.CATALOGOS_VER)
   @Get()
   @ApiOperation({ summary: 'Listar tipos de equipo de planta' })
   listar(@Query('soloActivos') soloActivos?: string) {
     return this.servicio.listar(comoCatalogo(this.prisma.tipoEquipoPlanta), soloActivos === 'true');
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Post()
-  @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Crear un tipo' })
   crear(@Body() dto: CrearItemCatalogoDto) {
     return this.servicio.crear(comoCatalogo(this.prisma.tipoEquipoPlanta), dto, 'el tipo');
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Patch(':id')
-  @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Editar un tipo' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
     return this.servicio.actualizar(comoCatalogo(this.prisma.tipoEquipoPlanta), id, dto, 'el tipo');
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Delete(':id')
-  @Roles(RolUsuario.ADMIN)
   @HttpCode(204)
   @ApiOperation({ summary: 'Eliminar un tipo (solo si no lo usa ningún equipo)' })
   eliminar(@Param('id', ParseUUIDPipe) id: string) {
@@ -333,7 +333,6 @@ export class TiposEquipoPlantaController {
 
 @ApiTags('Equipos · Marcas')
 @ApiBearerAuth()
-@Roles(RolUsuario.ADMIN)
 @Controller('marcas-equipo')
 export class MarcasEquipoController {
   constructor(
@@ -341,6 +340,7 @@ export class MarcasEquipoController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Permisos(PERMISOS.CATALOGOS_VER)
   @Get()
   @ApiOperation({
     summary: 'Listar marcas',
@@ -354,6 +354,7 @@ export class MarcasEquipoController {
     );
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Post()
   @ApiOperation({ summary: 'Crear una marca' })
   crear(@Body() dto: CrearItemCatalogoDto, @Query('ambito') ambito?: string) {
@@ -365,12 +366,14 @@ export class MarcasEquipoController {
     );
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Patch(':id')
   @ApiOperation({ summary: 'Editar una marca' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
     return this.servicio.actualizar(comoCatalogo(this.prisma.marcaEquipo), id, dto, 'la marca');
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Eliminar una marca (solo si no la usa ningún equipo)' })
@@ -395,7 +398,6 @@ export class CrearModeloDto extends CrearItemCatalogoDto {
  */
 @ApiTags('Equipos · Modelos')
 @ApiBearerAuth()
-@Roles(RolUsuario.ADMIN)
 @Controller('modelos-equipo')
 export class ModelosEquipoController {
   constructor(private readonly prisma: PrismaService) {}
@@ -420,6 +422,7 @@ export class ModelosEquipoController {
     };
   }
 
+  @Permisos(PERMISOS.CATALOGOS_VER)
   @Get()
   @ApiOperation({
     summary: 'Listar modelos',
@@ -437,6 +440,7 @@ export class ModelosEquipoController {
     return filas.map((f) => this.aItem(f));
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Post()
   @ApiOperation({ summary: 'Crear un modelo dentro de una marca' })
   async crear(@Body() dto: CrearModeloDto) {
@@ -482,6 +486,7 @@ export class ModelosEquipoController {
     }
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Patch(':id')
   @ApiOperation({ summary: 'Editar un modelo, o desactivarlo' })
   async actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarItemCatalogoDto) {
@@ -504,6 +509,7 @@ export class ModelosEquipoController {
     return this.aItem(fila);
   }
 
+  @Permisos(PERMISOS.CATALOGOS_EDITAR)
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Eliminar un modelo (solo si no lo usa ningún equipo)' })
