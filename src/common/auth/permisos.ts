@@ -91,8 +91,27 @@ export type Permiso = (typeof PERMISOS)[keyof typeof PERMISOS];
 export const TODOS_LOS_PERMISOS = Object.values(PERMISOS) as Permiso[];
 
 /** Los permisos que solo dejan mirar. */
+/**
+ * Módulos que todavía no se abren a nadie fuera del administrador.
+ *
+ * Órdenes de trabajo se apoya en los equipos —una orden se ata a la máquina que
+ * se arregló— y mantenimiento todavía no tiene ese módulo. Abrirlo antes sería
+ * darles la mitad de una función: podrían cargar trabajos pero no relacionarlos
+ * con nada, que es justo lo que hace que sirva.
+ *
+ * Cuando equipos se abra, se borra esta lista y las dos líneas vuelven al preset
+ * de mantenimiento. Es una decisión de hoy, no del diseño.
+ */
+const TODAVIA_SOLO_ADMIN: readonly string[] = [
+  PERMISOS.TRABAJOS_VER,
+  PERMISOS.TRABAJOS_EDITAR,
+  PERMISOS.TRABAJOS_ELIMINAR,
+  PERMISOS.TRABAJOS_ASIGNAR,
+];
+
 export const PERMISOS_DE_LECTURA: Permiso[] = TODOS_LOS_PERMISOS.filter(
-  (p) => p.endsWith('.ver') || p === PERMISOS.CREDENCIALES_REVELAR,
+  (p) =>
+    (p.endsWith('.ver') || p === PERMISOS.CREDENCIALES_REVELAR) && !TODAVIA_SOLO_ADMIN.includes(p),
 );
 
 /**
@@ -219,11 +238,9 @@ export const PRESETS: Record<string, Permiso[]> = {
     PERMISOS.ORDENES_RECIBIR,
     PERMISOS.ORDENES_ENVIAR,
 
-    // Las órdenes de trabajo son suyas: son ellos los que hacen el trabajo y
-    // los que sacan el material del pañol para hacerlo. Sin el permiso de
-    // editar, el módulo no sirve de nada para quien lo va a usar todos los días.
-    PERMISOS.TRABAJOS_VER,
-    PERMISOS.TRABAJOS_EDITAR,
+    // Órdenes de trabajo NO va acá todavía, y no es un olvido: ver
+    // TODAVIA_SOLO_ADMIN más arriba. El día que mantenimiento tenga equipos,
+    // estas dos líneas vuelven, porque el trabajo es suyo.
 
     // Sin esto, la ficha de un material no puede mostrar su categoría ni su
     // unidad, y el formulario de un movimiento queda sin desplegables.
