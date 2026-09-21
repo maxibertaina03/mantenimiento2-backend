@@ -185,6 +185,10 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
     return this.aDominio(fila);
   }
 
+  async eliminar(id: string): Promise<void> {
+    await this.prisma.ordenTrabajo.delete({ where: { id } });
+  }
+
   async agregarMaterial(
     material: Omit<MaterialUsado, 'id' | 'creadoEn'>,
   ): Promise<MaterialUsadoConRelaciones> {

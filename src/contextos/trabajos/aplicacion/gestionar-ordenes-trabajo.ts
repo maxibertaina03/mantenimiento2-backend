@@ -7,6 +7,7 @@ import {
   OrdenTrabajo,
   reabrirOrdenTrabajo,
   TipoTrabajo,
+  validarQueSePuedeEliminar,
 } from '../dominio/orden-trabajo';
 import { ConsultaEquipos } from '../puertos/consulta-equipos';
 import {
@@ -111,6 +112,12 @@ export class GestionarOrdenesTrabajo {
   async reabrir(id: string): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.traer(id);
     return this.repo.actualizar(id, reabrirOrdenTrabajo(orden));
+  }
+
+  async eliminar(id: string): Promise<void> {
+    const orden = await this.traer(id);
+    validarQueSePuedeEliminar(orden, orden.materiales.length);
+    await this.repo.eliminar(id);
   }
 
   async anular(id: string, motivo: string): Promise<OrdenTrabajoConRelaciones> {

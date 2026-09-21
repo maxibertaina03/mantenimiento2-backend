@@ -8,6 +8,7 @@ import {
   reabrirOrdenTrabajo,
   resumirMateriales,
   validarCantidadUsada,
+  validarQueSePuedeEliminar,
   validarQueAceptaMateriales,
 } from './orden-trabajo';
 
@@ -199,5 +200,25 @@ describe('resumirMateriales', () => {
 
   it('una orden sin materiales resume en cero', () => {
     expect(resumirMateriales([])).toEqual({ materialesDistintos: 0, unidadesTotales: 0 });
+  });
+});
+
+describe('validarQueSePuedeEliminar', () => {
+  it('una anulada y sin materiales se puede borrar', () => {
+    expect(() => validarQueSePuedeEliminar(orden({ estado: 'ANULADA' }), 0)).not.toThrow();
+  });
+
+  it.each(['ABIERTA', 'CERRADA'] as const)('REGRESION: una %s no se borra', (estado) => {
+    // Borrar son dos pasos y no uno: anular primero pide el motivo, asi que si
+    // alguien se arrepiente a mitad de camino queda escrito por que no iba.
+    expect(() => validarQueSePuedeEliminar(orden({ estado }), 0)).toThrow(ErrorTransicionInvalida);
+  });
+
+  it('REGRESION: no se borra nada que haya movido el paniol', () => {
+    // El movimiento de stock quedaria huerfano: una salida que ninguna orden
+    // explica es justamente el agujero que este modulo vino a tapar.
+    expect(() => validarQueSePuedeEliminar(orden({ estado: 'ANULADA' }), 1)).toThrow(
+      ErrorTransicionInvalida,
+    );
   });
 });

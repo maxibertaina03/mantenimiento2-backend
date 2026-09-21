@@ -46,6 +46,14 @@ export const PERMISOS = {
   TRABAJOS_VER: 'trabajos.ver',
   /** Abrir, cargar materiales, cerrar y anular. Mueve stock. */
   TRABAJOS_EDITAR: 'trabajos.editar',
+  /**
+   * Borrar del sistema una orden anulada que nunca movió stock.
+   *
+   * Aparte de editar, y a propósito: es la única acción del módulo que no deja
+   * rastro de lo que hubo. Como no entra en ningún preset salvo el del
+   * administrador, nace solo para él, que es lo que corresponde.
+   */
+  TRABAJOS_ELIMINAR: 'trabajos.eliminar',
 
   // ── Equipos de planta y sus services ──────────────────────────────────────
   EQUIPOS_VER: 'equipos.ver',
@@ -118,6 +126,10 @@ export const DESCRIPCION_PERMISOS: Record<Permiso, { grupo: string; etiqueta: st
   [PERMISOS.TRABAJOS_EDITAR]: {
     grupo: 'Trabajos',
     etiqueta: 'Abrir órdenes, cargarles materiales y cerrarlas (saca del pañol)',
+  },
+  [PERMISOS.TRABAJOS_ELIMINAR]: {
+    grupo: 'Trabajos',
+    etiqueta: 'Eliminar una orden anulada que nunca movió stock',
   },
   [PERMISOS.ORDENES_VER]: { grupo: 'Compras', etiqueta: 'Ver órdenes de compra' },
   [PERMISOS.ORDENES_EDITAR]: { grupo: 'Compras', etiqueta: 'Crear, editar y anular órdenes' },

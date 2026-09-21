@@ -216,6 +216,25 @@ describe('cerrar, reabrir y anular', () => {
     expect(anulada.estado).toBe('ANULADA');
   });
 
+  it('eliminar saca la orden del sistema, despues de anularla', async () => {
+    const { gestionar, consultar } = armar();
+    const orden = await gestionar.crear(NUEVA);
+    await gestionar.anular(orden.id, 'Era de prueba');
+
+    await gestionar.eliminar(orden.id);
+
+    expect((await consultar.listar({}, 1, 20)).total).toBe(0);
+    await expect(consultar.buscarPorId(orden.id)).rejects.toThrow(ErrorNoEncontrado);
+  });
+
+  it('REGRESION: una orden abierta no se elimina sin anular primero', async () => {
+    const { gestionar, consultar } = armar();
+    const orden = await gestionar.crear(NUEVA);
+
+    await expect(gestionar.eliminar(orden.id)).rejects.toThrow(ErrorTransicionInvalida);
+    expect((await consultar.listar({}, 1, 20)).total).toBe(1);
+  });
+
   it('una orden cerrada no se edita sin reabrirla', async () => {
     const { gestionar } = armar();
     const orden = await gestionar.crear(NUEVA);

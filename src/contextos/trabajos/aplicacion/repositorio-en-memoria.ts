@@ -87,6 +87,10 @@ export class RepositorioOrdenesEnMemoria implements RepositorioOrdenesTrabajo {
     return this.conMateriales(this.ordenes[indice]);
   }
 
+  async eliminar(id: string): Promise<void> {
+    this.ordenes = this.ordenes.filter((o) => o.id !== id);
+  }
+
   async agregarMaterial(
     material: Omit<MaterialUsado, 'id' | 'creadoEn'>,
   ): Promise<MaterialUsadoConRelaciones> {

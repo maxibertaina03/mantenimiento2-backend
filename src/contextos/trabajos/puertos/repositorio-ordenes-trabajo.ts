@@ -47,6 +47,9 @@ export interface RepositorioOrdenesTrabajo {
   /** Aplica los cambios que devolvió el dominio (cerrar, reabrir, anular, editar). */
   actualizar(id: string, cambios: Partial<OrdenTrabajo>): Promise<OrdenTrabajoConRelaciones>;
 
+  /** Borra la orden. Solo se llama sobre una que nunca movió stock. */
+  eliminar(id: string): Promise<void>;
+
   agregarMaterial(
     material: Omit<MaterialUsado, 'id' | 'creadoEn'>,
   ): Promise<MaterialUsadoConRelaciones>;

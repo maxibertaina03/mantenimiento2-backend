@@ -189,6 +189,14 @@ export class OrdenesTrabajoController {
     return this.gestionar.reabrir(id);
   }
 
+  @Permisos(PERMISOS.TRABAJOS_ELIMINAR)
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Eliminar una orden anulada que nunca movió stock' })
+  async eliminar(@Param('id', ParseUUIDPipe) id: string) {
+    await this.gestionar.eliminar(id);
+  }
+
   @Permisos(PERMISOS.TRABAJOS_EDITAR)
   @Post(':id/anular')
   @ApiOperation({ summary: 'Anular una orden abierta que no movió stock' })

@@ -236,6 +236,38 @@ export function anularOrdenTrabajo(
   return { estado: 'ANULADA', motivoAnulacion: texto };
 }
 
+/**
+ * Si la orden se puede borrar del sistema para siempre.
+ *
+ * Solo una anulada y que nunca movió stock. Los dos requisitos son la misma
+ * idea: lo que dejó rastro en el pañol no puede desaparecer, porque el rastro
+ * quedaría huérfano. Una orden que nunca sacó nada no explica ningún movimiento,
+ * así que borrarla no deja nada colgando.
+ *
+ * Exigir que esté anulada primero hace que borrar sean dos pasos y no uno. El
+ * primero pide el motivo, así que si alguien se arrepiente a mitad de camino
+ * queda escrito por qué esa orden no iba.
+ */
+export function validarQueSePuedeEliminar(orden: OrdenTrabajo, materialesCargados: number): void {
+  if (orden.estado !== 'ANULADA') {
+    throw new ErrorTransicionInvalida(
+      `Solo se elimina una orden anulada. La ${orden.numero} está ` +
+        `${ETIQUETA_ESTADO_TRABAJO[orden.estado].toLowerCase()}: anulala primero, así queda ` +
+        'dicho por qué no iba antes de que desaparezca.',
+    );
+  }
+
+  // Hoy una orden anulada no puede tener materiales, porque anular ya lo
+  // exige. Queda igual como segundo cerrojo: si alguna vez se afloja aquella
+  // regla, esta sigue impidiendo que se borre algo que movió el pañol.
+  if (materialesCargados > 0) {
+    throw new ErrorTransicionInvalida(
+      `La orden ${orden.numero} tiene materiales cargados: no se puede eliminar sin dejar ` +
+        'salidas de stock que ninguna orden explica.',
+    );
+  }
+}
+
 /** Lo que se usó, para mostrar arriba de la orden y en la ficha del equipo. */
 export interface ResumenTrabajo {
   materialesDistintos: number;
