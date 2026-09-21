@@ -11,6 +11,7 @@ import { CredencialesModule } from './modules/credenciales/credenciales.module';
 import { EquiposItModule } from './modules/equipos-it/equipos-it.module';
 import { CorreoModule } from './common/correo/correo.module';
 import { EquiposModule } from './contextos/equipos/infraestructura/equipos.module';
+import { TrabajosModule } from './contextos/trabajos/infraestructura/trabajos.module';
 import { TiposEquipoModule } from './modules/tipos-equipo/tipos-equipo.module';
 import { UnidadesMedidaModule } from './modules/unidades-medida/unidades-medida.module';
 import { MaterialesModule } from './modules/materiales/materiales.module';
@@ -39,6 +40,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     ResponsablesModule,
     CorreoModule,
     EquiposModule,
+    TrabajosModule,
     TiposEquipoModule,
     UnidadesMedidaModule,
     UsuariosModule,

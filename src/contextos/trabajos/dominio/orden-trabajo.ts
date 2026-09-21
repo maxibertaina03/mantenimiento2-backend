@@ -1,0 +1,250 @@
+import { ErrorDatosInvalidos, ErrorTransicionInvalida } from './errores';
+
+/**
+ * La orden de trabajo: para qué se usó lo que salió del pañol.
+ *
+ * Hoy una salida por trabajo es una fila de stock con una nota suelta, y ahí se
+ * termina el rastro. Nadie puede contestar "¿cuánto nos costó en repuestos
+ * arreglar la bomba 7 este año?" ni "¿en qué se fueron los 10 metros de
+ * manguera?". La orden es el lugar donde esas dos preguntas se cruzan: agrupa
+ * el trabajo, lo que se usó y, cuando se sabe, sobre qué máquina.
+ *
+ * El equipo es OPCIONAL y esa es una decisión de diseño, no una concesión. Hay
+ * trabajos que no son sobre una máquina —arreglar una cañería, un portón, una
+ * instalación nueva— y obligar a elegir un equipo haría que se cargue
+ * cualquiera con tal de poder guardar. Un dato inventado es peor que uno
+ * ausente: el ausente se ve, el inventado ensucia el historial de esa máquina.
+ */
+
+/** Estados por los que pasa una orden. */
+export const ESTADOS_ORDEN_TRABAJO = ['ABIERTA', 'CERRADA', 'ANULADA'] as const;
+export type EstadoOrdenTrabajo = (typeof ESTADOS_ORDEN_TRABAJO)[number];
+
+export const ETIQUETA_ESTADO_TRABAJO: Record<EstadoOrdenTrabajo, string> = {
+  ABIERTA: 'Abierta',
+  CERRADA: 'Cerrada',
+  ANULADA: 'Anulada',
+};
+
+/**
+ * Qué clase de trabajo es.
+ *
+ * Mismo vocabulario que el historial del equipo, y a propósito: es el que
+ * después contesta cuánto de lo que gastamos fue planificado y cuánto fue
+ * apagar incendios. Si acá se usaran otras palabras, las dos mitades del
+ * sistema no se podrían sumar.
+ */
+export const TIPOS_TRABAJO = ['PREVENTIVO', 'CORRECTIVO', 'MEJORA'] as const;
+export type TipoTrabajo = (typeof TIPOS_TRABAJO)[number];
+
+export const ETIQUETA_TIPO_TRABAJO: Record<TipoTrabajo, string> = {
+  PREVENTIVO: 'Preventivo',
+  CORRECTIVO: 'Correctivo',
+  MEJORA: 'Mejora',
+};
+
+/**
+ * Un material que se usó en el trabajo.
+ *
+ * `movimientoId` es el corazón de la trazabilidad: cargar un material acá no
+ * anota un número suelto, genera la salida de stock de verdad y se queda con su
+ * id. Por eso el stock del pañol y lo que dice la orden no pueden discrepar:
+ * son el mismo hecho, no dos registros que hay que mantener de acuerdo.
+ */
+export interface MaterialUsado {
+  id: string;
+  ordenTrabajoId: string;
+  materialId: string;
+  cantidad: number;
+  movimientoId: string;
+  registradoPorId: string | null;
+  creadoEn: Date;
+}
+
+export interface OrdenTrabajo {
+  id: string;
+  /** Correlativo legible: OT-2026-0001. */
+  numero: string;
+  /** Qué pasó, o para qué es el trabajo. */
+  titulo: string;
+  descripcion: string | null;
+  tipo: TipoTrabajo;
+  estado: EstadoOrdenTrabajo;
+  /** Sobre qué máquina, cuando se sabe y quien carga puede verlas. */
+  equipoId: string | null;
+  abiertaEn: Date;
+  abiertaPorId: string | null;
+  /** Qué se hizo finalmente. Obligatoria para cerrar. */
+  resolucion: string | null;
+  cerradaEn: Date | null;
+  cerradaPorId: string | null;
+  motivoAnulacion: string | null;
+  creadoEn: Date;
+}
+
+export interface DatosNuevaOrdenTrabajo {
+  titulo: string;
+  descripcion?: string | null;
+  tipo: TipoTrabajo;
+  equipoId?: string | null;
+  abiertaPorId?: string | null;
+}
+
+/** Deja el texto en una sola línea de espacios simples, o `null` si quedó vacío. */
+function limpiar(texto: string | null | undefined): string | null {
+  const limpio = (texto ?? '').trim().replace(/\s+/g, ' ');
+  return limpio === '' ? null : limpio;
+}
+
+/**
+ * Arma una orden de trabajo válida, lista para guardar.
+ *
+ * Recibe `ahora` en vez de preguntarlo para que los tests puedan fijar la
+ * fecha, igual que en el resto del sistema.
+ */
+export function crearOrdenTrabajo(
+  datos: DatosNuevaOrdenTrabajo,
+  ahora: Date,
+): Omit<OrdenTrabajo, 'id' | 'numero' | 'creadoEn'> {
+  const titulo = limpiar(datos.titulo);
+  if (titulo === null) {
+    throw new ErrorDatosInvalidos(
+      'Contá para qué es el trabajo. Una orden sin título es una fila que dentro de un mes no ' +
+        'le dice nada a nadie.',
+    );
+  }
+
+  return {
+    titulo,
+    descripcion: limpiar(datos.descripcion),
+    tipo: datos.tipo,
+    estado: 'ABIERTA',
+    equipoId: datos.equipoId ?? null,
+    abiertaEn: ahora,
+    abiertaPorId: datos.abiertaPorId ?? null,
+    resolucion: null,
+    cerradaEn: null,
+    cerradaPorId: null,
+    motivoAnulacion: null,
+  };
+}
+
+/**
+ * Si la orden todavía admite que se le carguen o quiten materiales.
+ *
+ * Una orden cerrada es historia: si se le pudiera seguir moviendo el stock, el
+ * costo del trabajo nunca terminaría de ser firme y el número que se mira para
+ * decidir "reparar o reemplazar" cambiaría a espaldas de quien lo miró.
+ */
+export function validarQueAceptaMateriales(orden: OrdenTrabajo): void {
+  if (orden.estado !== 'ABIERTA') {
+    throw new ErrorTransicionInvalida(
+      `La orden ${orden.numero} está ${ETIQUETA_ESTADO_TRABAJO[orden.estado].toLowerCase()}: ` +
+        'no se le pueden cargar ni quitar materiales. Si falta algo, reabrila primero.',
+    );
+  }
+}
+
+/** La cantidad usada de un material. */
+export function validarCantidadUsada(cantidad: number): void {
+  if (!Number.isFinite(cantidad) || cantidad <= 0) {
+    throw new ErrorDatosInvalidos('La cantidad usada tiene que ser mayor que cero.');
+  }
+}
+
+/** Los cambios que deja cerrar una orden. */
+export function cerrarOrdenTrabajo(
+  orden: OrdenTrabajo,
+  resolucion: string,
+  ahora: Date,
+  cerradaPorId: string | null,
+): Pick<OrdenTrabajo, 'estado' | 'resolucion' | 'cerradaEn' | 'cerradaPorId'> {
+  if (orden.estado !== 'ABIERTA') {
+    throw new ErrorTransicionInvalida(
+      `La orden ${orden.numero} ya está ${ETIQUETA_ESTADO_TRABAJO[orden.estado].toLowerCase()}.`,
+    );
+  }
+
+  // La razón de ser del módulo. Una orden cerrada sin decir qué se hizo deja el
+  // mismo vacío que había antes: se sabe qué material salió, no para qué sirvió
+  // ni si el problema quedó resuelto.
+  const texto = limpiar(resolucion);
+  if (texto === null) {
+    throw new ErrorDatosInvalidos(
+      'Contá qué se hizo antes de cerrar. Es lo que va a leer el que agarre la máquina la ' +
+        'próxima vez que falle.',
+    );
+  }
+
+  return { estado: 'CERRADA', resolucion: texto, cerradaEn: ahora, cerradaPorId };
+}
+
+/**
+ * Los cambios que deja reabrir una orden cerrada.
+ *
+ * Existe porque sin esto una orden cerrada de más queda muerta para siempre, y
+ * la alternativa sería que alguien la anule y cargue todo de nuevo, con el
+ * stock ya movido. La resolución no se borra: es lo que se escribió, y si
+ * cambia se vuelve a escribir al cerrar.
+ */
+export function reabrirOrdenTrabajo(
+  orden: OrdenTrabajo,
+): Pick<OrdenTrabajo, 'estado' | 'cerradaEn' | 'cerradaPorId'> {
+  if (orden.estado !== 'CERRADA') {
+    throw new ErrorTransicionInvalida(
+      `Solo se puede reabrir una orden cerrada. La ${orden.numero} está ` +
+        `${ETIQUETA_ESTADO_TRABAJO[orden.estado].toLowerCase()}.`,
+    );
+  }
+
+  return { estado: 'ABIERTA', cerradaEn: null, cerradaPorId: null };
+}
+
+/**
+ * Los cambios que deja anular una orden.
+ *
+ * Solo se anula una orden abierta, y solo si no movió stock. Anular una que ya
+ * consumió materiales dejaría el pañol descontado sin nada que explique a dónde
+ * fue: para eso están quitar el material —que devuelve el stock— y recién
+ * después anular.
+ */
+export function anularOrdenTrabajo(
+  orden: OrdenTrabajo,
+  motivo: string,
+  materialesCargados: number,
+): Pick<OrdenTrabajo, 'estado' | 'motivoAnulacion'> {
+  if (orden.estado !== 'ABIERTA') {
+    throw new ErrorTransicionInvalida(
+      `Solo se puede anular una orden abierta. La ${orden.numero} está ` +
+        `${ETIQUETA_ESTADO_TRABAJO[orden.estado].toLowerCase()}.`,
+    );
+  }
+
+  if (materialesCargados > 0) {
+    throw new ErrorTransicionInvalida(
+      `La orden ${orden.numero} tiene ${materialesCargados} material(es) cargados, que ya ` +
+        'salieron del stock. Quitalos primero: así el stock vuelve y queda asentado que ' +
+        'volvió.',
+    );
+  }
+
+  const texto = limpiar(motivo);
+  if (texto === null) {
+    throw new ErrorDatosInvalidos('Decí por qué se anula, para que quede el motivo.');
+  }
+
+  return { estado: 'ANULADA', motivoAnulacion: texto };
+}
+
+/** Lo que se usó, para mostrar arriba de la orden y en la ficha del equipo. */
+export interface ResumenTrabajo {
+  materialesDistintos: number;
+  unidadesTotales: number;
+}
+
+export function resumirMateriales(materiales: readonly MaterialUsado[]): ResumenTrabajo {
+  return {
+    materialesDistintos: new Set(materiales.map((m) => m.materialId)).size,
+    unidadesTotales: materiales.reduce((suma, m) => suma + m.cantidad, 0),
+  };
+}

@@ -42,6 +42,11 @@ export const PERMISOS = {
   /** Mandarla al proveedor por correo o por WhatsApp. */
   ORDENES_ENVIAR: 'ordenes.enviar',
 
+  // ── Órdenes de trabajo ──────────────────────────────────────────
+  TRABAJOS_VER: 'trabajos.ver',
+  /** Abrir, cargar materiales, cerrar y anular. Mueve stock. */
+  TRABAJOS_EDITAR: 'trabajos.editar',
+
   // ── Equipos de planta y sus services ──────────────────────────────────────
   EQUIPOS_VER: 'equipos.ver',
   EQUIPOS_EDITAR: 'equipos.editar',
@@ -106,6 +111,14 @@ export const DESCRIPCION_PERMISOS: Record<Permiso, { grupo: string; etiqueta: st
 
   [PERMISOS.PROVEEDORES_VER]: { grupo: 'Compras', etiqueta: 'Ver proveedores' },
   [PERMISOS.PROVEEDORES_EDITAR]: { grupo: 'Compras', etiqueta: 'Crear y editar proveedores' },
+  [PERMISOS.TRABAJOS_VER]: {
+    grupo: 'Trabajos',
+    etiqueta: 'Ver las órdenes de trabajo y qué material usó cada una',
+  },
+  [PERMISOS.TRABAJOS_EDITAR]: {
+    grupo: 'Trabajos',
+    etiqueta: 'Abrir órdenes, cargarles materiales y cerrarlas (saca del pañol)',
+  },
   [PERMISOS.ORDENES_VER]: { grupo: 'Compras', etiqueta: 'Ver órdenes de compra' },
   [PERMISOS.ORDENES_EDITAR]: { grupo: 'Compras', etiqueta: 'Crear, editar y anular órdenes' },
   [PERMISOS.ORDENES_RECIBIR]: {
@@ -181,6 +194,12 @@ export const PRESETS: Record<string, Permiso[]> = {
     PERMISOS.ORDENES_EDITAR,
     PERMISOS.ORDENES_RECIBIR,
     PERMISOS.ORDENES_ENVIAR,
+
+    // Las órdenes de trabajo son suyas: son ellos los que hacen el trabajo y
+    // los que sacan el material del pañol para hacerlo. Sin el permiso de
+    // editar, el módulo no sirve de nada para quien lo va a usar todos los días.
+    PERMISOS.TRABAJOS_VER,
+    PERMISOS.TRABAJOS_EDITAR,
 
     // Sin esto, la ficha de un material no puede mostrar su categoría ni su
     // unidad, y el formulario de un movimiento queda sin desplegables.

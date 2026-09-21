@@ -235,9 +235,10 @@ model Material {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  categoria        CategoriaMaterial    @relation(fields: [categoriaId], references: [id])
-  unidad           UnidadMedida?        @relation(fields: [unidadId], references: [id])
-  estanteria       EstanteriaMaterial?  @relation(fields: [estanteriaId], references: [id])
+  categoria        CategoriaMaterial      @relation(fields: [categoriaId], references: [id])
+  unidad           UnidadMedida?          @relation(fields: [unidadId], references: [id])
+  estanteria       EstanteriaMaterial?    @relation(fields: [estanteriaId], references: [id])
+  usosEnTrabajos   MaterialUsadoTrabajo[]
   movimientos      MovimientoStock[]
   renglonesOrdenes RenglonOrdenCompra[]
 
@@ -278,6 +279,10 @@ model MovimientoStock {
   usuario       Usuario?            @relation(fields: [usuarioId], references: [id])
   ediciones     EdicionMovimiento[]
   renglonOrigen RenglonOrdenCompra?
+
+  /// Si la salida la generó una orden de trabajo, el renglón que la reclama.
+  /// Es lo que permite ir del movimiento al trabajo, además de al revés.
+  usoEnTrabajo MaterialUsadoTrabajo?
 
   @@index([materialId])
   // Cubre exactamente el orden que pide recalcularStock (historial de un material).
@@ -327,9 +332,13 @@ model Usuario {
 
   intervencionesEjecutadas Intervencion[] @relation("IntervencionEjecutor")
   intervencionesCargadas   Intervencion[] @relation("IntervencionRegistro")
-  ordenesCreadas           OrdenCompra[]  @relation("OrdenesCreadas")
-  ordenesRecibidas         OrdenCompra[]  @relation("OrdenesRecibidas")
-  enviosDeOrden            EnvioOrden[]   @relation("EnviosDeOrden")
+
+  trabajosAbiertos    OrdenTrabajo[]         @relation("TrabajosAbiertos")
+  trabajosCerrados    OrdenTrabajo[]         @relation("TrabajosCerrados")
+  materialesDeTrabajo MaterialUsadoTrabajo[] @relation("MaterialesDeTrabajo")
+  ordenesCreadas      OrdenCompra[]          @relation("OrdenesCreadas")
+  ordenesRecibidas    OrdenCompra[]          @relation("OrdenesRecibidas")
+  enviosDeOrden       EnvioOrden[]           @relation("EnviosDeOrden")
 
   rotacionesDeCredencial RotacionCredencial[] @relation("RotacionesDeCredencial")
   comprobantesSubidos    ComprobanteOrden[]   @relation("ComprobantesSubidos")
@@ -813,6 +822,7 @@ model Equipo {
   proveedor      Proveedor?          @relation(fields: [proveedorId], references: [id])
   intervenciones Intervencion[]
   planes         PlanMantenimiento[]
+  ordenesTrabajo OrdenTrabajo[]
 
   @@index([ubicacionId])
   @@index([tipoId])
@@ -1057,4 +1067,98 @@ model VistaCredencial {
   @@index([credencialId, vistaEn])
   @@index([usuarioId, vistaEn])
   @@map("vistas_credencial")
+}
+
+// ═══════════════════ Contexto: Órdenes de trabajo ═══════════════════
+//
+// Para qué se usó lo que salió del pañol.
+//
+// Antes una salida por trabajo era una fila de stock con una nota suelta, y ahí
+// terminaba el rastro: nadie podía contestar cuánto costó en repuestos arreglar
+// una bomba, ni en qué se fueron diez metros de manguera. La orden es donde esas
+// dos preguntas se cruzan.
+//
+// Es un contexto aparte del de equipos a propósito, aunque se toquen: un trabajo
+// puede no ser sobre ninguna máquina, y mantenimiento carga órdenes sin ver el
+// módulo de equipos.
+
+/// Una orden de trabajo.
+model OrdenTrabajo {
+  id String @id @default(uuid())
+
+  /// Correlativo legible: OT-2026-0001. Lo asigna el backend de forma atómica,
+  /// con el mismo contador que las órdenes de compra.
+  numero String @unique
+
+  /// Qué pasó, o para qué es el trabajo. Obligatorio: una orden sin título es
+  /// una fila que dentro de un mes no le dice nada a nadie.
+  titulo      String
+  descripcion String?
+
+  /// PREVENTIVO | CORRECTIVO | MEJORA. Mismo vocabulario que el historial del
+  /// equipo, para que las dos mitades del sistema se puedan sumar.
+  tipo String
+
+  /// ABIERTA | CERRADA | ANULADA.
+  estado String @default("ABIERTA")
+
+  /// Sobre qué máquina, cuando se sabe. Opcional y es una decisión de diseño:
+  /// hay trabajos que no son sobre un equipo, y obligar a elegir uno haría que
+  /// se cargue cualquiera con tal de poder guardar. Un dato inventado es peor
+  /// que uno ausente: el ausente se ve, el inventado ensucia ese historial.
+  equipoId String?
+
+  abiertaEn    DateTime @default(now())
+  abiertaPorId String?
+
+  /// Qué se hizo finalmente. Obligatoria para cerrar: es lo que va a leer el
+  /// que agarre la máquina la próxima vez que falle.
+  resolucion   String?
+  cerradaEn    DateTime?
+  cerradaPorId String?
+
+  motivoAnulacion String?
+
+  creadoEn DateTime @default(now())
+
+  equipo     Equipo?                @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  abiertaPor Usuario?               @relation("TrabajosAbiertos", fields: [abiertaPorId], references: [id])
+  cerradaPor Usuario?               @relation("TrabajosCerrados", fields: [cerradaPorId], references: [id])
+  materiales MaterialUsadoTrabajo[]
+
+  @@index([estado])
+  @@index([equipoId])
+  @@index([abiertaEn])
+  @@index([tipo])
+  @@map("ordenes_trabajo")
+}
+
+/// Un material que consumió un trabajo.
+///
+/// `movimientoId` es único y obligatorio, y ahí está toda la idea: cargar un
+/// material en una orden no anota un número al costado, genera la salida de
+/// stock de verdad. El pañol y la orden no pueden discrepar porque son el mismo
+/// hecho registrado una sola vez.
+model MaterialUsadoTrabajo {
+  id             String @id @default(uuid())
+  ordenTrabajoId String
+  materialId     String
+
+  cantidad Decimal @db.Decimal(14, 3)
+
+  /// La salida de stock que generó. Uno a uno: un movimiento pertenece a lo
+  /// sumo a un renglón de una orden.
+  movimientoId String @unique
+
+  registradoPorId String?
+  creadoEn        DateTime @default(now())
+
+  orden         OrdenTrabajo    @relation(fields: [ordenTrabajoId], references: [id], onDelete: Cascade)
+  material      Material        @relation(fields: [materialId], references: [id])
+  movimiento    MovimientoStock @relation(fields: [movimientoId], references: [id])
+  registradoPor Usuario?        @relation("MaterialesDeTrabajo", fields: [registradoPorId], references: [id])
+
+  @@index([ordenTrabajoId])
+  @@index([materialId])
+  @@map("materiales_orden_trabajo")
 }
