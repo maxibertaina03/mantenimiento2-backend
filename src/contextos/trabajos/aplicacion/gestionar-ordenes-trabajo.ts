@@ -6,10 +6,13 @@ import {
   DatosNuevaOrdenTrabajo,
   OrdenTrabajo,
   reabrirOrdenTrabajo,
+  reasignarOrdenTrabajo,
+  validarQueEsSuyo,
   TipoTrabajo,
   validarQueSePuedeEliminar,
 } from '../dominio/orden-trabajo';
 import { ConsultaEquipos } from '../puertos/consulta-equipos';
+import { ConsultaUsuarios } from '../puertos/consulta-usuarios';
 import {
   OrdenTrabajoConRelaciones,
   RepositorioOrdenesTrabajo,
@@ -35,6 +38,7 @@ export class GestionarOrdenesTrabajo {
   constructor(
     private readonly repo: RepositorioOrdenesTrabajo,
     private readonly equipos: ConsultaEquipos,
+    private readonly usuarios: ConsultaUsuarios,
     private readonly reloj: Reloj,
   ) {}
 
@@ -57,13 +61,52 @@ export class GestionarOrdenesTrabajo {
     if (!equipo) throw new ErrorNoEncontrado(`No existe el equipo con id ${equipoId}`);
   }
 
-  async crear(datos: DatosNuevaOrdenTrabajo): Promise<OrdenTrabajoConRelaciones> {
-    await this.validarEquipo(datos.equipoId);
-    return this.repo.crear(crearOrdenTrabajo(datos, this.reloj.ahora()));
+  /**
+   * Comprueba que a quien se le asigna exista y pueda trabajar órdenes.
+   *
+   * Sin el segundo control se podría dejarle el trabajo a alguien de
+   * administración, que ni siquiera ve el módulo: la orden quedaría trabada
+   * desde el primer día y nadie sabría por qué.
+   */
+  private async validarAsignado(usuarioId: string): Promise<void> {
+    const usuario = await this.usuarios.buscarPorId(usuarioId);
+    if (!usuario) throw new ErrorNoEncontrado(`No existe el usuario con id ${usuarioId}`);
+    if (!usuario.puedeTrabajar) {
+      throw new ErrorDatosInvalidos(
+        `${usuario.nombre} no puede hacerse cargo de órdenes de trabajo. Elegí a alguien de ` +
+          'mantenimiento, o dale el permiso primero.',
+      );
+    }
   }
 
-  async editar(id: string, cambios: CambiosOrdenTrabajo): Promise<OrdenTrabajoConRelaciones> {
+  async crear(datos: DatosNuevaOrdenTrabajo): Promise<OrdenTrabajoConRelaciones> {
+    await this.validarEquipo(datos.equipoId);
+    // El dominio decide a quién queda: al elegido, o a quien la abre.
+    const orden = crearOrdenTrabajo(datos, this.reloj.ahora());
+    await this.validarAsignado(orden.asignadoAId);
+    return this.repo.crear(orden);
+  }
+
+  /**
+   * Cambia a quién está asignada.
+   *
+   * Es la única acción sobre una orden que no exige ser su dueño, y por eso
+   * pide un permiso aparte. Es la salida para cuando la persona que la tenía no
+   * está: sin esto, la orden quedaría trabada hasta que vuelva.
+   */
+  async reasignar(id: string, nuevoAsignadoId: string): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.traer(id);
+    await this.validarAsignado(nuevoAsignadoId);
+    return this.repo.actualizar(id, reasignarOrdenTrabajo(orden, nuevoAsignadoId));
+  }
+
+  async editar(
+    id: string,
+    cambios: CambiosOrdenTrabajo,
+    usuarioId: string | null,
+  ): Promise<OrdenTrabajoConRelaciones> {
+    const orden = await this.traer(id);
+    validarQueEsSuyo(orden, usuarioId);
 
     if (orden.estado !== 'ABIERTA') {
       throw new ErrorDatosInvalidos(
@@ -103,14 +146,16 @@ export class GestionarOrdenesTrabajo {
     usuarioId: string | null,
   ): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.traer(id);
+    validarQueEsSuyo(orden, usuarioId);
     return this.repo.actualizar(
       id,
       cerrarOrdenTrabajo(orden, resolucion, this.reloj.ahora(), usuarioId),
     );
   }
 
-  async reabrir(id: string): Promise<OrdenTrabajoConRelaciones> {
+  async reabrir(id: string, usuarioId: string | null): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.traer(id);
+    validarQueEsSuyo(orden, usuarioId);
     return this.repo.actualizar(id, reabrirOrdenTrabajo(orden));
   }
 
@@ -120,8 +165,13 @@ export class GestionarOrdenesTrabajo {
     await this.repo.eliminar(id);
   }
 
-  async anular(id: string, motivo: string): Promise<OrdenTrabajoConRelaciones> {
+  async anular(
+    id: string,
+    motivo: string,
+    usuarioId: string | null,
+  ): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.traer(id);
+    validarQueEsSuyo(orden, usuarioId);
     // El dominio necesita saber cuántos materiales tiene cargados: una orden
     // que ya movió stock no se anula, se le quitan los materiales primero.
     return this.repo.actualizar(id, anularOrdenTrabajo(orden, motivo, orden.materiales.length));

@@ -1,6 +1,12 @@
-import { ErrorNoEncontrado, ErrorTransicionInvalida } from '../dominio/errores';
+import {
+  ErrorDatosInvalidos,
+  ErrorNoEncontrado,
+  ErrorNoEsSuyo,
+  ErrorTransicionInvalida,
+} from '../dominio/errores';
 import { Reloj } from '../puertos/reloj';
 import { ConsultaEquiposEnMemoria } from './consulta-equipos-en-memoria';
+import { ConsultaUsuariosEnMemoria } from './consulta-usuarios-en-memoria';
 import { ConsultarOrdenesTrabajo } from './consultar-ordenes-trabajo';
 import { GestionarOrdenesTrabajo } from './gestionar-ordenes-trabajo';
 import { RepositorioOrdenesEnMemoria } from './repositorio-en-memoria';
@@ -16,17 +22,23 @@ function armar() {
   const equipos = new ConsultaEquiposEnMemoria([
     { id: 'eq-7', nombre: 'Bomba recibo 7', codigo: 'B-007' },
   ]);
+  // Dos que trabajan y uno de administracion, que no.
+  const usuarios = new ConsultaUsuariosEnMemoria([
+    { id: 'u1', nombre: 'Facundo', puedeTrabajar: true },
+    { id: 'u2', nombre: 'Leandro', puedeTrabajar: true },
+    { id: 'admin', nombre: 'Administracion', puedeTrabajar: false },
+  ]);
 
   return {
     repo,
     stock,
-    gestionar: new GestionarOrdenesTrabajo(repo, equipos, reloj),
+    gestionar: new GestionarOrdenesTrabajo(repo, equipos, usuarios, reloj),
     materiales: new UsarMateriales(repo, stock),
     consultar: new ConsultarOrdenesTrabajo(repo),
   };
 }
 
-const NUEVA = { titulo: 'Perdida en la bomba', tipo: 'CORRECTIVO' } as const;
+const NUEVA = { titulo: 'Perdida en la bomba', tipo: 'CORRECTIVO', abiertaPorId: 'u1' } as const;
 
 describe('abrir una orden de trabajo', () => {
   it('sin equipo se puede, y es el caso normal de mantenimiento hoy', async () => {
@@ -56,7 +68,7 @@ describe('abrir una orden de trabajo', () => {
   it('un equipo inexistente tambien se rechaza al editar', async () => {
     const { gestionar } = armar();
     const orden = await gestionar.crear(NUEVA);
-    await expect(gestionar.editar(orden.id, { equipoId: 'eq-inventado' })).rejects.toThrow(
+    await expect(gestionar.editar(orden.id, { equipoId: 'eq-inventado' }, 'u1')).rejects.toThrow(
       ErrorNoEncontrado,
     );
   });
@@ -173,15 +185,17 @@ describe('quitar un material', () => {
 });
 
 describe('cerrar, reabrir y anular', () => {
-  it('cerrar guarda que se hizo', async () => {
+  it('cerrar guarda que se hizo y quien la cerro', async () => {
     const { gestionar } = armar();
     const orden = await gestionar.crear(NUEVA);
 
-    const cerrada = await gestionar.cerrar(orden.id, 'Se cambio el reten y la junta', 'u9');
+    const cerrada = await gestionar.cerrar(orden.id, 'Se cambio el reten y la junta', 'u1');
 
     expect(cerrada.estado).toBe('CERRADA');
     expect(cerrada.resolucion).toBe('Se cambio el reten y la junta');
     expect(cerrada.cerradaEn).toEqual(AHORA);
+    // Quien la cerro es el asignado, porque es el unico que puede.
+    expect(cerrada.cerradaPorId).toBe('u1');
   });
 
   it('una orden reabierta vuelve a aceptar materiales', async () => {
@@ -189,7 +203,7 @@ describe('cerrar, reabrir y anular', () => {
     const orden = await gestionar.crear(NUEVA);
     await gestionar.cerrar(orden.id, 'Listo', 'u1');
 
-    await gestionar.reabrir(orden.id);
+    await gestionar.reabrir(orden.id, 'u1');
     await materiales.agregar(orden.id, { materialId: 'mat-1', cantidad: 1 }, 'u1');
 
     expect(stock.asientos).toHaveLength(1);
@@ -200,7 +214,7 @@ describe('cerrar, reabrir y anular', () => {
     const orden = await gestionar.crear(NUEVA);
     await materiales.agregar(orden.id, { materialId: 'mat-1', cantidad: 2 }, 'u1');
 
-    await expect(gestionar.anular(orden.id, 'Me equivoque')).rejects.toThrow(
+    await expect(gestionar.anular(orden.id, 'Me equivoque', 'u1')).rejects.toThrow(
       ErrorTransicionInvalida,
     );
   });
@@ -211,7 +225,7 @@ describe('cerrar, reabrir y anular', () => {
     const renglon = await materiales.agregar(orden.id, { materialId: 'mat-1', cantidad: 2 }, 'u1');
 
     await materiales.quitar(renglon.id, 'u1');
-    const anulada = await gestionar.anular(orden.id, 'Se cargo duplicada');
+    const anulada = await gestionar.anular(orden.id, 'Se cargo duplicada', 'u1');
 
     expect(anulada.estado).toBe('ANULADA');
   });
@@ -219,7 +233,7 @@ describe('cerrar, reabrir y anular', () => {
   it('eliminar saca la orden del sistema, despues de anularla', async () => {
     const { gestionar, consultar } = armar();
     const orden = await gestionar.crear(NUEVA);
-    await gestionar.anular(orden.id, 'Era de prueba');
+    await gestionar.anular(orden.id, 'Era de prueba', 'u1');
 
     await gestionar.eliminar(orden.id);
 
@@ -240,9 +254,94 @@ describe('cerrar, reabrir y anular', () => {
     const orden = await gestionar.crear(NUEVA);
     await gestionar.cerrar(orden.id, 'Listo', 'u1');
 
-    await expect(gestionar.editar(orden.id, { titulo: 'Otro titulo' })).rejects.toThrow(
+    await expect(gestionar.editar(orden.id, { titulo: 'Otro titulo' }, 'u1')).rejects.toThrow(
       /reabrila primero/i,
     );
+  });
+});
+
+describe('el trabajo es de quien lo tiene asignado', () => {
+  it('sin elegir a nadie, la orden queda para quien la abre', async () => {
+    const { gestionar } = armar();
+    const orden = await gestionar.crear(NUEVA);
+    expect(orden.asignadoAId).toBe('u1');
+  });
+
+  it('un encargado se la asigna a otro y ese otro la trabaja', async () => {
+    const { gestionar, materiales, stock } = armar();
+    const orden = await gestionar.crear({ ...NUEVA, asignadoAId: 'u2' });
+
+    await materiales.agregar(orden.id, { materialId: 'mat-1', cantidad: 1 }, 'u2');
+    const cerrada = await gestionar.cerrar(orden.id, 'Listo', 'u2');
+
+    expect(stock.asientos).toHaveLength(1);
+    expect(cerrada.cerradaPorId).toBe('u2');
+  });
+
+  it('REGRESION: el que no la tiene asignada no le carga materiales', async () => {
+    // Y no llega a tocar el paniol: el candado va antes que el stock.
+    const { gestionar, materiales, stock } = armar();
+    const orden = await gestionar.crear({ ...NUEVA, asignadoAId: 'u2' });
+
+    await expect(
+      materiales.agregar(orden.id, { materialId: 'mat-1', cantidad: 1 }, 'u1'),
+    ).rejects.toThrow(ErrorNoEsSuyo);
+    expect(stock.asientos).toHaveLength(0);
+  });
+
+  it('REGRESION: el que no la tiene asignada no la cierra', async () => {
+    const { gestionar } = armar();
+    const orden = await gestionar.crear({ ...NUEVA, asignadoAId: 'u2' });
+
+    await expect(gestionar.cerrar(orden.id, 'La cierro yo', 'u1')).rejects.toThrow(ErrorNoEsSuyo);
+  });
+
+  it('REGRESION: tampoco quita un material que cargo el duenio', async () => {
+    const { gestionar, materiales } = armar();
+    const orden = await gestionar.crear({ ...NUEVA, asignadoAId: 'u2' });
+    const renglon = await materiales.agregar(orden.id, { materialId: 'mat-1', cantidad: 1 }, 'u2');
+
+    await expect(materiales.quitar(renglon.id, 'u1')).rejects.toThrow(ErrorNoEsSuyo);
+  });
+
+  it('no se le asigna a alguien que no puede trabajar ordenes', async () => {
+    // Administracion ni ve el modulo: la orden quedaria trabada desde el primer
+    // dia y nadie sabria por que.
+    const { gestionar } = armar();
+
+    await expect(gestionar.crear({ ...NUEVA, asignadoAId: 'admin' })).rejects.toThrow(
+      ErrorDatosInvalidos,
+    );
+  });
+
+  it('no se le asigna a alguien que no existe', async () => {
+    const { gestionar } = armar();
+    await expect(gestionar.crear({ ...NUEVA, asignadoAId: 'fantasma' })).rejects.toThrow(
+      ErrorNoEncontrado,
+    );
+  });
+
+  it('reasignar destraba una orden y el nuevo duenio la puede cerrar', async () => {
+    // Es la salida para cuando la persona que la tenia no esta.
+    const { gestionar } = armar();
+    const orden = await gestionar.crear({ ...NUEVA, asignadoAId: 'u2' });
+
+    const reasignada = await gestionar.reasignar(orden.id, 'u1');
+    expect(reasignada.asignadoAId).toBe('u1');
+
+    const cerrada = await gestionar.cerrar(orden.id, 'La termine yo', 'u1');
+    expect(cerrada.cerradaPorId).toBe('u1');
+  });
+
+  it('las ordenes de una persona se pueden listar aparte', async () => {
+    const { gestionar, consultar } = armar();
+    await gestionar.crear(NUEVA);
+    const deOtro = await gestionar.crear({ ...NUEVA, asignadoAId: 'u2' });
+
+    const suyas = await consultar.listar({ asignadoAId: 'u2' }, 1, 20);
+
+    expect(suyas.total).toBe(1);
+    expect(suyas.datos[0].id).toBe(deOtro.id);
   });
 });
 
@@ -250,7 +349,11 @@ describe('consultar', () => {
   it('filtra por estado', async () => {
     const { gestionar, consultar } = armar();
     const abierta = await gestionar.crear(NUEVA);
-    const otra = await gestionar.crear({ titulo: 'Cambio de filtro', tipo: 'PREVENTIVO' });
+    const otra = await gestionar.crear({
+      titulo: 'Cambio de filtro',
+      tipo: 'PREVENTIVO',
+      abiertaPorId: 'u1',
+    });
     await gestionar.cerrar(otra.id, 'Se cambio', 'u1');
 
     const pagina = await consultar.listar({ estado: 'ABIERTA' }, 1, 20);
@@ -272,7 +375,11 @@ describe('consultar', () => {
   it('busca por numero y por titulo', async () => {
     const { gestionar, consultar } = armar();
     await gestionar.crear(NUEVA);
-    await gestionar.crear({ titulo: 'Cambio de filtro de aire', tipo: 'PREVENTIVO' });
+    await gestionar.crear({
+      titulo: 'Cambio de filtro de aire',
+      tipo: 'PREVENTIVO',
+      abiertaPorId: 'u1',
+    });
 
     expect((await consultar.listar({ buscar: 'filtro' }, 1, 20)).total).toBe(1);
     expect((await consultar.listar({ buscar: 'OT-2026-0001' }, 1, 20)).total).toBe(1);

@@ -16,6 +16,7 @@ export interface OrdenTrabajoConRelaciones extends OrdenTrabajo {
   equipoNombre: string | null;
   equipoCodigo: string | null;
   abiertaPorNombre: string | null;
+  asignadoANombre: string | null;
   cerradaPorNombre: string | null;
   materiales: MaterialUsadoConRelaciones[];
 }
@@ -26,6 +27,8 @@ export interface FiltroOrdenesTrabajo {
   equipoId?: string;
   /** Busca en el número, el título y la descripción. */
   buscar?: string;
+  /** Solo las de una persona, para el filtro "las mías". */
+  asignadoAId?: string;
   desde?: Date;
   hasta?: Date;
 }

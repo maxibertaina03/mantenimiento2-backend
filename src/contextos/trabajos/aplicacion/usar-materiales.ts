@@ -1,5 +1,9 @@
 import { ErrorNoEncontrado } from '../dominio/errores';
-import { validarCantidadUsada, validarQueAceptaMateriales } from '../dominio/orden-trabajo';
+import {
+  validarCantidadUsada,
+  validarQueAceptaMateriales,
+  validarQueEsSuyo,
+} from '../dominio/orden-trabajo';
 import {
   MaterialUsadoConRelaciones,
   RepositorioOrdenesTrabajo,
@@ -40,6 +44,9 @@ export class UsarMateriales {
     const orden = await this.repo.buscarPorId(ordenId);
     if (!orden) throw new ErrorNoEncontrado(`No existe la orden de trabajo con id ${ordenId}`);
 
+    // Sacar material del pañol es trabajar la orden, así que solo lo hace quien
+    // la tiene asignada. Va antes que nada: si no es suya, no se toca el stock.
+    validarQueEsSuyo(orden, usuarioId);
     validarQueAceptaMateriales(orden);
     validarCantidadUsada(datos.cantidad);
 
@@ -83,6 +90,7 @@ export class UsarMateriales {
     const orden = await this.repo.buscarPorId(usado.ordenTrabajoId);
     if (!orden) throw new ErrorNoEncontrado(`No existe la orden de trabajo de ese material`);
 
+    validarQueEsSuyo(orden, usuarioId);
     validarQueAceptaMateriales(orden);
 
     await this.repo.quitarMaterial(materialUsadoId);

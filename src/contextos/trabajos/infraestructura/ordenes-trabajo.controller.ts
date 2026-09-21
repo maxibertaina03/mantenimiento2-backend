@@ -24,6 +24,7 @@ import { ConsultarOrdenesTrabajo } from '../aplicacion/consultar-ordenes-trabajo
 import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo';
 import { UsarMateriales } from '../aplicacion/usar-materiales';
 import { CONSULTA_EQUIPOS, ConsultaEquipos } from '../puertos/consulta-equipos';
+import { CONSULTA_USUARIOS, ConsultaUsuarios } from '../puertos/consulta-usuarios';
 import {
   REPOSITORIO_ORDENES_TRABAJO,
   RepositorioOrdenesTrabajo,
@@ -37,6 +38,7 @@ import {
   CrearOrdenTrabajoDto,
   EditarOrdenTrabajoDto,
   ListarOrdenesTrabajoDto,
+  ReasignarOrdenTrabajoDto,
   UsarMaterialDto,
 } from './ordenes-trabajo.dto';
 
@@ -60,11 +62,12 @@ export class OrdenesTrabajoController {
   constructor(
     @Inject(REPOSITORIO_ORDENES_TRABAJO) repo: RepositorioOrdenesTrabajo,
     @Inject(CONSULTA_EQUIPOS) equipos: ConsultaEquipos,
+    @Inject(CONSULTA_USUARIOS) private readonly usuarios: ConsultaUsuarios,
     @Inject(STOCK) stock: Stock,
     @Inject(RELOJ_TRABAJOS) reloj: Reloj,
     private readonly permisos: PermisosService,
   ) {
-    this.gestionar = new GestionarOrdenesTrabajo(repo, equipos, reloj);
+    this.gestionar = new GestionarOrdenesTrabajo(repo, equipos, usuarios, reloj);
     this.materiales = new UsarMateriales(repo, stock);
     this.consultar = new ConsultarOrdenesTrabajo(repo);
   }
@@ -106,10 +109,26 @@ export class OrdenesTrabajoController {
         estado: query.estado,
         tipo: query.tipo,
         equipoId: query.equipoId,
+        asignadoAId: query.asignadoAId,
       },
       query.pagina ?? 1,
       query.limite ?? 20,
     );
+  }
+
+  /**
+   * Va antes que `:id` a propósito: si no, Nest tomaría "asignables" como un id
+   * y devolvería un error de formato en vez de la lista.
+   *
+   * Vive acá y no en el módulo de usuarios porque mantenimiento no tiene
+   * permiso para listar el padrón, y sin embargo tiene que poder elegir a quién
+   * le pasa un trabajo. Devuelve solo id y nombre: lo justo para el desplegable.
+   */
+  @Permisos(PERMISOS.TRABAJOS_EDITAR)
+  @Get('asignables')
+  @ApiOperation({ summary: 'Quiénes pueden hacerse cargo de una orden' })
+  asignables() {
+    return this.usuarios.listarAsignables();
   }
 
   @Permisos(PERMISOS.TRABAJOS_VER)
@@ -130,6 +149,7 @@ export class OrdenesTrabajoController {
       tipo: dto.tipo,
       equipoId: dto.equipoId,
       abiertaPorId: usuario?.id ?? null,
+      asignadoAId: dto.asignadoAId,
     });
   }
 
@@ -142,7 +162,7 @@ export class OrdenesTrabajoController {
     @UsuarioActual() usuario?: Usuario,
   ) {
     await this.validarEleccionDeEquipo(dto.equipoId, usuario);
-    return this.gestionar.editar(id, dto);
+    return this.gestionar.editar(id, dto, usuario?.id ?? null);
   }
 
   @Permisos(PERMISOS.TRABAJOS_EDITAR)
@@ -185,8 +205,15 @@ export class OrdenesTrabajoController {
   @Permisos(PERMISOS.TRABAJOS_EDITAR)
   @Post(':id/reabrir')
   @ApiOperation({ summary: 'Volver a abrir una orden cerrada de más' })
-  reabrir(@Param('id', ParseUUIDPipe) id: string) {
-    return this.gestionar.reabrir(id);
+  reabrir(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() usuario?: Usuario) {
+    return this.gestionar.reabrir(id, usuario?.id ?? null);
+  }
+
+  @Permisos(PERMISOS.TRABAJOS_ASIGNAR)
+  @Post(':id/reasignar')
+  @ApiOperation({ summary: 'Pasarle la orden a otra persona' })
+  reasignar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReasignarOrdenTrabajoDto) {
+    return this.gestionar.reasignar(id, dto.asignadoAId);
   }
 
   @Permisos(PERMISOS.TRABAJOS_ELIMINAR)
@@ -200,7 +227,11 @@ export class OrdenesTrabajoController {
   @Permisos(PERMISOS.TRABAJOS_EDITAR)
   @Post(':id/anular')
   @ApiOperation({ summary: 'Anular una orden abierta que no movió stock' })
-  anular(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AnularOrdenTrabajoDto) {
-    return this.gestionar.anular(id, dto.motivo);
+  anular(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AnularOrdenTrabajoDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.gestionar.anular(id, dto.motivo, usuario?.id ?? null);
   }
 }

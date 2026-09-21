@@ -25,3 +25,13 @@ export class ErrorTransicionInvalida extends ErrorDominio {}
 
 /** Se pidió algo que no existe. */
 export class ErrorNoEncontrado extends ErrorDominio {}
+
+/**
+ * La orden está asignada a otra persona.
+ *
+ * Es un error aparte y no un "datos inválidos" porque no es un problema de lo
+ * que se mandó: está bien formado y la orden existe. Lo que falta es ser quien
+ * tiene que hacer ese trabajo, y eso merece un 403 y un mensaje que diga de
+ * quién es.
+ */
+export class ErrorNoEsSuyo extends ErrorDominio {}

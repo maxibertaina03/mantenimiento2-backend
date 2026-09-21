@@ -51,6 +51,20 @@ export class CrearOrdenTrabajoDto {
   @IsOptional()
   @IsUUID()
   equipoId?: string | null;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'A quién se le asigna. Si no viene, queda para quien la abre.',
+  })
+  @IsOptional()
+  @IsUUID()
+  asignadoAId?: string | null;
+}
+
+export class ReasignarOrdenTrabajoDto {
+  @ApiProperty({ format: 'uuid', description: 'A quién pasa el trabajo.' })
+  @IsUUID()
+  asignadoAId!: string;
 }
 
 export class EditarOrdenTrabajoDto {
@@ -136,6 +150,11 @@ export class ListarOrdenesTrabajoDto {
   @IsOptional()
   @IsUUID()
   equipoId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Solo las de esa persona.' })
+  @IsOptional()
+  @IsUUID()
+  asignadoAId?: string;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

@@ -1,4 +1,4 @@
-import { ErrorDatosInvalidos, ErrorTransicionInvalida } from './errores';
+import { ErrorDatosInvalidos, ErrorNoEsSuyo, ErrorTransicionInvalida } from './errores';
 import {
   anularOrdenTrabajo,
   cerrarOrdenTrabajo,
@@ -6,8 +6,10 @@ import {
   MaterialUsado,
   OrdenTrabajo,
   reabrirOrdenTrabajo,
+  reasignarOrdenTrabajo,
   resumirMateriales,
   validarCantidadUsada,
+  validarQueEsSuyo,
   validarQueSePuedeEliminar,
   validarQueAceptaMateriales,
 } from './orden-trabajo';
@@ -24,6 +26,7 @@ const orden = (cambios: Partial<OrdenTrabajo> = {}): OrdenTrabajo => ({
   equipoId: null,
   abiertaEn: AHORA,
   abiertaPorId: 'u1',
+  asignadoAId: 'u1',
   resolucion: null,
   cerradaEn: null,
   cerradaPorId: null,
@@ -44,7 +47,10 @@ const usado = (materialId: string, cantidad: number): MaterialUsado => ({
 
 describe('crearOrdenTrabajo', () => {
   it('nace abierta, sin resolucion y sin cierre', () => {
-    const nueva = crearOrdenTrabajo({ titulo: 'Cambio de reten', tipo: 'CORRECTIVO' }, AHORA);
+    const nueva = crearOrdenTrabajo(
+      { titulo: 'Cambio de reten', tipo: 'CORRECTIVO', abiertaPorId: 'u1' },
+      AHORA,
+    );
 
     expect(nueva.estado).toBe('ABIERTA');
     expect(nueva.resolucion).toBeNull();
@@ -55,14 +61,14 @@ describe('crearOrdenTrabajo', () => {
   it('exige decir para que es el trabajo', () => {
     // Una orden sin titulo es una fila que dentro de un mes no le dice nada a
     // nadie, que es exactamente el problema que el modulo viene a resolver.
-    expect(() => crearOrdenTrabajo({ titulo: '   ', tipo: 'CORRECTIVO' }, AHORA)).toThrow(
-      ErrorDatosInvalidos,
-    );
+    expect(() =>
+      crearOrdenTrabajo({ titulo: '   ', tipo: 'CORRECTIVO', abiertaPorId: 'u1' }, AHORA),
+    ).toThrow(ErrorDatosInvalidos);
   });
 
   it('normaliza los espacios del titulo', () => {
     const nueva = crearOrdenTrabajo(
-      { titulo: '  Perdida   en la   bomba  ', tipo: 'CORRECTIVO' },
+      { titulo: '  Perdida   en la   bomba  ', tipo: 'CORRECTIVO', abiertaPorId: 'u1' },
       AHORA,
     );
     expect(nueva.titulo).toBe('Perdida en la bomba');
@@ -72,13 +78,16 @@ describe('crearOrdenTrabajo', () => {
     // Hay trabajos que no son sobre una maquina, y mantenimiento todavia no ve
     // el modulo de equipos. Obligar a elegir uno haria que se cargue cualquiera
     // con tal de poder guardar, y un dato inventado ensucia ese historial.
-    const nueva = crearOrdenTrabajo({ titulo: 'Arreglo de canieria', tipo: 'MEJORA' }, AHORA);
+    const nueva = crearOrdenTrabajo(
+      { titulo: 'Arreglo de canieria', tipo: 'MEJORA', abiertaPorId: 'u1' },
+      AHORA,
+    );
     expect(nueva.equipoId).toBeNull();
   });
 
   it('guarda el equipo cuando viene', () => {
     const nueva = crearOrdenTrabajo(
-      { titulo: 'Cambio de rodamiento', tipo: 'CORRECTIVO', equipoId: 'eq-7' },
+      { titulo: 'Cambio de rodamiento', tipo: 'CORRECTIVO', equipoId: 'eq-7', abiertaPorId: 'u1' },
       AHORA,
     );
     expect(nueva.equipoId).toBe('eq-7');
@@ -86,7 +95,7 @@ describe('crearOrdenTrabajo', () => {
 
   it('una descripcion vacia queda en null, no en cadena vacia', () => {
     const nueva = crearOrdenTrabajo(
-      { titulo: 'Trabajo', tipo: 'MEJORA', descripcion: '   ' },
+      { titulo: 'Trabajo', tipo: 'MEJORA', descripcion: '   ', abiertaPorId: 'u1' },
       AHORA,
     );
     expect(nueva.descripcion).toBeNull();
@@ -219,6 +228,68 @@ describe('validarQueSePuedeEliminar', () => {
     // explica es justamente el agujero que este modulo vino a tapar.
     expect(() => validarQueSePuedeEliminar(orden({ estado: 'ANULADA' }), 1)).toThrow(
       ErrorTransicionInvalida,
+    );
+  });
+});
+
+describe('de quien es el trabajo', () => {
+  it('si no se elige a nadie, queda para quien la abre', () => {
+    // Es el caso de abrirse una orden para uno mismo: no tiene por que costar
+    // un paso de mas.
+    const nueva = crearOrdenTrabajo(
+      { titulo: 'Reviso la bomba', tipo: 'CORRECTIVO', abiertaPorId: 'u1' },
+      AHORA,
+    );
+    expect(nueva.asignadoAId).toBe('u1');
+  });
+
+  it('un encargado se la puede asignar a otro', () => {
+    const nueva = crearOrdenTrabajo(
+      { titulo: 'Cambio de reten', tipo: 'CORRECTIVO', abiertaPorId: 'u1', asignadoAId: 'u2' },
+      AHORA,
+    );
+    expect(nueva.asignadoAId).toBe('u2');
+    expect(nueva.abiertaPorId).toBe('u1');
+  });
+
+  it('REGRESION: no se crea una orden sin duenio', () => {
+    // Una orden sin duenio es una que nadie puede cerrar y que todos suponen
+    // que va a hacer otro.
+    expect(() => crearOrdenTrabajo({ titulo: 'Algo', tipo: 'MEJORA' }, AHORA)).toThrow(
+      ErrorDatosInvalidos,
+    );
+  });
+
+  it('el asignado puede trabajarla', () => {
+    expect(() => validarQueEsSuyo(orden({ asignadoAId: 'u1' }), 'u1')).not.toThrow();
+  });
+
+  it('REGRESION: el que no la tiene asignada no puede', () => {
+    // Sin esto "asignada a" seria una etiqueta decorativa, y dos personas
+    // podrian cargar repuestos sobre el mismo trabajo sin saberlo.
+    expect(() => validarQueEsSuyo(orden({ asignadoAId: 'u2' }), 'u1')).toThrow(ErrorNoEsSuyo);
+  });
+
+  it('REGRESION: sin saber quien es, tampoco', () => {
+    expect(() => validarQueEsSuyo(orden({ asignadoAId: 'u1' }), null)).toThrow(ErrorNoEsSuyo);
+  });
+});
+
+describe('reasignarOrdenTrabajo', () => {
+  it('una abierta pasa a otra persona', () => {
+    expect(reasignarOrdenTrabajo(orden({ asignadoAId: 'u1' }), 'u2')).toEqual({
+      asignadoAId: 'u2',
+    });
+  });
+
+  it.each(['CERRADA', 'ANULADA'] as const)('no se reasigna una %s', (estado) => {
+    // Ya no es trabajo pendiente: no hay nada que pasarle a nadie.
+    expect(() => reasignarOrdenTrabajo(orden({ estado }), 'u2')).toThrow(ErrorTransicionInvalida);
+  });
+
+  it('reasignar a quien ya la tiene no tiene sentido', () => {
+    expect(() => reasignarOrdenTrabajo(orden({ asignadoAId: 'u1' }), 'u1')).toThrow(
+      ErrorDatosInvalidos,
     );
   });
 });

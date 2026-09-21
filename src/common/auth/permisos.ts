@@ -54,6 +54,14 @@ export const PERMISOS = {
    * administrador, nace solo para él, que es lo que corresponde.
    */
   TRABAJOS_ELIMINAR: 'trabajos.eliminar',
+  /**
+   * Cambiar a quién está asignada una orden.
+   *
+   * Aparte de editar porque es la única acción sobre una orden que no exige
+   * ser su dueño. Es la salida para cuando la persona que la tenía no está;
+   * si lo tuviera cualquiera, "asignada a" dejaría de significar algo.
+   */
+  TRABAJOS_ASIGNAR: 'trabajos.asignar',
 
   // ── Equipos de planta y sus services ──────────────────────────────────────
   EQUIPOS_VER: 'equipos.ver',
@@ -130,6 +138,10 @@ export const DESCRIPCION_PERMISOS: Record<Permiso, { grupo: string; etiqueta: st
   [PERMISOS.TRABAJOS_ELIMINAR]: {
     grupo: 'Trabajos',
     etiqueta: 'Eliminar una orden anulada que nunca movió stock',
+  },
+  [PERMISOS.TRABAJOS_ASIGNAR]: {
+    grupo: 'Trabajos',
+    etiqueta: 'Reasignar una orden abierta a otra persona',
   },
   [PERMISOS.ORDENES_VER]: { grupo: 'Compras', etiqueta: 'Ver órdenes de compra' },
   [PERMISOS.ORDENES_EDITAR]: { grupo: 'Compras', etiqueta: 'Crear, editar y anular órdenes' },

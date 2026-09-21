@@ -4,6 +4,7 @@ import {
   ErrorDatosInvalidos,
   ErrorDominio,
   ErrorNoEncontrado,
+  ErrorNoEsSuyo,
   ErrorTransicionInvalida,
 } from '../dominio/errores';
 
@@ -21,6 +22,8 @@ import {
 export class FiltroErroresTrabajo implements ExceptionFilter {
   private estadoDe(error: ErrorDominio): number {
     if (error instanceof ErrorNoEncontrado) return HttpStatus.NOT_FOUND;
+    // 403 y no 401: está bien identificado, el trabajo es de otro.
+    if (error instanceof ErrorNoEsSuyo) return HttpStatus.FORBIDDEN;
     // 409 y no 400: el pedido está bien formado, lo que no da es el estado en
     // el que está la orden. La pantalla puede ofrecer reabrirla.
     if (error instanceof ErrorTransicionInvalida) return HttpStatus.CONFLICT;

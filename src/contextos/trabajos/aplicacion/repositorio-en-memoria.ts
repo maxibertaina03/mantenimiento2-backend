@@ -41,6 +41,7 @@ export class RepositorioOrdenesEnMemoria implements RepositorioOrdenesTrabajo {
       equipoNombre: orden.equipoId ? `Equipo ${orden.equipoId}` : null,
       equipoCodigo: null,
       abiertaPorNombre: null,
+      asignadoANombre: orden.asignadoAId ? `Usuario ${orden.asignadoAId}` : null,
       cerradaPorNombre: null,
       materiales: [],
     };
@@ -72,6 +73,7 @@ export class RepositorioOrdenesEnMemoria implements RepositorioOrdenesTrabajo {
       if (filtro.estado && o.estado !== filtro.estado) return false;
       if (filtro.tipo && o.tipo !== filtro.tipo) return false;
       if (filtro.equipoId && o.equipoId !== filtro.equipoId) return false;
+      if (filtro.asignadoAId && o.asignadoAId !== filtro.asignadoAId) return false;
       if (filtro.buscar) {
         const texto = `${o.numero} ${o.titulo} ${o.descripcion ?? ''}`.toLowerCase();
         if (!texto.includes(filtro.buscar.toLowerCase())) return false;

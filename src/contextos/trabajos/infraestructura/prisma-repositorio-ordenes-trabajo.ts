@@ -17,6 +17,7 @@ import {
 const RELACIONES = {
   equipo: { select: { nombre: true, codigoInterno: true } },
   abiertaPor: { select: { nombre: true } },
+  asignadoA: { select: { nombre: true } },
   cerradaPor: { select: { nombre: true } },
   materiales: {
     orderBy: { creadoEn: 'asc' },
@@ -59,6 +60,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       equipoId: fila.equipoId,
       abiertaEn: fila.abiertaEn,
       abiertaPorId: fila.abiertaPorId,
+      asignadoAId: fila.asignadoAId,
       resolucion: fila.resolucion,
       cerradaEn: fila.cerradaEn,
       cerradaPorId: fila.cerradaPorId,
@@ -67,6 +69,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       equipoNombre: fila.equipo?.nombre ?? null,
       equipoCodigo: fila.equipo?.codigoInterno ?? null,
       abiertaPorNombre: fila.abiertaPor?.nombre ?? null,
+      asignadoANombre: fila.asignadoA?.nombre ?? null,
       cerradaPorNombre: fila.cerradaPor?.nombre ?? null,
       materiales: fila.materiales.map((m) => this.materialADominio(m)),
     };
@@ -77,6 +80,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       ...(filtro.estado ? { estado: filtro.estado } : {}),
       ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
       ...(filtro.equipoId ? { equipoId: filtro.equipoId } : {}),
+      ...(filtro.asignadoAId ? { asignadoAId: filtro.asignadoAId } : {}),
       ...(filtro.desde || filtro.hasta
         ? {
             abiertaEn: {
@@ -131,6 +135,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
           equipoId: orden.equipoId,
           abiertaEn: orden.abiertaEn,
           abiertaPorId: orden.abiertaPorId,
+          asignadoAId: orden.asignadoAId,
         },
         include: RELACIONES,
       });
@@ -173,6 +178,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
         ...(cambios.tipo === undefined ? {} : { tipo: cambios.tipo }),
         ...(cambios.estado === undefined ? {} : { estado: cambios.estado }),
         ...(cambios.equipoId === undefined ? {} : { equipoId: cambios.equipoId }),
+        ...(cambios.asignadoAId === undefined ? {} : { asignadoAId: cambios.asignadoAId }),
         ...(cambios.resolucion === undefined ? {} : { resolucion: cambios.resolucion }),
         ...(cambios.cerradaEn === undefined ? {} : { cerradaEn: cambios.cerradaEn }),
         ...(cambios.cerradaPorId === undefined ? {} : { cerradaPorId: cambios.cerradaPorId }),

@@ -334,6 +334,7 @@ model Usuario {
   intervencionesCargadas   Intervencion[] @relation("IntervencionRegistro")
 
   trabajosAbiertos    OrdenTrabajo[]         @relation("TrabajosAbiertos")
+  trabajosAsignados   OrdenTrabajo[]         @relation("TrabajosAsignados")
   trabajosCerrados    OrdenTrabajo[]         @relation("TrabajosCerrados")
   materialesDeTrabajo MaterialUsadoTrabajo[] @relation("MaterialesDeTrabajo")
   ordenesCreadas      OrdenCompra[]          @relation("OrdenesCreadas")
@@ -1111,6 +1112,16 @@ model OrdenTrabajo {
   abiertaEn    DateTime @default(now())
   abiertaPorId String?
 
+  /// Quién tiene que hacer el trabajo. Obligatoria, y la base lo exige: la
+  /// tabla estaba vacía cuando se agregó la columna, así que no hay ninguna
+  /// fila vieja que obligue a aflojar la regla.
+  ///
+  /// Una orden sin dueño es una que nadie puede cerrar y que todos suponen que
+  /// va a hacer otro. Solo esta persona puede cargarle materiales y cerrarla;
+  /// los demás la ven. El administrador no trabaja por encima: si hace falta
+  /// destrabarla, la reasigna, y entonces figura como suya.
+  asignadoAId String
+
   /// Qué se hizo finalmente. Obligatoria para cerrar: es lo que va a leer el
   /// que agarre la máquina la próxima vez que falle.
   resolucion   String?
@@ -1123,11 +1134,13 @@ model OrdenTrabajo {
 
   equipo     Equipo?                @relation(fields: [equipoId], references: [id], onDelete: SetNull)
   abiertaPor Usuario?               @relation("TrabajosAbiertos", fields: [abiertaPorId], references: [id])
+  asignadoA  Usuario                @relation("TrabajosAsignados", fields: [asignadoAId], references: [id])
   cerradaPor Usuario?               @relation("TrabajosCerrados", fields: [cerradaPorId], references: [id])
   materiales MaterialUsadoTrabajo[]
 
   @@index([estado])
   @@index([equipoId])
+  @@index([asignadoAId])
   @@index([abiertaEn])
   @@index([tipo])
   @@map("ordenes_trabajo")

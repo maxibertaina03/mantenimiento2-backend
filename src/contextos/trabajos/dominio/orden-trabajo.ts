@@ -1,4 +1,4 @@
-import { ErrorDatosInvalidos, ErrorTransicionInvalida } from './errores';
+import { ErrorDatosInvalidos, ErrorNoEsSuyo, ErrorTransicionInvalida } from './errores';
 
 /**
  * La orden de trabajo: para qué se usó lo que salió del pañol.
@@ -74,6 +74,15 @@ export interface OrdenTrabajo {
   equipoId: string | null;
   abiertaEn: Date;
   abiertaPorId: string | null;
+  /**
+   * Quién tiene que hacer el trabajo. Nunca vacía.
+   *
+   * Es la pieza que convierte una lista de trabajos en un reparto: se sabe de
+   * quién es cada uno, y el que no es tuyo lo ves pero no lo tocas. Que sea
+   * obligatoria no es rigor por el rigor mismo: una orden sin dueño es una que
+   * nadie puede cerrar y que todos suponen que va a hacer otro.
+   */
+  asignadoAId: string;
   /** Qué se hizo finalmente. Obligatoria para cerrar. */
   resolucion: string | null;
   cerradaEn: Date | null;
@@ -88,6 +97,8 @@ export interface DatosNuevaOrdenTrabajo {
   tipo: TipoTrabajo;
   equipoId?: string | null;
   abiertaPorId?: string | null;
+  /** A quién se le asigna. Si no viene, queda para quien la abre. */
+  asignadoAId?: string | null;
 }
 
 /** Deja el texto en una sola línea de espacios simples, o `null` si quedó vacío. */
@@ -114,8 +125,18 @@ export function crearOrdenTrabajo(
     );
   }
 
+  // Si no se eligió a nadie, queda para quien la abre. Es el caso de abrirse
+  // una orden para uno mismo, que no tiene por qué costar un paso de más.
+  const asignadoAId = datos.asignadoAId ?? datos.abiertaPorId ?? null;
+  if (asignadoAId === null) {
+    throw new ErrorDatosInvalidos(
+      'Una orden de trabajo necesita dueño: elegí a quién se le asigna.',
+    );
+  }
+
   return {
     titulo,
+    asignadoAId,
     descripcion: limpiar(datos.descripcion),
     tipo: datos.tipo,
     estado: 'ABIERTA',
@@ -127,6 +148,58 @@ export function crearOrdenTrabajo(
     cerradaPorId: null,
     motivoAnulacion: null,
   };
+}
+
+/**
+ * Si el trabajo es de quien lo está queriendo hacer.
+ *
+ * El candado del módulo. Los demás ven la orden —saber qué está pasando en la
+ * planta es de todos— pero cargarle materiales o cerrarla es solo del que la
+ * tiene asignada. Sin esto, "asignada a" sería una etiqueta decorativa y dos
+ * personas podrían estar cargando repuestos sobre el mismo trabajo sin saberlo.
+ *
+ * El administrador no queda por encima: si necesita destrabar una orden, la
+ * reasigna, y entonces figura como suya. Es a propósito, para que nunca haya
+ * una orden cerrada por alguien que nunca la tuvo a cargo.
+ */
+export function validarQueEsSuyo(orden: OrdenTrabajo, usuarioId: string | null): void {
+  if (usuarioId === null) {
+    throw new ErrorNoEsSuyo(
+      `No se sabe quién sos, así que no se puede saber si la orden ${orden.numero} es tuya.`,
+    );
+  }
+
+  if (orden.asignadoAId !== usuarioId) {
+    throw new ErrorNoEsSuyo(
+      `La orden ${orden.numero} está asignada a otra persona. Podés verla, pero la termina ` +
+        'quien la tiene a cargo. Si tiene que pasar a vos, pedí que te la reasignen.',
+    );
+  }
+}
+
+/**
+ * Los cambios que deja reasignar una orden.
+ *
+ * Existe para que una orden no quede muerta cuando la persona que la tenía no
+ * está: falta, se va de vacaciones o deja la empresa. Una cerrada o anulada ya
+ * no es trabajo pendiente, así que no se reasigna.
+ */
+export function reasignarOrdenTrabajo(
+  orden: OrdenTrabajo,
+  nuevoAsignadoId: string,
+): Pick<OrdenTrabajo, 'asignadoAId'> {
+  if (orden.estado !== 'ABIERTA') {
+    throw new ErrorTransicionInvalida(
+      `Solo se reasigna una orden abierta. La ${orden.numero} está ` +
+        `${ETIQUETA_ESTADO_TRABAJO[orden.estado].toLowerCase()}, ya no es trabajo pendiente.`,
+    );
+  }
+
+  if (nuevoAsignadoId === orden.asignadoAId) {
+    throw new ErrorDatosInvalidos('La orden ya está asignada a esa persona.');
+  }
+
+  return { asignadoAId: nuevoAsignadoId };
 }
 
 /**
