@@ -48,6 +48,17 @@ export class UsuariosService {
     });
   }
 
+  /**
+   * Busca a alguien por su correo. Devuelve el registro entero, no el DTO.
+   *
+   * Lo usa el escape hatch de desarrollo para entrar como una persona real. No
+   * lo expone ningún endpoint: buscar usuarios por mail desde afuera sería una
+   * forma de averiguar quién tiene cuenta.
+   */
+  async buscarPorEmail(email: string): Promise<Usuario | null> {
+    return this.repo.buscarPorEmail(email);
+  }
+
   async crear(dto: CrearUsuarioDto): Promise<UsuarioRespuestaDto> {
     const creado = await this.repo.crear(dto);
     return UsuarioRespuestaDto.desde(creado);

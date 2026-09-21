@@ -20,7 +20,8 @@ import { CLAVE_PUBLICO } from '../decorators/public.decorator';
  *
  * Flujo:
  *  1. Si la ruta es @Public() -> pasa.
- *  2. Si AUTH_DISABLED="true" (solo dev) -> pasa sin verificar (no adjunta usuario).
+ *  2. Si AUTH_DISABLED="true" (solo dev) -> pasa sin verificar. Si además hay
+ *     USUARIO_DEV, entra como esa persona; si no, pasa sin usuario.
  *  3. Verifica el JWT de Clerk del header Authorization: Bearer <token>.
  *  4. Provisiona el Usuario en la DB (just-in-time) y lo adjunta a request.usuario.
  *
@@ -29,6 +30,32 @@ import { CLAVE_PUBLICO } from '../decorators/public.decorator';
 @Injectable()
 export class GuardAutenticacion implements CanActivate {
   private readonly logger = new Logger(GuardAutenticacion.name);
+
+  /**
+   * En desarrollo, entrar como alguien de verdad.
+   *
+   * Sin esto, `AUTH_DISABLED=true` deja pasar todo pero sin adjuntar usuario, y
+   * entonces la mitad del sistema no funciona: los permisos de la pantalla
+   * vienen vacíos, y una orden de trabajo ni siquiera se puede crear porque no
+   * hay a quién asignársela. Se termina probando contra una cáscara.
+   *
+   * Es opcional y por eso no cambia nada para nadie: sin `USUARIO_DEV` se
+   * comporta igual que siempre. Y cuelga del mismo flag que ya existía, que en
+   * producción vale "false" y está fijado en el blueprint de Render.
+   */
+  private async adjuntarUsuarioDeDesarrollo(context: ExecutionContext): Promise<void> {
+    const email = this.config.get<string>('USUARIO_DEV');
+    if (!email) return;
+
+    const usuario = await this.usuarios.buscarPorEmail(email);
+    if (!usuario) {
+      this.logger.warn(`USUARIO_DEV="${email}" no existe: se sigue sin usuario.`);
+      return;
+    }
+
+    const request = context.switchToHttp().getRequest<Request & { usuario?: unknown }>();
+    request.usuario = usuario;
+  }
 
   constructor(
     private readonly reflector: Reflector,
@@ -46,7 +73,10 @@ export class GuardAutenticacion implements CanActivate {
     if (esPublico) return true;
 
     // Escape hatch de desarrollo.
-    if (this.config.get<string>('AUTH_DISABLED') === 'true') return true;
+    if (this.config.get<string>('AUTH_DISABLED') === 'true') {
+      await this.adjuntarUsuarioDeDesarrollo(context);
+      return true;
+    }
 
     const secretKey = this.config.get<string>('CLERK_SECRET_KEY');
     if (!secretKey || !this.clerk) {

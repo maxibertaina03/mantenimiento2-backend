@@ -28,7 +28,14 @@ function contextoCon(headers: Record<string, string> = {}) {
   };
 }
 
-function armar(opciones: { authDisabled?: string; secretKey?: string; publico?: boolean } = {}) {
+function armar(
+  opciones: {
+    authDisabled?: string;
+    secretKey?: string;
+    publico?: boolean;
+    usuarioDev?: string;
+  } = {},
+) {
   const reflector = {
     getAllAndOverride: jest.fn(() => opciones.publico ?? false),
   } as any;
@@ -37,12 +44,16 @@ function armar(opciones: { authDisabled?: string; secretKey?: string; publico?: 
     get: jest.fn((clave: string) => {
       if (clave === 'AUTH_DISABLED') return opciones.authDisabled ?? 'false';
       if (clave === 'CLERK_SECRET_KEY') return opciones.secretKey ?? 'sk_test_xxx';
+      if (clave === 'USUARIO_DEV') return opciones.usuarioDev;
       return undefined;
     }),
   } as any;
 
   const usuarios = {
     buscarOCrearPorClerk: jest.fn(async () => usuario),
+    buscarPorEmail: jest.fn(async (email: string) =>
+      email === 'admin@empresa.com' ? usuario : null,
+    ),
   } as any;
 
   const clerk = {
@@ -79,6 +90,40 @@ describe('GuardAutenticacion', () => {
     const { guard } = armar({ authDisabled: 'true' });
     const { ctx } = contextoCon();
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
+  });
+
+  it('con USUARIO_DEV entra como esa persona, para poder probar de verdad', async () => {
+    // Sin esto, AUTH_DISABLED deja pasar pero sin usuario, y entonces los
+    // permisos de la pantalla vienen vacios y media funcionalidad no anda.
+    const { guard } = armar({ authDisabled: 'true', usuarioDev: 'admin@empresa.com' });
+    const { ctx, request } = contextoCon();
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.usuario).toBe(usuario);
+  });
+
+  it('sin USUARIO_DEV se comporta como siempre: pasa sin usuario', async () => {
+    const { guard } = armar({ authDisabled: 'true' });
+    const { ctx, request } = contextoCon();
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.usuario).toBeUndefined();
+  });
+
+  it('REGRESION: USUARIO_DEV no hace nada si AUTH_DISABLED no esta prendido', async () => {
+    // Es lo que garantiza que en produccion la variable sea inofensiva.
+    const { guard } = armar({ authDisabled: 'false', usuarioDev: 'admin@empresa.com' });
+    const { ctx } = contextoCon();
+
+    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('un USUARIO_DEV que no existe no rompe: sigue sin usuario', async () => {
+    const { guard } = armar({ authDisabled: 'true', usuarioDev: 'fantasma@empresa.com' });
+    const { ctx, request } = contextoCon();
+
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(request.usuario).toBeUndefined();
   });
 
   it('AUTH_DISABLED solo acepta el string "true" exacto (falla cerrado)', async () => {
