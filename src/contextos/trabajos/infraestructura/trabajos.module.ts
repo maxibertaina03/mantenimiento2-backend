@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../../../common/auth/auth.module';
 import { MovimientosStockModule } from '../../../modules/movimientos-stock/movimientos-stock.module';
 import { CONSULTA_EQUIPOS } from '../puertos/consulta-equipos';
 import { RELOJ_TRABAJOS, RelojDelSistema } from '../puertos/reloj';
@@ -17,12 +18,17 @@ import { StockPorMovimientos } from './stock-por-movimientos';
  * dominio y los casos de uso solo conocen las interfaces, y por eso se prueban
  * con las implementaciones en memoria sin cambiar una línea.
  *
- * Importa el módulo de movimientos porque el pañol de verdad vive ahí. Es la
- * única dependencia hacia afuera, y pasa por el service del otro módulo, no por
- * su base: las reglas de stock siguen siendo suyas.
+ * Importa el módulo de movimientos porque el pañol de verdad vive ahí. Pasa por
+ * el service del otro módulo, no por su base: las reglas de stock siguen siendo
+ * suyas.
+ *
+ * Y el de auth porque el controlador pregunta si quien carga puede ver equipos,
+ * para decidir si lo deja atar la orden a una máquina. `AuthModule` no es
+ * global: sus guards sí lo son, pero `PermisosService` solo lo ve quien lo
+ * importa. Olvidarlo no rompe la compilación, rompe el arranque.
  */
 @Module({
-  imports: [MovimientosStockModule],
+  imports: [MovimientosStockModule, AuthModule],
   controllers: [OrdenesTrabajoController],
   providers: [
     { provide: REPOSITORIO_ORDENES_TRABAJO, useClass: PrismaRepositorioOrdenesTrabajo },
