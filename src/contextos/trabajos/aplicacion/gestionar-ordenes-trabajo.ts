@@ -2,6 +2,7 @@ import { ErrorDatosInvalidos, ErrorNoEncontrado } from '../dominio/errores';
 import {
   anularOrdenTrabajo,
   cerrarOrdenTrabajo,
+  CierreDeTrabajo,
   crearOrdenTrabajo,
   DatosNuevaOrdenTrabajo,
   OrdenTrabajo,
@@ -13,6 +14,7 @@ import {
 } from '../dominio/orden-trabajo';
 import { ConsultaEquipos } from '../puertos/consulta-equipos';
 import { ConsultaUsuarios } from '../puertos/consulta-usuarios';
+import { PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import {
   OrdenTrabajoConRelaciones,
   RepositorioOrdenesTrabajo,
@@ -39,6 +41,7 @@ export class GestionarOrdenesTrabajo {
     private readonly repo: RepositorioOrdenesTrabajo,
     private readonly equipos: ConsultaEquipos,
     private readonly usuarios: ConsultaUsuarios,
+    private readonly planes: PlanesDeMantenimiento,
     private readonly reloj: Reloj,
   ) {}
 
@@ -79,12 +82,46 @@ export class GestionarOrdenesTrabajo {
     }
   }
 
+  /**
+   * Comprueba que el plan exista y sea de ese equipo.
+   *
+   * Lo segundo importa tanto como lo primero: un plan de otra máquina que se
+   * adelanta porque se arregló esta deja las dos con la fecha mal, y nadie se
+   * entera hasta que una falla.
+   */
+  private async validarPlan(
+    planId: string | null | undefined,
+    equipoId: string | null,
+  ): Promise<void> {
+    if (!planId) return;
+    if (!equipoId) {
+      throw new ErrorDatosInvalidos(
+        'Un trabajo no puede responder a un plan de mantenimiento si no dice sobre qué equipo es.',
+      );
+    }
+    if (!(await this.planes.esDelEquipo(planId, equipoId))) {
+      throw new ErrorNoEncontrado('Ese plan de mantenimiento no es de ese equipo.');
+    }
+  }
+
   async crear(datos: DatosNuevaOrdenTrabajo): Promise<OrdenTrabajoConRelaciones> {
     await this.validarEquipo(datos.equipoId);
+    await this.validarPlan(datos.planId, datos.equipoId ?? null);
     // El dominio decide a quién queda: al elegido, o a quien la abre.
     const orden = crearOrdenTrabajo(datos, this.reloj.ahora());
     await this.validarAsignado(orden.asignadoAId);
-    return this.repo.crear(orden);
+
+    const guardada = await this.repo.crear(orden);
+
+    // Si nace cerrada —el trabajo ya estaba hecho— el plan corre ahora. Va
+    // DESPUÉS de guardar: al revés, un fallo al guardar dejaría el plan corrido
+    // sin el trabajo que lo justifica, y el equipo pasaría meses sin service
+    // creyendo que está al día.
+    if (guardada.estado === 'CERRADA' && guardada.planId) {
+      await this.planes.registrarTrabajo(guardada.planId, guardada.fecha);
+    }
+
+    return guardada;
   }
 
   /**
@@ -144,13 +181,21 @@ export class GestionarOrdenesTrabajo {
     id: string,
     resolucion: string,
     usuarioId: string | null,
+    cierre: CierreDeTrabajo = {},
   ): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.traer(id);
     validarQueEsSuyo(orden, usuarioId);
-    return this.repo.actualizar(
+
+    const cerrada = await this.repo.actualizar(
       id,
-      cerrarOrdenTrabajo(orden, resolucion, this.reloj.ahora(), usuarioId),
+      cerrarOrdenTrabajo(orden, resolucion, this.reloj.ahora(), usuarioId, cierre),
     );
+
+    // Cerrar el trabajo es lo que corre el plan, y se cuenta desde la fecha
+    // real del trabajo, no desde la que estaba planificada.
+    if (cerrada.planId) await this.planes.registrarTrabajo(cerrada.planId, cerrada.fecha);
+
+    return cerrada;
   }
 
   async reabrir(id: string, usuarioId: string | null): Promise<OrdenTrabajoConRelaciones> {

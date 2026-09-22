@@ -44,6 +44,21 @@ export const ETIQUETA_TIPO_TRABAJO: Record<TipoTrabajo, string> = {
 };
 
 /**
+ * Quién hizo el trabajo: la planta o un tercero.
+ *
+ * Con el discriminador y las dos relaciones se puede preguntar "cuánto
+ * gastamos con este proveedor el año pasado". Con un texto libre esa pregunta
+ * no se podría hacer.
+ */
+export const EJECUTORES = ['INTERNO', 'EXTERNO'] as const;
+export type Ejecutor = (typeof EJECUTORES)[number];
+
+export const ETIQUETA_EJECUTOR: Record<Ejecutor, string> = {
+  INTERNO: 'En fábrica',
+  EXTERNO: 'Servicio externo',
+};
+
+/**
  * Un material que se usó en el trabajo.
  *
  * `movimientoId` es el corazón de la trazabilidad: cargar un material acá no
@@ -72,6 +87,33 @@ export interface OrdenTrabajo {
   estado: EstadoOrdenTrabajo;
   /** Sobre qué máquina, cuando se sabe y quien carga puede verlas. */
   equipoId: string | null;
+  /**
+   * Cuándo se hizo el trabajo.
+   *
+   * Separada de `abiertaEn` porque no son lo mismo: una orden puede abrirse hoy
+   * para registrar algo que se hizo la semana pasada. Es la fecha por la que se
+   * ordena el historial de la máquina, y la que cuenta para adelantar un plan.
+   */
+  fecha: Date;
+  /** Quién lo hizo: la planta o un tercero. */
+  ejecutor: Ejecutor;
+  /** Qué proveedor, si fue externo. */
+  proveedorId: string | null;
+  /**
+   * Cuánto cobró la mano de obra. Solo lo que se sabe: no se pone en cero lo
+   * que falta, porque un total que mezcla "gratis" con "no lo sabemos" es un
+   * número que miente, y con ese número se decide reparar o reemplazar.
+   */
+  costoManoObra: number | null;
+  /**
+   * Cuántas horas estuvo parada la máquina.
+   *
+   * El costo de una rotura no son los repuestos, es la producción que no salió.
+   * Sin este dato los números cuentan media historia.
+   */
+  horasParada: number | null;
+  /** El plan al que responde. Cerrarla adelanta su próxima fecha. */
+  planId: string | null;
   abiertaEn: Date;
   abiertaPorId: string | null;
   /**
@@ -99,7 +141,27 @@ export interface DatosNuevaOrdenTrabajo {
   abiertaPorId?: string | null;
   /** A quién se le asigna. Si no viene, queda para quien la abre. */
   asignadoAId?: string | null;
+
+  /** Cuándo se hizo. Si no viene, ahora. */
+  fecha?: Date | null;
+  ejecutor?: Ejecutor;
+  proveedorId?: string | null;
+  costoManoObra?: number | null;
+  horasParada?: number | null;
+  planId?: string | null;
+
+  /**
+   * El trabajo ya está terminado: la orden nace cerrada, con esta resolución.
+   *
+   * Es el camino desde la ficha de una máquina, donde casi siempre se anota
+   * algo que ya pasó. Obligar a abrir y después cerrar serían dos pasos para
+   * registrar un hecho consumado, y eso termina en que no se registra.
+   */
+  resolucion?: string | null;
 }
+
+/** Margen de tolerancia para la fecha, por diferencias de reloj y de huso. */
+const MARGEN_FUTURO_MS = 24 * 60 * 60 * 1000;
 
 /** Deja el texto en una sola línea de espacios simples, o `null` si quedó vacío. */
 function limpiar(texto: string | null | undefined): string | null {
@@ -134,20 +196,66 @@ export function crearOrdenTrabajo(
     );
   }
 
+  const fecha = datos.fecha ?? ahora;
+  if (fecha.getTime() > ahora.getTime() + MARGEN_FUTURO_MS) {
+    throw new ErrorDatosInvalidos(
+      'La fecha del trabajo no puede ser futura: acá se registra lo que se hizo, no lo que está ' +
+        'planificado. Para eso están los planes de mantenimiento.',
+    );
+  }
+
+  const ejecutor = datos.ejecutor ?? 'INTERNO';
+  validarEjecutor(ejecutor, datos.proveedorId);
+  validarCosto('El costo de mano de obra', datos.costoManoObra);
+  validarCosto('Las horas de parada', datos.horasParada);
+
+  // El trabajo ya terminado nace cerrado. Es el camino desde la ficha de una
+  // máquina, donde lo que se anota casi siempre ya pasó.
+  const resolucion = limpiar(datos.resolucion);
+  const yaHecha = datos.resolucion !== undefined && datos.resolucion !== null;
+  if (yaHecha && resolucion === null) {
+    throw new ErrorDatosInvalidos(
+      'Contá qué se hizo. Es lo que va a leer el que agarre la máquina la próxima vez que falle.',
+    );
+  }
+
   return {
     titulo,
     asignadoAId,
     descripcion: limpiar(datos.descripcion),
     tipo: datos.tipo,
-    estado: 'ABIERTA',
+    estado: yaHecha ? 'CERRADA' : 'ABIERTA',
     equipoId: datos.equipoId ?? null,
+    fecha,
+    ejecutor,
+    // Se guarda solo el que corresponde: dejar los dos permitiría una orden que
+    // dice haberse hecho en fábrica y apunta a un proveedor.
+    proveedorId: ejecutor === 'EXTERNO' ? (datos.proveedorId ?? null) : null,
+    costoManoObra: datos.costoManoObra ?? null,
+    horasParada: datos.horasParada ?? null,
+    planId: datos.planId ?? null,
     abiertaEn: ahora,
     abiertaPorId: datos.abiertaPorId ?? null,
-    resolucion: null,
-    cerradaEn: null,
-    cerradaPorId: null,
+    resolucion,
+    cerradaEn: yaHecha ? ahora : null,
+    cerradaPorId: yaHecha ? asignadoAId : null,
     motivoAnulacion: null,
   };
+}
+
+/** Interno lleva quien lo hizo; externo lleva qué proveedor. Nunca los dos. */
+export function validarEjecutor(ejecutor: Ejecutor, proveedorId: string | null | undefined): void {
+  if (ejecutor === 'EXTERNO' && !proveedorId) {
+    throw new ErrorDatosInvalidos('Si el trabajo lo hizo un tercero, indicá qué proveedor.');
+  }
+}
+
+/** Un costo o unas horas negativas no son un dato incompleto, son un error. */
+export function validarCosto(etiqueta: string, valor: number | null | undefined): void {
+  if (valor === undefined || valor === null) return;
+  if (!Number.isFinite(valor) || valor < 0) {
+    throw new ErrorDatosInvalidos(`${etiqueta} no puede ser negativo.`);
+  }
 }
 
 /**
@@ -225,13 +333,37 @@ export function validarCantidadUsada(cantidad: number): void {
   }
 }
 
+/**
+ * Lo que se puede cargar recién al cerrar.
+ *
+ * El costo y las horas de parada no se saben cuando el trabajo arranca: se
+ * saben cuando terminó. Por eso van acá y no en el alta.
+ */
+export interface CierreDeTrabajo {
+  ejecutor?: Ejecutor;
+  proveedorId?: string | null;
+  costoManoObra?: number | null;
+  horasParada?: number | null;
+}
+
 /** Los cambios que deja cerrar una orden. */
 export function cerrarOrdenTrabajo(
   orden: OrdenTrabajo,
   resolucion: string,
   ahora: Date,
   cerradaPorId: string | null,
-): Pick<OrdenTrabajo, 'estado' | 'resolucion' | 'cerradaEn' | 'cerradaPorId'> {
+  cierre: CierreDeTrabajo = {},
+): Pick<
+  OrdenTrabajo,
+  | 'estado'
+  | 'resolucion'
+  | 'cerradaEn'
+  | 'cerradaPorId'
+  | 'ejecutor'
+  | 'proveedorId'
+  | 'costoManoObra'
+  | 'horasParada'
+> {
   if (orden.estado !== 'ABIERTA') {
     throw new ErrorTransicionInvalida(
       `La orden ${orden.numero} ya está ${ETIQUETA_ESTADO_TRABAJO[orden.estado].toLowerCase()}.`,
@@ -249,7 +381,21 @@ export function cerrarOrdenTrabajo(
     );
   }
 
-  return { estado: 'CERRADA', resolucion: texto, cerradaEn: ahora, cerradaPorId };
+  const ejecutor = cierre.ejecutor ?? orden.ejecutor;
+  validarEjecutor(ejecutor, cierre.proveedorId ?? orden.proveedorId);
+  validarCosto('El costo de mano de obra', cierre.costoManoObra);
+  validarCosto('Las horas de parada', cierre.horasParada);
+
+  return {
+    estado: 'CERRADA',
+    resolucion: texto,
+    cerradaEn: ahora,
+    cerradaPorId,
+    ejecutor,
+    proveedorId: ejecutor === 'EXTERNO' ? (cierre.proveedorId ?? orden.proveedorId) : null,
+    costoManoObra: cierre.costoManoObra ?? orden.costoManoObra,
+    horasParada: cierre.horasParada ?? orden.horasParada,
+  };
 }
 
 /**

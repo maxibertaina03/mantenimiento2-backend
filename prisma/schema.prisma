@@ -119,6 +119,7 @@ model Proveedor {
   ordenes        OrdenCompra[]
   equipos        Equipo[]
   intervenciones Intervencion[]
+  trabajos       OrdenTrabajo[]
 
   @@map("proveedores")
 }
@@ -921,6 +922,7 @@ model PlanMantenimiento {
   equipo         Equipo         @relation(fields: [equipoId], references: [id], onDelete: Cascade)
   intervenciones Intervencion[]
   avisos         AvisoEnviado[]
+  trabajos       OrdenTrabajo[]
 
   @@index([equipoId])
   @@index([proximaFecha])
@@ -1109,6 +1111,31 @@ model OrdenTrabajo {
   /// que uno ausente: el ausente se ve, el inventado ensucia ese historial.
   equipoId String?
 
+  /// Cuándo se hizo el trabajo. Separada de `abiertaEn` porque no son lo mismo:
+  /// una orden puede abrirse hoy para registrar algo de la semana pasada. Es la
+  /// fecha por la que se ordena el historial de la máquina.
+  fecha DateTime @default(now())
+
+  /// INTERNO | EXTERNO. Con el discriminador y las dos relaciones se puede
+  /// preguntar cuánto se gastó con un proveedor; con un texto libre, no.
+  ejecutor String @default("INTERNO")
+
+  /// Qué proveedor, si el trabajo lo hizo un tercero.
+  proveedorId String?
+
+  /// Solo lo que se sabe. No se pone en cero lo que falta: un total que mezcla
+  /// "gratis" con "no lo sabemos" es un número que miente, y con ese número se
+  /// decide reparar o reemplazar.
+  costoManoObra Decimal? @db.Decimal(14, 2)
+
+  /// El costo de una rotura no son los repuestos, es la producción que no
+  /// salió. Sin este dato los números cuentan media historia.
+  horasParada Decimal? @db.Decimal(8, 2)
+
+  /// El plan de mantenimiento al que responde. Cerrar la orden adelanta su
+  /// próxima fecha, contada desde el trabajo real y no desde la planificada.
+  planId String?
+
   abiertaEn    DateTime @default(now())
   abiertaPorId String?
 
@@ -1133,6 +1160,8 @@ model OrdenTrabajo {
   creadoEn DateTime @default(now())
 
   equipo     Equipo?                @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  proveedor  Proveedor?             @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  plan       PlanMantenimiento?     @relation(fields: [planId], references: [id], onDelete: SetNull)
   abiertaPor Usuario?               @relation("TrabajosAbiertos", fields: [abiertaPorId], references: [id])
   asignadoA  Usuario                @relation("TrabajosAsignados", fields: [asignadoAId], references: [id])
   cerradaPor Usuario?               @relation("TrabajosCerrados", fields: [cerradaPorId], references: [id])
@@ -1141,6 +1170,9 @@ model OrdenTrabajo {
   @@index([estado])
   @@index([equipoId])
   @@index([asignadoAId])
+  @@index([proveedorId])
+  @@index([planId])
+  @@index([fecha])
   @@index([abiertaEn])
   @@index([tipo])
   @@map("ordenes_trabajo")

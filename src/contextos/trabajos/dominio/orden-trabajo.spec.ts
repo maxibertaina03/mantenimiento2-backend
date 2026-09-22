@@ -24,6 +24,12 @@ const orden = (cambios: Partial<OrdenTrabajo> = {}): OrdenTrabajo => ({
   tipo: 'CORRECTIVO',
   estado: 'ABIERTA',
   equipoId: null,
+  fecha: AHORA,
+  ejecutor: 'INTERNO',
+  proveedorId: null,
+  costoManoObra: null,
+  horasParada: null,
+  planId: null,
   abiertaEn: AHORA,
   abiertaPorId: 'u1',
   asignadoAId: 'u1',
@@ -135,12 +141,42 @@ describe('cerrarOrdenTrabajo', () => {
   it('cerrada guarda la resolucion, la fecha y quien cerro', () => {
     const cambios = cerrarOrdenTrabajo(orden(), 'Se cambio el reten y la junta', AHORA, 'u9');
 
-    expect(cambios).toEqual({
+    expect(cambios).toMatchObject({
       estado: 'CERRADA',
       resolucion: 'Se cambio el reten y la junta',
       cerradaEn: AHORA,
       cerradaPorId: 'u9',
     });
+  });
+
+  it('el costo y las horas se cargan al cerrar, que es cuando se saben', () => {
+    // Cuando el trabajo arranca nadie sabe cuanto va a costar ni cuanto va a
+    // estar parada la maquina.
+    const cambios = cerrarOrdenTrabajo(orden(), 'Vino el service', AHORA, 'u1', {
+      ejecutor: 'EXTERNO',
+      proveedorId: 'prov-1',
+      costoManoObra: 45000,
+      horasParada: 3.5,
+    });
+
+    expect(cambios.ejecutor).toBe('EXTERNO');
+    expect(cambios.proveedorId).toBe('prov-1');
+    expect(cambios.costoManoObra).toBe(45000);
+    expect(cambios.horasParada).toBe(3.5);
+  });
+
+  it('REGRESION: cerrar como externo sin proveedor se rechaza', () => {
+    expect(() =>
+      cerrarOrdenTrabajo(orden(), 'Vino alguien', AHORA, 'u1', { ejecutor: 'EXTERNO' }),
+    ).toThrow(ErrorDatosInvalidos);
+  });
+
+  it('cerrar sin tocar el costo conserva el que ya tenia', () => {
+    const conCosto = orden({ costoManoObra: 1000, horasParada: 2 });
+    const cambios = cerrarOrdenTrabajo(conCosto, 'Listo', AHORA, 'u1');
+
+    expect(cambios.costoManoObra).toBe(1000);
+    expect(cambios.horasParada).toBe(2);
   });
 
   it('una orden ya cerrada no se vuelve a cerrar', () => {
@@ -291,5 +327,106 @@ describe('reasignarOrdenTrabajo', () => {
     expect(() => reasignarOrdenTrabajo(orden({ asignadoAId: 'u1' }), 'u1')).toThrow(
       ErrorDatosInvalidos,
     );
+  });
+});
+
+describe('registrar un trabajo que ya se hizo', () => {
+  const YA_HECHO = {
+    titulo: 'Cambio de reten',
+    tipo: 'CORRECTIVO',
+    abiertaPorId: 'u1',
+    resolucion: 'Se cambio el reten y la junta',
+  } as const;
+
+  it('la orden nace cerrada, en un solo paso', () => {
+    // Es el camino desde la ficha de una maquina, donde lo que se anota casi
+    // siempre ya paso. Dos pasos para un hecho consumado terminan en que no se
+    // anota nada.
+    const nueva = crearOrdenTrabajo(YA_HECHO, AHORA);
+
+    expect(nueva.estado).toBe('CERRADA');
+    expect(nueva.resolucion).toBe('Se cambio el reten y la junta');
+    expect(nueva.cerradaEn).toEqual(AHORA);
+  });
+
+  it('sin resolucion nace abierta, como siempre', () => {
+    const nueva = crearOrdenTrabajo(
+      { titulo: 'Reviso', tipo: 'MEJORA', abiertaPorId: 'u1' },
+      AHORA,
+    );
+    expect(nueva.estado).toBe('ABIERTA');
+  });
+
+  it('REGRESION: una resolucion vacia no cierra nada, avisa', () => {
+    expect(() => crearOrdenTrabajo({ ...YA_HECHO, resolucion: '   ' }, AHORA)).toThrow(
+      ErrorDatosInvalidos,
+    );
+  });
+
+  it('se puede registrar con fecha de la semana pasada', () => {
+    const laSemanaPasada = new Date('2026-09-14T09:00:00.000Z');
+    const nueva = crearOrdenTrabajo({ ...YA_HECHO, fecha: laSemanaPasada }, AHORA);
+
+    expect(nueva.fecha).toEqual(laSemanaPasada);
+    // Abierta hoy, hecha la semana pasada: no son lo mismo y por eso son dos
+    // campos.
+    expect(nueva.abiertaEn).toEqual(AHORA);
+  });
+
+  it('REGRESION: la fecha no puede ser futura', () => {
+    // Aca se registra lo que se hizo. Lo que va a pasar son los planes.
+    const elMesQueViene = new Date('2026-10-21T10:00:00.000Z');
+    expect(() => crearOrdenTrabajo({ ...YA_HECHO, fecha: elMesQueViene }, AHORA)).toThrow(
+      ErrorDatosInvalidos,
+    );
+  });
+
+  it('sin fecha, es ahora', () => {
+    expect(crearOrdenTrabajo(YA_HECHO, AHORA).fecha).toEqual(AHORA);
+  });
+});
+
+describe('quien hizo el trabajo', () => {
+  const BASE = { titulo: 'Service de caldera', tipo: 'PREVENTIVO', abiertaPorId: 'u1' } as const;
+
+  it('por defecto lo hizo la fabrica', () => {
+    const nueva = crearOrdenTrabajo(BASE, AHORA);
+    expect(nueva.ejecutor).toBe('INTERNO');
+    expect(nueva.proveedorId).toBeNull();
+  });
+
+  it('un service externo guarda que proveedor vino', () => {
+    const nueva = crearOrdenTrabajo({ ...BASE, ejecutor: 'EXTERNO', proveedorId: 'prov-1' }, AHORA);
+    expect(nueva.proveedorId).toBe('prov-1');
+  });
+
+  it('REGRESION: externo sin proveedor se rechaza', () => {
+    // Sin esto no se podria contestar cuanto se gasto con cada proveedor, que
+    // es la razon de guardar quien lo hizo en vez de un texto libre.
+    expect(() => crearOrdenTrabajo({ ...BASE, ejecutor: 'EXTERNO' }, AHORA)).toThrow(
+      ErrorDatosInvalidos,
+    );
+  });
+
+  it('REGRESION: interno no se queda con un proveedor colgado', () => {
+    // Dejar los dos permitiria una orden que dice haberse hecho en fabrica y
+    // apunta a un tercero.
+    const nueva = crearOrdenTrabajo({ ...BASE, ejecutor: 'INTERNO', proveedorId: 'prov-1' }, AHORA);
+    expect(nueva.proveedorId).toBeNull();
+  });
+
+  it.each([
+    ['costoManoObra', { costoManoObra: -1 }],
+    ['horasParada', { horasParada: -2 }],
+  ])('rechaza %s negativo', (_campo, extra) => {
+    expect(() => crearOrdenTrabajo({ ...BASE, ...extra }, AHORA)).toThrow(ErrorDatosInvalidos);
+  });
+
+  it('el costo y las horas quedan en null cuando no se saben', () => {
+    // No se ponen en cero: un total que mezcla "gratis" con "no lo sabemos" es
+    // un numero que miente, y con ese numero se decide reparar o reemplazar.
+    const nueva = crearOrdenTrabajo(BASE, AHORA);
+    expect(nueva.costoManoObra).toBeNull();
+    expect(nueva.horasParada).toBeNull();
   });
 });

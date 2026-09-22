@@ -170,7 +170,8 @@ export class CredencialesService {
       notas: dto.notas !== undefined ? dto.notas.trim() || null : undefined,
       // `undefined` es "no lo toques"; `null` es "desatala". Los dos casos
       // tienen que poder expresarse, y son distintos.
-      equipoItId: dto.equipoItId === undefined ? undefined : await this.equipoValido(dto.equipoItId),
+      equipoItId:
+        dto.equipoItId === undefined ? undefined : await this.equipoValido(dto.equipoItId),
       rotarCadaDias,
       activo: dto.activo,
       ...(rotarCadaDias !== undefined

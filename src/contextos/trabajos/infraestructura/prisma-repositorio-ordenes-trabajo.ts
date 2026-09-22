@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import {
+  Ejecutor,
   EstadoOrdenTrabajo,
   MaterialUsado,
   OrdenTrabajo,
@@ -16,6 +17,8 @@ import {
 
 const RELACIONES = {
   equipo: { select: { nombre: true, codigoInterno: true } },
+  proveedor: { select: { nombre: true } },
+  plan: { select: { nombre: true } },
   abiertaPor: { select: { nombre: true } },
   asignadoA: { select: { nombre: true } },
   cerradaPor: { select: { nombre: true } },
@@ -26,6 +29,11 @@ const RELACIONES = {
 } as const;
 
 type Fila = Prisma.OrdenTrabajoGetPayload<{ include: typeof RELACIONES }>;
+
+/** `null` se guarda como null; un número, con los decimales que corresponden. */
+function aDecimal(valor: number | null, decimales: number): Prisma.Decimal | null {
+  return valor === null ? null : new Prisma.Decimal(valor.toFixed(decimales));
+}
 type FilaMaterial = Fila['materiales'][number];
 
 /** El único archivo de este contexto que sabe que existe Prisma. */
@@ -58,6 +66,13 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       tipo: fila.tipo as TipoTrabajo,
       estado: fila.estado as EstadoOrdenTrabajo,
       equipoId: fila.equipoId,
+      fecha: fila.fecha,
+      ejecutor: fila.ejecutor as Ejecutor,
+      proveedorId: fila.proveedorId,
+      // Decimal en Postgres, number en el dominio.
+      costoManoObra: fila.costoManoObra === null ? null : fila.costoManoObra.toNumber(),
+      horasParada: fila.horasParada === null ? null : fila.horasParada.toNumber(),
+      planId: fila.planId,
       abiertaEn: fila.abiertaEn,
       abiertaPorId: fila.abiertaPorId,
       asignadoAId: fila.asignadoAId,
@@ -68,6 +83,8 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       creadoEn: fila.creadoEn,
       equipoNombre: fila.equipo?.nombre ?? null,
       equipoCodigo: fila.equipo?.codigoInterno ?? null,
+      proveedorNombre: fila.proveedor?.nombre ?? null,
+      planNombre: fila.plan?.nombre ?? null,
       abiertaPorNombre: fila.abiertaPor?.nombre ?? null,
       asignadoANombre: fila.asignadoA?.nombre ?? null,
       cerradaPorNombre: fila.cerradaPor?.nombre ?? null,
@@ -133,6 +150,12 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
           tipo: orden.tipo,
           estado: orden.estado,
           equipoId: orden.equipoId,
+          fecha: orden.fecha,
+          ejecutor: orden.ejecutor,
+          proveedorId: orden.proveedorId,
+          costoManoObra: aDecimal(orden.costoManoObra, 2),
+          horasParada: aDecimal(orden.horasParada, 2),
+          planId: orden.planId,
           abiertaEn: orden.abiertaEn,
           abiertaPorId: orden.abiertaPorId,
           asignadoAId: orden.asignadoAId,
@@ -179,6 +202,16 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
         ...(cambios.estado === undefined ? {} : { estado: cambios.estado }),
         ...(cambios.equipoId === undefined ? {} : { equipoId: cambios.equipoId }),
         ...(cambios.asignadoAId === undefined ? {} : { asignadoAId: cambios.asignadoAId }),
+        ...(cambios.ejecutor === undefined ? {} : { ejecutor: cambios.ejecutor }),
+        ...(cambios.proveedorId === undefined ? {} : { proveedorId: cambios.proveedorId }),
+        ...(cambios.costoManoObra === undefined
+          ? {}
+          : { costoManoObra: aDecimal(cambios.costoManoObra, 2) }),
+        ...(cambios.horasParada === undefined
+          ? {}
+          : { horasParada: aDecimal(cambios.horasParada, 2) }),
+        ...(cambios.planId === undefined ? {} : { planId: cambios.planId }),
+        ...(cambios.fecha === undefined ? {} : { fecha: cambios.fecha }),
         ...(cambios.resolucion === undefined ? {} : { resolucion: cambios.resolucion }),
         ...(cambios.cerradaEn === undefined ? {} : { cerradaEn: cambios.cerradaEn }),
         ...(cambios.cerradaPorId === undefined ? {} : { cerradaPorId: cambios.cerradaPorId }),

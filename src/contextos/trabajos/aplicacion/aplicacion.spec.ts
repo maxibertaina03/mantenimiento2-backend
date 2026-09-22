@@ -7,6 +7,8 @@ import {
 import { Reloj } from '../puertos/reloj';
 import { ConsultaEquiposEnMemoria } from './consulta-equipos-en-memoria';
 import { ConsultaUsuariosEnMemoria } from './consulta-usuarios-en-memoria';
+import { PlanesEnMemoria } from './planes-en-memoria';
+import { RegistrarTrabajoHecho } from './registrar-trabajo-hecho';
 import { ConsultarOrdenesTrabajo } from './consultar-ordenes-trabajo';
 import { GestionarOrdenesTrabajo } from './gestionar-ordenes-trabajo';
 import { RepositorioOrdenesEnMemoria } from './repositorio-en-memoria';
@@ -29,12 +31,19 @@ function armar() {
     { id: 'admin', nombre: 'Administracion', puedeTrabajar: false },
   ]);
 
+  const planes = new PlanesEnMemoria([{ id: 'plan-1', equipoId: 'eq-7' }]);
+
   return {
     repo,
     stock,
-    gestionar: new GestionarOrdenesTrabajo(repo, equipos, usuarios, reloj),
+    planes,
+    gestionar: new GestionarOrdenesTrabajo(repo, equipos, usuarios, planes, reloj),
     materiales: new UsarMateriales(repo, stock),
     consultar: new ConsultarOrdenesTrabajo(repo),
+    registrarHecho: new RegistrarTrabajoHecho(
+      new GestionarOrdenesTrabajo(repo, equipos, usuarios, planes, reloj),
+      new UsarMateriales(repo, stock),
+    ),
   };
 }
 
@@ -345,6 +354,68 @@ describe('el trabajo es de quien lo tiene asignado', () => {
   });
 });
 
+describe('el plan de mantenimiento corre con el trabajo', () => {
+  const CON_PLAN = {
+    titulo: 'Service de los 90 dias',
+    tipo: 'PREVENTIVO',
+    abiertaPorId: 'u1',
+    equipoId: 'eq-7',
+    planId: 'plan-1',
+  } as const;
+
+  it('registrar un trabajo ya hecho adelanta el plan en el acto', async () => {
+    const { gestionar, planes } = armar();
+
+    const orden = await gestionar.crear({ ...CON_PLAN, resolucion: 'Se cambio el aceite' });
+
+    expect(orden.estado).toBe('CERRADA');
+    expect(planes.avisos).toEqual([{ planId: 'plan-1', fecha: orden.fecha }]);
+  });
+
+  it('REGRESION: una orden abierta todavia no adelanta nada', async () => {
+    // El plan corre cuando el trabajo se hizo, no cuando se penso hacerlo. Si
+    // corriera al abrir, una orden que queda a medias dejaria la maquina meses
+    // sin service creyendo que esta al dia.
+    const { gestionar, planes } = armar();
+
+    await gestionar.crear(CON_PLAN);
+
+    expect(planes.avisos).toHaveLength(0);
+  });
+
+  it('al cerrarla, el plan corre desde la fecha del trabajo', async () => {
+    const { gestionar, planes } = armar();
+    const orden = await gestionar.crear(CON_PLAN);
+
+    await gestionar.cerrar(orden.id, 'Se cambio el aceite', 'u1');
+
+    expect(planes.avisos).toEqual([{ planId: 'plan-1', fecha: orden.fecha }]);
+  });
+
+  it('REGRESION: no se acepta un plan de otra maquina', async () => {
+    // Adelantaria la fecha de una maquina porque se arreglo otra, y las dos
+    // quedarian mal sin que nadie se entere hasta que una falle.
+    const { gestionar } = armar();
+
+    await expect(
+      gestionar.crear({ ...CON_PLAN, equipoId: null, planId: 'plan-1' }),
+    ).rejects.toThrow(ErrorDatosInvalidos);
+  });
+
+  it('REGRESION: no se acepta un plan que no existe', async () => {
+    const { gestionar } = armar();
+    await expect(gestionar.crear({ ...CON_PLAN, planId: 'plan-fantasma' })).rejects.toThrow(
+      ErrorNoEncontrado,
+    );
+  });
+
+  it('un trabajo sin plan no le avisa a nadie', async () => {
+    const { gestionar, planes } = armar();
+    await gestionar.crear({ ...NUEVA, resolucion: 'Listo' });
+    expect(planes.avisos).toHaveLength(0);
+  });
+});
+
 describe('consultar', () => {
   it('filtra por estado', async () => {
     const { gestionar, consultar } = armar();
@@ -388,5 +459,67 @@ describe('consultar', () => {
   it('pedir una orden que no existe es un error de dominio, no un null', async () => {
     const { consultar } = armar();
     await expect(consultar.buscarPorId('no-existe')).rejects.toThrow(ErrorNoEncontrado);
+  });
+});
+
+describe('registrar de una un trabajo ya hecho', () => {
+  const HECHO = {
+    titulo: 'Cambio de reten en la bomba',
+    tipo: 'CORRECTIVO',
+    abiertaPorId: 'u1',
+    resolucion: 'Se cambio el reten y la junta',
+  } as const;
+
+  it('sin materiales, queda cerrada en un paso', async () => {
+    const { registrarHecho, stock } = armar();
+
+    const orden = await registrarHecho.ejecutar(HECHO, 'u1');
+
+    expect(orden.estado).toBe('CERRADA');
+    expect(orden.resolucion).toBe('Se cambio el reten y la junta');
+    expect(stock.asientos).toHaveLength(0);
+  });
+
+  it('con materiales, los saca del paniol y la cierra igual', async () => {
+    // Es el caso comun desde la ficha de una maquina: alguien arreglo algo y
+    // gasto dos retenes. Tres pasos para un hecho consumado terminan en que no
+    // se anota nada.
+    const { registrarHecho, stock, consultar } = armar();
+
+    const orden = await registrarHecho.ejecutar(
+      { ...HECHO, materiales: [{ materialId: 'mat-1', cantidad: 2 }] },
+      'u1',
+    );
+
+    expect(orden.estado).toBe('CERRADA');
+    expect(stock.asientos).toHaveLength(1);
+    expect(stock.asientos[0]).toMatchObject({ sentido: 'SALIDA', cantidad: 2 });
+    expect((await consultar.buscarPorId(orden.id)).materiales).toHaveLength(1);
+  });
+
+  it('REGRESION: si el paniol rechaza un material, la orden queda ABIERTA y se puede arreglar', async () => {
+    // Mejor una orden abierta que se corrige que perder lo que ya se registro.
+    const { registrarHecho, consultar, stock } = armar();
+    stock.fallarAlDescontar = true;
+
+    await expect(
+      registrarHecho.ejecutar(
+        { ...HECHO, materiales: [{ materialId: 'mat-1', cantidad: 2 }] },
+        'u1',
+      ),
+    ).rejects.toThrow('No hay stock suficiente.');
+
+    const pagina = await consultar.listar({}, 1, 20);
+    expect(pagina.total).toBe(1);
+    expect(pagina.datos[0].estado).toBe('ABIERTA');
+  });
+
+  it('sin resolucion queda abierta, que es el flujo de siempre', async () => {
+    const { registrarHecho } = armar();
+    const orden = await registrarHecho.ejecutar(
+      { titulo: 'Reviso la bomba', tipo: 'CORRECTIVO', abiertaPorId: 'u1' },
+      'u1',
+    );
+    expect(orden.estado).toBe('ABIERTA');
   });
 });

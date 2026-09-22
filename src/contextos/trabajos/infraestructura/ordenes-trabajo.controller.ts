@@ -22,9 +22,11 @@ import { PERMISOS } from '../../../common/auth/permisos';
 import { PermisosService } from '../../../common/auth/permisos.service';
 import { ConsultarOrdenesTrabajo } from '../aplicacion/consultar-ordenes-trabajo';
 import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo';
+import { RegistrarTrabajoHecho } from '../aplicacion/registrar-trabajo-hecho';
 import { UsarMateriales } from '../aplicacion/usar-materiales';
 import { CONSULTA_EQUIPOS, ConsultaEquipos } from '../puertos/consulta-equipos';
 import { CONSULTA_USUARIOS, ConsultaUsuarios } from '../puertos/consulta-usuarios';
+import { PLANES_DE_MANTENIMIENTO, PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import {
   REPOSITORIO_ORDENES_TRABAJO,
   RepositorioOrdenesTrabajo,
@@ -58,18 +60,21 @@ export class OrdenesTrabajoController {
   private readonly gestionar: GestionarOrdenesTrabajo;
   private readonly materiales: UsarMateriales;
   private readonly consultar: ConsultarOrdenesTrabajo;
+  private readonly registrarHecho: RegistrarTrabajoHecho;
 
   constructor(
     @Inject(REPOSITORIO_ORDENES_TRABAJO) repo: RepositorioOrdenesTrabajo,
     @Inject(CONSULTA_EQUIPOS) equipos: ConsultaEquipos,
     @Inject(CONSULTA_USUARIOS) private readonly usuarios: ConsultaUsuarios,
+    @Inject(PLANES_DE_MANTENIMIENTO) planes: PlanesDeMantenimiento,
     @Inject(STOCK) stock: Stock,
     @Inject(RELOJ_TRABAJOS) reloj: Reloj,
     private readonly permisos: PermisosService,
   ) {
-    this.gestionar = new GestionarOrdenesTrabajo(repo, equipos, usuarios, reloj);
+    this.gestionar = new GestionarOrdenesTrabajo(repo, equipos, usuarios, planes, reloj);
     this.materiales = new UsarMateriales(repo, stock);
     this.consultar = new ConsultarOrdenesTrabajo(repo);
+    this.registrarHecho = new RegistrarTrabajoHecho(this.gestionar, this.materiales);
   }
 
   /**
@@ -143,14 +148,29 @@ export class OrdenesTrabajoController {
   @ApiOperation({ summary: 'Abrir una orden de trabajo' })
   async crear(@Body() dto: CrearOrdenTrabajoDto, @UsuarioActual() usuario?: Usuario) {
     await this.validarEleccionDeEquipo(dto.equipoId, usuario);
-    return this.gestionar.crear({
-      titulo: dto.titulo,
-      descripcion: dto.descripcion,
-      tipo: dto.tipo,
-      equipoId: dto.equipoId,
-      abiertaPorId: usuario?.id ?? null,
-      asignadoAId: dto.asignadoAId,
-    });
+    // Un solo endpoint para los dos caminos: abrir una orden, o registrar de
+    // una un trabajo que ya se hizo con lo que se usó. Lo que los distingue es
+    // si viene la resolución, no una ruta aparte.
+    return this.registrarHecho.ejecutar(
+      {
+        titulo: dto.titulo,
+        descripcion: dto.descripcion,
+        tipo: dto.tipo,
+        equipoId: dto.equipoId,
+        abiertaPorId: usuario?.id ?? null,
+        asignadoAId: dto.asignadoAId,
+        // Las fechas llegan como texto ISO y el dominio trabaja con Date.
+        fecha: dto.fecha ? new Date(dto.fecha) : undefined,
+        ejecutor: dto.ejecutor,
+        proveedorId: dto.proveedorId,
+        costoManoObra: dto.costoManoObra,
+        horasParada: dto.horasParada,
+        planId: dto.planId,
+        resolucion: dto.resolucion,
+        materiales: dto.materiales,
+      },
+      usuario?.id ?? null,
+    );
   }
 
   @Permisos(PERMISOS.TRABAJOS_EDITAR)
@@ -199,7 +219,12 @@ export class OrdenesTrabajoController {
     @Body() dto: CerrarOrdenTrabajoDto,
     @UsuarioActual() usuario?: Usuario,
   ) {
-    return this.gestionar.cerrar(id, dto.resolucion, usuario?.id ?? null);
+    return this.gestionar.cerrar(id, dto.resolucion, usuario?.id ?? null, {
+      ejecutor: dto.ejecutor,
+      proveedorId: dto.proveedorId,
+      costoManoObra: dto.costoManoObra,
+      horasParada: dto.horasParada,
+    });
   }
 
   @Permisos(PERMISOS.TRABAJOS_EDITAR)

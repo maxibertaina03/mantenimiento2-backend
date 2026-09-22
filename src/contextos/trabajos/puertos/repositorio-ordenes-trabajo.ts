@@ -15,6 +15,8 @@ export interface MaterialUsadoConRelaciones extends MaterialUsado {
 export interface OrdenTrabajoConRelaciones extends OrdenTrabajo {
   equipoNombre: string | null;
   equipoCodigo: string | null;
+  proveedorNombre: string | null;
+  planNombre: string | null;
   abiertaPorNombre: string | null;
   asignadoANombre: string | null;
   cerradaPorNombre: string | null;

@@ -4,10 +4,10 @@ import { DESTINATARIOS_AVISOS } from '../puertos/destinatarios-avisos';
 import { ENVIADOR_AVISOS } from '../puertos/enviador-avisos';
 import { REPOSITORIO_AVISOS } from '../puertos/repositorio-avisos';
 import { REPOSITORIO_INTERVENCIONES } from '../puertos/repositorio-intervenciones';
-import { REPOSITORIO_PLANES } from '../puertos/repositorio-planes';
-import { REPOSITORIO_EQUIPOS } from '../puertos/repositorio-equipos';
+import { REPOSITORIO_PLANES, RepositorioPlanes } from '../puertos/repositorio-planes';
+import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
 import { REPOSITORIO_UBICACIONES } from '../puertos/repositorio-ubicaciones';
-import { RELOJ, RelojDelSistema } from '../puertos/reloj';
+import { RELOJ, Reloj, RelojDelSistema } from '../puertos/reloj';
 import {
   CatalogosEquipoService,
   MarcasEquipoController,
@@ -15,6 +15,7 @@ import {
   TiposEquipoPlantaController,
   UbicacionesEquipoController,
 } from './catalogos.controller';
+import { GestionarPlanes } from '../aplicacion/gestionar-planes';
 import { AvisosController } from './avisos.controller';
 import { CorreoEnviadorAvisos } from './correo-enviador-avisos';
 import { EquiposController } from './equipos.controller';
@@ -54,7 +55,15 @@ import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
     { provide: DESTINATARIOS_AVISOS, useClass: PrismaDestinatariosAvisos },
     { provide: ENVIADOR_AVISOS, useClass: CorreoEnviadorAvisos },
     { provide: RELOJ, useClass: RelojDelSistema },
+    // Se ofrece armado para que el contexto de trabajos pueda avisarle que un
+    // service se hizo, sin copiar la cuenta de cuándo toca el próximo.
+    {
+      provide: GestionarPlanes,
+      useFactory: (planes: RepositorioPlanes, equipos: RepositorioEquipos, reloj: Reloj) =>
+        new GestionarPlanes(planes, equipos, reloj),
+      inject: [REPOSITORIO_PLANES, REPOSITORIO_EQUIPOS, RELOJ],
+    },
   ],
-  exports: [REPOSITORIO_EQUIPOS, RELOJ],
+  exports: [REPOSITORIO_EQUIPOS, RELOJ, GestionarPlanes],
 })
 export class EquiposModule {}

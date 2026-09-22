@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
+  IsDateString,
   IsIn,
   IsInt,
   IsNumber,
@@ -10,8 +12,11 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import {
+  EJECUTORES,
+  Ejecutor,
   ESTADOS_ORDEN_TRABAJO,
   EstadoOrdenTrabajo,
   TIPOS_TRABAJO,
@@ -26,6 +31,24 @@ import {
  * materiales en una orden cerrada, no se anula una que ya movió stock— son del
  * dominio, y por eso valen igual para cualquier carga que no entre por HTTP.
  */
+export class UsarMaterialDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  materialId!: string;
+
+  @ApiProperty({ example: 2, description: 'Cuánto se usó. Sale del pañol de verdad.' })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0.001)
+  cantidad!: number;
+
+  @ApiPropertyOptional({ example: 'Se uso uno de repuesto del pañol chico' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notas?: string | null;
+}
+
 export class CrearOrdenTrabajoDto {
   @ApiProperty({ example: 'Perdida en la bomba de recibo' })
   @IsString()
@@ -59,6 +82,64 @@ export class CrearOrdenTrabajoDto {
   @IsOptional()
   @IsUUID()
   asignadoAId?: string | null;
+
+  @ApiPropertyOptional({
+    example: '2026-09-18',
+    description: 'Cuándo se hizo. Si no viene, ahora. No puede ser futura.',
+  })
+  @IsOptional()
+  @IsDateString()
+  fecha?: string;
+
+  @ApiPropertyOptional({ enum: EJECUTORES, default: 'INTERNO' })
+  @IsOptional()
+  @IsIn(EJECUTORES)
+  ejecutor?: Ejecutor;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Qué proveedor, si fue externo.' })
+  @IsOptional()
+  @IsUUID()
+  proveedorId?: string | null;
+
+  @ApiPropertyOptional({ example: 45000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  costoManoObra?: number | null;
+
+  @ApiPropertyOptional({ example: 3.5, description: 'Horas que la máquina estuvo parada.' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  horasParada?: number | null;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'El plan al que responde.' })
+  @IsOptional()
+  @IsUUID()
+  planId?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Si viene, el trabajo ya está hecho y la orden nace cerrada con esta resolución. ' +
+      'Es el camino desde la ficha de una máquina.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  resolucion?: string;
+
+  @ApiPropertyOptional({
+    type: [UsarMaterialDto],
+    description: 'Lo que se usó. Sale del pañol igual que en una orden abierta.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UsarMaterialDto)
+  materiales?: UsarMaterialDto[];
 }
 
 export class ReasignarOrdenTrabajoDto {
@@ -101,6 +182,30 @@ export class CerrarOrdenTrabajoDto {
   @MinLength(1)
   @MaxLength(2000)
   resolucion!: string;
+
+  @ApiPropertyOptional({ enum: EJECUTORES })
+  @IsOptional()
+  @IsIn(EJECUTORES)
+  ejecutor?: Ejecutor;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  proveedorId?: string | null;
+
+  @ApiPropertyOptional({ example: 45000 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  costoManoObra?: number | null;
+
+  @ApiPropertyOptional({ example: 3.5 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  horasParada?: number | null;
 }
 
 export class AnularOrdenTrabajoDto {
@@ -109,24 +214,6 @@ export class AnularOrdenTrabajoDto {
   @MinLength(1)
   @MaxLength(500)
   motivo!: string;
-}
-
-export class UsarMaterialDto {
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
-  materialId!: string;
-
-  @ApiProperty({ example: 2, description: 'Cuánto se usó. Sale del pañol de verdad.' })
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 3 })
-  @Min(0.001)
-  cantidad!: number;
-
-  @ApiPropertyOptional({ example: 'Se uso uno de repuesto del pañol chico' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  notas?: string | null;
 }
 
 export class ListarOrdenesTrabajoDto {
