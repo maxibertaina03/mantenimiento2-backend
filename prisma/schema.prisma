@@ -120,6 +120,7 @@ model Proveedor {
   equipos        Equipo[]
   intervenciones Intervencion[]
   trabajos       OrdenTrabajo[]
+  tareas         TareaProgramada[]
 
   @@map("proveedores")
 }
@@ -334,6 +335,10 @@ model Usuario {
   intervencionesEjecutadas Intervencion[] @relation("IntervencionEjecutor")
   intervencionesCargadas   Intervencion[] @relation("IntervencionRegistro")
 
+  tareasAsignadas     TareaProgramada[]      @relation("TareasAsignadas")
+  tareasCreadas       TareaProgramada[]      @relation("TareasCreadas")
+  rutinasAsignadas    RutinaTarea[]          @relation("RutinasAsignadas")
+  rutinasCreadas      RutinaTarea[]          @relation("RutinasCreadas")
   trabajosAbiertos    OrdenTrabajo[]         @relation("TrabajosAbiertos")
   trabajosAsignados   OrdenTrabajo[]         @relation("TrabajosAsignados")
   trabajosCerrados    OrdenTrabajo[]         @relation("TrabajosCerrados")
@@ -825,6 +830,8 @@ model Equipo {
   intervenciones Intervencion[]
   planes         PlanMantenimiento[]
   ordenesTrabajo OrdenTrabajo[]
+  tareas         TareaProgramada[]
+  rutinas        RutinaTarea[]
 
   @@index([ubicacionId])
   @@index([tipoId])
@@ -919,10 +926,11 @@ model PlanMantenimiento {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  equipo         Equipo         @relation(fields: [equipoId], references: [id], onDelete: Cascade)
-  intervenciones Intervencion[]
-  avisos         AvisoEnviado[]
-  trabajos       OrdenTrabajo[]
+  equipo          Equipo            @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  intervenciones  Intervencion[]
+  avisos          AvisoEnviado[]
+  trabajos        OrdenTrabajo[]
+  TareaProgramada TareaProgramada[]
 
   @@index([equipoId])
   @@index([proximaFecha])
@@ -1166,6 +1174,7 @@ model OrdenTrabajo {
   asignadoA  Usuario                @relation("TrabajosAsignados", fields: [asignadoAId], references: [id])
   cerradaPor Usuario?               @relation("TrabajosCerrados", fields: [cerradaPorId], references: [id])
   materiales MaterialUsadoTrabajo[]
+  tarea      TareaProgramada?
 
   @@index([estado])
   @@index([equipoId])
@@ -1206,4 +1215,98 @@ model MaterialUsadoTrabajo {
   @@index([ordenTrabajoId])
   @@index([materialId])
   @@map("materiales_orden_trabajo")
+}
+
+// ═══════════════════ Calendario: tareas programadas ═══════════════════
+//
+// La pieza que faltaba entre un plan y una orden de trabajo. Un plan es una
+// definición que se repite y no se le asigna a nadie; una orden es un hecho
+// consumado y no acepta fecha futura. La tarea está en el medio: hay que
+// hacerla, alguien tiene que hacerla, y al hacerse se vuelve una orden.
+
+/// Algo que hay que hacer, con fecha y con dueño.
+model TareaProgramada {
+  id          String  @id @default(uuid())
+  titulo      String
+  descripcion String?
+
+  /// El día en que hay que hacerla, a medianoche UTC. La hora se descarta:
+  /// dos tareas del mismo día son del mismo día aunque se carguen a horas
+  /// distintas.
+  fecha DateTime
+
+  /// PENDIENTE | HECHA | CANCELADA.
+  estado String @default("PENDIENTE")
+
+  /// Quién tiene que hacerla. Puede estar vacía: las que genera un plan nacen
+  /// sin dueño porque el sistema sabe que hay un service, no a quién le toca.
+  asignadoAId String?
+
+  equipoId       String?
+  /// El plan de mantenimiento que la generó, si vino de uno.
+  planId         String?
+  /// La rutina que la generó, si se repite.
+  rutinaId       String?
+  /// La orden de trabajo que salió al completarla.
+  ordenTrabajoId String? @unique
+
+  creadaPorId String?
+  creadoEn    DateTime @default(now())
+
+  asignadoA    Usuario?           @relation("TareasAsignadas", fields: [asignadoAId], references: [id])
+  creadaPor    Usuario?           @relation("TareasCreadas", fields: [creadaPorId], references: [id])
+  equipo       Equipo?            @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  plan         PlanMantenimiento? @relation(fields: [planId], references: [id], onDelete: Cascade)
+  rutina       RutinaTarea?       @relation(fields: [rutinaId], references: [id], onDelete: Cascade)
+  ordenTrabajo OrdenTrabajo?      @relation(fields: [ordenTrabajoId], references: [id], onDelete: SetNull)
+  Proveedor    Proveedor?         @relation(fields: [proveedorId], references: [id])
+  proveedorId  String?
+
+  /// Un vencimiento de plan genera UNA tarea, y una repetición de rutina
+  /// también. Es lo que hace que generarlas al leer el calendario se pueda
+  /// repetir sin duplicar nada. Las cargadas a mano tienen los dos en null, y
+  /// en Postgres los nulos no chocan entre sí, así que no se estorban.
+  @@unique([planId, fecha])
+  @@unique([rutinaId, fecha])
+  @@index([fecha])
+  @@index([estado])
+  @@index([asignadoAId])
+  @@index([equipoId])
+  @@map("tareas_programadas")
+}
+
+/// Algo que se repite y no responde a ningún plan de mantenimiento.
+///
+/// "Revisar la presión de la caldera todas las mañanas" no es el service de una
+/// máquina: es una rutina del día. Cargarla una vez y que el calendario la
+/// reparta es la diferencia entre que se haga y que no.
+model RutinaTarea {
+  id          String  @id @default(uuid())
+  titulo      String
+  descripcion String?
+
+  /// Cada cuántos días se repite. 1 es todos los días. Se cuenta en días
+  /// enteros y no en meses, para que "cada 15" signifique siempre lo mismo.
+  cadaDias Int
+
+  desde DateTime
+  /// Hasta cuándo. Sin esto, para siempre.
+  hasta DateTime?
+
+  equipoId    String?
+  /// A quién le toca siempre. Sin esto, cada repetición nace sin dueño.
+  asignadoAId String?
+
+  activa      Boolean  @default(true)
+  creadaPorId String?
+  creadoEn    DateTime @default(now())
+
+  equipo    Equipo?           @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  asignadoA Usuario?          @relation("RutinasAsignadas", fields: [asignadoAId], references: [id])
+  creadaPor Usuario?          @relation("RutinasCreadas", fields: [creadaPorId], references: [id])
+  tareas    TareaProgramada[]
+
+  @@index([activa])
+  @@index([equipoId])
+  @@map("rutinas_tarea")
 }

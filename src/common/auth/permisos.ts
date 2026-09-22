@@ -63,6 +63,19 @@ export const PERMISOS = {
    */
   TRABAJOS_ASIGNAR: 'trabajos.asignar',
 
+  // ── Calendario ─────────────────────────────────────────────────
+  TAREAS_VER: 'tareas.ver',
+  /** Programar tareas, definir rutinas y darlas por hechas. */
+  TAREAS_EDITAR: 'tareas.editar',
+  /**
+   * Repartir el trabajo: darle una tarea a otra persona.
+   *
+   * Aparte de editar porque no es lo mismo hacer lo tuyo que decidir qué hace
+   * el resto. Quien tiene solo `editar` completa las suyas y programa las
+   * propias; repartir es de quien organiza.
+   */
+  TAREAS_ASIGNAR: 'tareas.asignar',
+
   // ── Equipos de planta y sus services ──────────────────────────────────────
   EQUIPOS_VER: 'equipos.ver',
   EQUIPOS_EDITAR: 'equipos.editar',
@@ -162,6 +175,18 @@ export const DESCRIPCION_PERMISOS: Record<Permiso, { grupo: string; etiqueta: st
     grupo: 'Trabajos',
     etiqueta: 'Reasignar una orden abierta a otra persona',
   },
+  [PERMISOS.TAREAS_VER]: {
+    grupo: 'Calendario',
+    etiqueta: 'Ver el calendario y las tareas propias',
+  },
+  [PERMISOS.TAREAS_EDITAR]: {
+    grupo: 'Calendario',
+    etiqueta: 'Programar tareas, definir rutinas y darlas por hechas',
+  },
+  [PERMISOS.TAREAS_ASIGNAR]: {
+    grupo: 'Calendario',
+    etiqueta: 'Repartir tareas: dárselas a otra persona',
+  },
   [PERMISOS.ORDENES_VER]: { grupo: 'Compras', etiqueta: 'Ver órdenes de compra' },
   [PERMISOS.ORDENES_EDITAR]: { grupo: 'Compras', etiqueta: 'Crear, editar y anular órdenes' },
   [PERMISOS.ORDENES_RECIBIR]: {
@@ -237,6 +262,12 @@ export const PRESETS: Record<string, Permiso[]> = {
     PERMISOS.ORDENES_EDITAR,
     PERMISOS.ORDENES_RECIBIR,
     PERMISOS.ORDENES_ENVIAR,
+
+    // El calendario SÍ es suyo: es donde ven lo que tienen que hacer en el día
+    // y donde lo dan por hecho. Repartir el trabajo no, eso lo decide quien
+    // organiza.
+    PERMISOS.TAREAS_VER,
+    PERMISOS.TAREAS_EDITAR,
 
     // Órdenes de trabajo NO va acá todavía, y no es un olvido: ver
     // TODAVIA_SOLO_ADMIN más arriba. El día que mantenimiento tenga equipos,

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { GestionarPlanes } from '../../equipos/aplicacion/gestionar-planes';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
+import { PlanesDeMantenimiento, VencimientoDePlan } from '../puertos/planes-de-mantenimiento';
 
 /**
  * El puente hacia los planes, que viven en el contexto de equipos.
@@ -20,6 +20,32 @@ export class PlanesPorEquipos implements PlanesDeMantenimiento {
     private readonly prisma: PrismaService,
     private readonly planes: GestionarPlanes,
   ) {}
+
+  /**
+   * Los services que vencen entre dos fechas.
+   *
+   * No entran los de equipos fuera de servicio ni dados de baja: no tiene
+   * sentido programarle un service a algo desafectado, y el calendario se
+   * llenaría de tareas que nadie va a hacer.
+   */
+  async vencimientosEntre(desde: Date, hasta: Date): Promise<VencimientoDePlan[]> {
+    const filas = await this.prisma.planMantenimiento.findMany({
+      where: {
+        activo: true,
+        proximaFecha: { gte: desde, lte: hasta },
+        equipo: { estado: { notIn: ['FUERA_DE_SERVICIO', 'DADO_DE_BAJA'] } },
+      },
+      select: { id: true, equipoId: true, nombre: true, tareas: true, proximaFecha: true },
+    });
+
+    return filas.map((f) => ({
+      planId: f.id,
+      equipoId: f.equipoId,
+      nombre: f.nombre,
+      tareas: f.tareas,
+      fecha: f.proximaFecha,
+    }));
+  }
 
   async esDelEquipo(planId: string, equipoId: string): Promise<boolean> {
     const fila = await this.prisma.planMantenimiento.findFirst({

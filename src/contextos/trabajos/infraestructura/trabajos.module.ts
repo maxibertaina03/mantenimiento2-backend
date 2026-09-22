@@ -1,14 +1,19 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../../common/auth/auth.module';
+import { CorreoModule } from '../../../common/correo/correo.module';
 import { EquiposModule } from '../../equipos/infraestructura/equipos.module';
 import { MovimientosStockModule } from '../../../modules/movimientos-stock/movimientos-stock.module';
 import { CONSULTA_EQUIPOS } from '../puertos/consulta-equipos';
 import { CONSULTA_USUARIOS } from '../puertos/consulta-usuarios';
+import { REPOSITORIO_TAREAS } from '../puertos/repositorio-tareas';
 import { PLANES_DE_MANTENIMIENTO } from '../puertos/planes-de-mantenimiento';
 import { RELOJ_TRABAJOS, RelojDelSistema } from '../puertos/reloj';
 import { REPOSITORIO_ORDENES_TRABAJO } from '../puertos/repositorio-ordenes-trabajo';
 import { STOCK } from '../puertos/stock';
+import { AvisadorDeTareas } from './avisador-de-tareas';
+import { CalendarioController } from './calendario.controller';
 import { OrdenesTrabajoController } from './ordenes-trabajo.controller';
+import { PrismaRepositorioTareas } from './prisma-repositorio-tareas';
 import { PrismaConsultaEquipos } from './prisma-consulta-equipos';
 import { PlanesPorEquipos } from './planes-por-equipos';
 import { PrismaConsultaUsuarios } from './prisma-consulta-usuarios';
@@ -33,13 +38,15 @@ import { StockPorMovimientos } from './stock-por-movimientos';
  * importa. Olvidarlo no rompe la compilación, rompe el arranque.
  */
 @Module({
-  imports: [MovimientosStockModule, AuthModule, EquiposModule],
-  controllers: [OrdenesTrabajoController],
+  imports: [MovimientosStockModule, AuthModule, EquiposModule, CorreoModule],
+  controllers: [OrdenesTrabajoController, CalendarioController],
   providers: [
     { provide: REPOSITORIO_ORDENES_TRABAJO, useClass: PrismaRepositorioOrdenesTrabajo },
     { provide: CONSULTA_EQUIPOS, useClass: PrismaConsultaEquipos },
     { provide: CONSULTA_USUARIOS, useClass: PrismaConsultaUsuarios },
     { provide: PLANES_DE_MANTENIMIENTO, useClass: PlanesPorEquipos },
+    { provide: REPOSITORIO_TAREAS, useClass: PrismaRepositorioTareas },
+    AvisadorDeTareas,
     { provide: STOCK, useClass: StockPorMovimientos },
     { provide: RELOJ_TRABAJOS, useClass: RelojDelSistema },
   ],
