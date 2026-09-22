@@ -39,6 +39,22 @@ export class CredencialesService {
     private readonly cofre: CofreService,
   ) {}
 
+  /**
+   * Comprueba que el equipo de IT exista antes de atarle la credencial.
+   *
+   * Sin esto, un id equivocado llega hasta Postgres y vuelve como una violación
+   * de clave foránea: un 500 con un texto que no le dice nada a nadie. Acá se
+   * convierte en un mensaje que se entiende.
+   */
+  private async equipoValido(equipoItId: string | null | undefined): Promise<string | null> {
+    if (!equipoItId) return null;
+    const existe = await this.repo.existeEquipoIt(equipoItId);
+    if (!existe) {
+      throw new NotFoundException(`No existe el equipo de informática con id ${equipoItId}`);
+    }
+    return equipoItId;
+  }
+
   /** Se pasa como parámetro para poder probar "faltan tres días" sin esperar. */
   private ahora(): Date {
     return new Date();
@@ -119,7 +135,7 @@ export class CredencialesService {
       huella: this.cofre.huella(dto.secreto),
       url: dto.url?.trim() || null,
       notas: dto.notas?.trim() || null,
-      equipoItId: dto.equipoItId ?? null,
+      equipoItId: await this.equipoValido(dto.equipoItId),
       rotarCadaDias: dto.rotarCadaDias ?? null,
       rotadaEn,
       proximaRotacion: calcularProximaRotacion(rotadaEn, dto.rotarCadaDias),
@@ -152,7 +168,9 @@ export class CredencialesService {
       usuario: dto.usuario !== undefined ? dto.usuario.trim() || null : undefined,
       url: dto.url !== undefined ? dto.url.trim() || null : undefined,
       notas: dto.notas !== undefined ? dto.notas.trim() || null : undefined,
-      equipoItId: dto.equipoItId,
+      // `undefined` es "no lo toques"; `null` es "desatala". Los dos casos
+      // tienen que poder expresarse, y son distintos.
+      equipoItId: dto.equipoItId === undefined ? undefined : await this.equipoValido(dto.equipoItId),
       rotarCadaDias,
       activo: dto.activo,
       ...(rotarCadaDias !== undefined

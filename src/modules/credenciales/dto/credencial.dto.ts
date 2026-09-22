@@ -11,6 +11,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { PaginacionDto } from '../../../common/dto/paginacion.dto';
 import { EstadoRotacion, estadoDeRotacion } from '../rotacion';
@@ -78,7 +79,18 @@ export class ActualizarCredencialDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) usuario?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(300) url?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) notas?: string;
-  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() equipoItId?: string;
+  /**
+   * A qué equipo de IT pertenece, o `null` para desatarla.
+   *
+   * Acepta null a propósito: sin eso se podía atar una credencial a una máquina
+   * pero nunca despegarla, y el día que esa clave deja de ser de esa PC queda
+   * apuntando a algo que ya no es cierto.
+   */
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @IsOptional()
+  @ValidateIf((o: ActualizarCredencialDto) => o.equipoItId !== null)
+  @IsUUID()
+  equipoItId?: string | null;
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)

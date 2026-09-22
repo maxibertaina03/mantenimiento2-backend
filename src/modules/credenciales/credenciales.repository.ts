@@ -72,6 +72,17 @@ export class CredencialesRepository {
   }
 
   /** Las huellas de todas las contraseñas que esta credencial ya usó. */
+  /**
+   * Si existe ese equipo de IT.
+   *
+   * Va por acá y no por el módulo de equipos de IT para no atar los dos módulos
+   * enteros por una pregunta de sí o no.
+   */
+  async existeEquipoIt(id: string): Promise<boolean> {
+    const fila = await this.prisma.equipoIT.findUnique({ where: { id }, select: { id: true } });
+    return fila !== null;
+  }
+
   async huellasUsadas(id: string): Promise<string[]> {
     const [actual, anteriores] = await Promise.all([
       this.prisma.credencial.findUnique({ where: { id }, select: { huella: true } }),
