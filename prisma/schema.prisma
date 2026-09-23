@@ -120,7 +120,6 @@ model Proveedor {
   equipos        Equipo[]
   intervenciones Intervencion[]
   trabajos       OrdenTrabajo[]
-  tareas         TareaProgramada[]
 
   @@map("proveedores")
 }
@@ -926,11 +925,11 @@ model PlanMantenimiento {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  equipo          Equipo            @relation(fields: [equipoId], references: [id], onDelete: Cascade)
-  intervenciones  Intervencion[]
-  avisos          AvisoEnviado[]
-  trabajos        OrdenTrabajo[]
-  TareaProgramada TareaProgramada[]
+  equipo            Equipo            @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  intervenciones    Intervencion[]
+  avisos            AvisoEnviado[]
+  trabajos          OrdenTrabajo[]
+  tareasProgramadas TareaProgramada[]
 
   @@index([equipoId])
   @@index([proximaFecha])
@@ -1259,8 +1258,6 @@ model TareaProgramada {
   plan         PlanMantenimiento? @relation(fields: [planId], references: [id], onDelete: Cascade)
   rutina       RutinaTarea?       @relation(fields: [rutinaId], references: [id], onDelete: Cascade)
   ordenTrabajo OrdenTrabajo?      @relation(fields: [ordenTrabajoId], references: [id], onDelete: SetNull)
-  Proveedor    Proveedor?         @relation(fields: [proveedorId], references: [id])
-  proveedorId  String?
 
   /// Un vencimiento de plan genera UNA tarea, y una repetición de rutina
   /// también. Es lo que hace que generarlas al leer el calendario se pueda

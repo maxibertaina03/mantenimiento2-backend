@@ -159,6 +159,13 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
           abiertaEn: orden.abiertaEn,
           abiertaPorId: orden.abiertaPorId,
           asignadoAId: orden.asignadoAId,
+          // El cierre tambien se guarda al crear. Una orden puede nacer
+          // CERRADA —registrar un trabajo ya hecho— y sin esto quedaba cerrada
+          // pero sin decir que se hizo, que es justo lo que se queria anotar.
+          resolucion: orden.resolucion,
+          cerradaEn: orden.cerradaEn,
+          cerradaPorId: orden.cerradaPorId,
+          motivoAnulacion: orden.motivoAnulacion,
         },
         include: RELACIONES,
       });
