@@ -140,10 +140,25 @@ const conexionAdmin = ['-h', hacia.host, '-p', hacia.puerto, '-U', hacia.usuario
 correr('psql', [...conexionAdmin, '-c', `DROP DATABASE IF EXISTS "${hacia.base}"`], hacia.clave);
 correr('psql', [...conexionAdmin, '-c', `CREATE DATABASE "${hacia.base}"`], hacia.clave);
 
+// El dump de Supabase trae su propio `CREATE SCHEMA public`, y una base recién
+// creada ya lo tiene. Con --single-transaction ese choque aborta la restauración
+// entera, y el único síntoma es una base vacía. Se le saca el esquema para que
+// el dump ponga el suyo: la base acaba de nacer, acá no hay nada que perder.
+correr(
+  'psql',
+  [
+    '-h', hacia.host, '-p', hacia.puerto, '-U', hacia.usuario, '-d', hacia.base,
+    '-c', 'DROP SCHEMA IF EXISTS public CASCADE',
+  ],
+  hacia.clave,
+);
+
 // ── 3. Restaurar ──────────────────────────────────────────────────────────
-// pg_restore devuelve un código distinto de cero por avisos que no son
-// errores (extensiones que ya existen, comentarios sobre objetos de Supabase),
-// así que se le permite fallar y después se comprueba el resultado de verdad.
+// --single-transaction: o entra todo o no entra nada. Una base a medio
+// restaurar es peor que ninguna, porque parece que funciona.
+//
+// Los avisos de pg_restore no llegan acá como error, así que si esto falla es
+// que falló de verdad y hay que verlo, no taparlo.
 console.log('3/3  Restaurando en local…');
 correr(
   'pg_restore',
@@ -152,7 +167,6 @@ correr(
     '--no-owner', '--no-privileges', '--single-transaction', archivo,
   ],
   hacia.clave,
-  true,
 );
 
 // ── Comprobación ──────────────────────────────────────────────────────────
