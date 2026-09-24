@@ -17,6 +17,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "local:migrar": "dotenv -e .env -- prisma migrate deploy",
+    "local:copiar-produccion": "node scripts/copiar-produccion-a-local.mjs",
     "local:seed": "dotenv -e .env -- ts-node prisma/seed.ts",
     "local:studio": "dotenv -e .env -- prisma studio",
     "local:api": "dotenv -e .env -- nest start --watch",

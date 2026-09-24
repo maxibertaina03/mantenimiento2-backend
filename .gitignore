@@ -30,3 +30,7 @@ prisma/*.db
 
 # Reportes de cobertura de tests
 /coverage
+
+# Copias de la base traidas de produccion para trabajar en local.
+# Llevan datos reales de la empresa: NUNCA se suben.
+.copias/
