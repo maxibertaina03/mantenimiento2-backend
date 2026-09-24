@@ -43,7 +43,7 @@ import {
   CrearEquipoDto,
   ListarEquiposDto,
 } from './equipos.dto';
-import { FiltroErroresDominio } from './filtro-errores-dominio';
+import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { DetectarImportacionDto, ImportarEquiposDto } from './importacion.dto';
 import { RegistrarIntervencionDto } from './intervenciones.dto';
 import { ActualizarPlanDto, CrearPlanDto } from './planes.dto';

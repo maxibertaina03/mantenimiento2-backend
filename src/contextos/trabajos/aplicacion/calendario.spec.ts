@@ -41,7 +41,14 @@ function armar(
     vencimientos.map((v) => ({ ...v, tareas: null })),
   );
 
-  const gestionarOrdenes = new GestionarOrdenesTrabajo(ordenes, equipos, equiposIt, usuarios, planes, reloj);
+  const gestionarOrdenes = new GestionarOrdenesTrabajo(
+    ordenes,
+    equipos,
+    equiposIt,
+    usuarios,
+    planes,
+    reloj,
+  );
   const registrarHecho = new RegistrarTrabajoHecho(
     gestionarOrdenes,
     new UsarMateriales(ordenes, stock),

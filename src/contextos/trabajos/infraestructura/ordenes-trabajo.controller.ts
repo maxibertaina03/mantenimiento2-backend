@@ -34,7 +34,7 @@ import {
 } from '../puertos/repositorio-ordenes-trabajo';
 import { RELOJ_TRABAJOS, Reloj } from '../puertos/reloj';
 import { STOCK, Stock } from '../puertos/stock';
-import { FiltroErroresTrabajo } from './filtro-errores-trabajo';
+import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import {
   AnularOrdenTrabajoDto,
   CerrarOrdenTrabajoDto,
@@ -55,7 +55,7 @@ import {
  */
 @ApiTags('Órdenes de trabajo')
 @ApiBearerAuth()
-@UseFilters(FiltroErroresTrabajo)
+@UseFilters(FiltroErroresDominio)
 @Controller('ordenes-trabajo')
 export class OrdenesTrabajoController {
   private readonly gestionar: GestionarOrdenesTrabajo;
@@ -73,14 +73,7 @@ export class OrdenesTrabajoController {
     @Inject(RELOJ_TRABAJOS) reloj: Reloj,
     private readonly permisos: PermisosService,
   ) {
-    this.gestionar = new GestionarOrdenesTrabajo(
-      repo,
-      equipos,
-      equiposIt,
-      usuarios,
-      planes,
-      reloj,
-    );
+    this.gestionar = new GestionarOrdenesTrabajo(repo, equipos, equiposIt, usuarios, planes, reloj);
     this.materiales = new UsarMateriales(repo, stock);
     this.consultar = new ConsultarOrdenesTrabajo(repo);
     this.registrarHecho = new RegistrarTrabajoHecho(this.gestionar, this.materiales);

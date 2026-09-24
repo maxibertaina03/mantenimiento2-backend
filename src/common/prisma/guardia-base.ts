@@ -128,9 +128,13 @@ export function exigirBaseCorrecta(
   }
 
   console.error(
-    ['', '  ⛔ Arranque bloqueado: la base no corresponde al entorno.', '', `     ${problema}`, ''].join(
-      '\n',
-    ),
+    [
+      '',
+      '  ⛔ Arranque bloqueado: la base no corresponde al entorno.',
+      '',
+      `     ${problema}`,
+      '',
+    ].join('\n'),
   );
   process.exit(1);
 }

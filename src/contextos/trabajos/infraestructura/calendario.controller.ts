@@ -32,7 +32,7 @@ import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo
 import { RegistrarTrabajoHecho } from '../aplicacion/registrar-trabajo-hecho';
 import { UsarMateriales } from '../aplicacion/usar-materiales';
 import { AvisadorDeTareas } from './avisador-de-tareas';
-import { FiltroErroresTrabajo } from './filtro-errores-trabajo';
+import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import {
   AsignarTareaDto,
   CambiarRutinaDto,
@@ -52,7 +52,7 @@ import {
  */
 @ApiTags('Calendario')
 @ApiBearerAuth()
-@UseFilters(FiltroErroresTrabajo)
+@UseFilters(FiltroErroresDominio)
 @Controller('calendario')
 export class CalendarioController {
   private readonly consultar: ConsultarCalendario;

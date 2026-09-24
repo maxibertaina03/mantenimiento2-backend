@@ -20,7 +20,7 @@ import { ENVIADOR_AVISOS, EnviadorDeAvisos } from '../puertos/enviador-avisos';
 import { RELOJ, Reloj } from '../puertos/reloj';
 import { REPOSITORIO_AVISOS, RepositorioAvisos } from '../puertos/repositorio-avisos';
 import { REPOSITORIO_PLANES, RepositorioPlanes } from '../puertos/repositorio-planes';
-import { FiltroErroresDominio } from './filtro-errores-dominio';
+import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 
 /** Compara sin filtrar la respuesta por el tiempo que tarda. */
 function iguales(a: string, b: string): boolean {

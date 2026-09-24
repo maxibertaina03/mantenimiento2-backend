@@ -557,9 +557,9 @@ describe('un trabajo sobre un equipo de informatica', () => {
     // costo se cuenta dos veces.
     const { gestionar } = armar();
 
-    await expect(gestionar.crear({ ...NUEVA, equipoId: 'eq-7', equipoItId: 'pc-1' })).rejects.toThrow(
-      /no sobre los dos/,
-    );
+    await expect(
+      gestionar.crear({ ...NUEVA, equipoId: 'eq-7', equipoItId: 'pc-1' }),
+    ).rejects.toThrow(/no sobre los dos/);
   });
 
   it('REGRESION: editando tampoco puede terminar con las dos', async () => {
@@ -577,11 +577,7 @@ describe('un trabajo sobre un equipo de informatica', () => {
     const { gestionar } = armar();
     const orden = await gestionar.crear({ ...NUEVA, equipoId: 'eq-7' });
 
-    const editada = await gestionar.editar(
-      orden.id,
-      { equipoId: null, equipoItId: 'pc-1' },
-      'u1',
-    );
+    const editada = await gestionar.editar(orden.id, { equipoId: null, equipoItId: 'pc-1' }, 'u1');
 
     expect(editada.equipoId).toBeNull();
     expect(editada.equipoItId).toBe('pc-1');
