@@ -77,6 +77,16 @@ export class CrearOrdenTrabajoDto {
 
   @ApiPropertyOptional({
     format: 'uuid',
+    description:
+      'Sobre qué equipo de informática. Excluyente con equipoId: un trabajo es de una ' +
+      'máquina de planta o de una PC, no de las dos.',
+  })
+  @IsOptional()
+  @IsUUID()
+  equipoItId?: string | null;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
     description: 'A quién se le asigna. Si no viene, queda para quien la abre.',
   })
   @IsOptional()
@@ -171,6 +181,16 @@ export class EditarOrdenTrabajoDto {
   @IsOptional()
   @IsUUID()
   equipoId?: string | null;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Sobre qué equipo de informática. Excluyente con equipoId: un trabajo es de una ' +
+      'máquina de planta o de una PC, no de las dos.',
+  })
+  @IsOptional()
+  @IsUUID()
+  equipoItId?: string | null;
 }
 
 export class CerrarOrdenTrabajoDto {
@@ -237,6 +257,11 @@ export class ListarOrdenesTrabajoDto {
   @IsOptional()
   @IsUUID()
   equipoId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  equipoItId?: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Solo las de esa persona.' })
   @IsOptional()

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { SELECT_NOMBRE_EQUIPO_IT, nombreDeEquipoIt } from './prisma-consulta-equipos-it';
 import { EstadoTarea, Rutina, Tarea } from '../dominio/tarea';
 import {
   FiltroTareas,
@@ -12,6 +13,7 @@ import {
 const RELACIONES = {
   asignadoA: { select: { nombre: true } },
   equipo: { select: { nombre: true } },
+  equipoIt: { select: SELECT_NOMBRE_EQUIPO_IT },
   plan: { select: { nombre: true } },
   rutina: { select: { titulo: true } },
   ordenTrabajo: { select: { numero: true } },
@@ -20,6 +22,7 @@ const RELACIONES = {
 const RELACIONES_RUTINA = {
   asignadoA: { select: { nombre: true } },
   equipo: { select: { nombre: true } },
+  equipoIt: { select: SELECT_NOMBRE_EQUIPO_IT },
 } as const;
 
 type Fila = Prisma.TareaProgramadaGetPayload<{ include: typeof RELACIONES }>;
@@ -41,6 +44,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       estado: fila.estado as EstadoTarea,
       asignadoAId: fila.asignadoAId,
       equipoId: fila.equipoId,
+      equipoItId: fila.equipoItId,
       planId: fila.planId,
       rutinaId: fila.rutinaId,
       ordenTrabajoId: fila.ordenTrabajoId,
@@ -48,6 +52,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       creadoEn: fila.creadoEn,
       asignadoANombre: fila.asignadoA?.nombre ?? null,
       equipoNombre: fila.equipo?.nombre ?? null,
+      equipoItNombre: fila.equipoIt ? nombreDeEquipoIt(fila.equipoIt) : null,
       planNombre: fila.plan?.nombre ?? null,
       rutinaTitulo: fila.rutina?.titulo ?? null,
       ordenTrabajoNumero: fila.ordenTrabajo?.numero ?? null,
@@ -63,12 +68,14 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       desde: fila.desde,
       hasta: fila.hasta,
       equipoId: fila.equipoId,
+      equipoItId: fila.equipoItId,
       asignadoAId: fila.asignadoAId,
       activa: fila.activa,
       creadaPorId: fila.creadaPorId,
       creadoEn: fila.creadoEn,
       asignadoANombre: fila.asignadoA?.nombre ?? null,
       equipoNombre: fila.equipo?.nombre ?? null,
+      equipoItNombre: fila.equipoIt ? nombreDeEquipoIt(fila.equipoIt) : null,
     };
   }
 
@@ -80,6 +87,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       estado: tarea.estado,
       asignadoAId: tarea.asignadoAId,
       equipoId: tarea.equipoId,
+      equipoItId: tarea.equipoItId,
       planId: tarea.planId,
       rutinaId: tarea.rutinaId,
       ordenTrabajoId: tarea.ordenTrabajoId,
@@ -130,6 +138,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
         fecha: { gte: desde, lte: hasta },
         ...(filtro.asignadoAId ? { asignadoAId: filtro.asignadoAId } : {}),
         ...(filtro.equipoId ? { equipoId: filtro.equipoId } : {}),
+        ...(filtro.equipoItId ? { equipoItId: filtro.equipoItId } : {}),
         ...(filtro.soloPendientes ? { estado: 'PENDIENTE' } : {}),
       },
       orderBy: [{ fecha: 'asc' }, { creadoEn: 'asc' }],
@@ -148,6 +157,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
         ...(cambios.estado === undefined ? {} : { estado: cambios.estado }),
         ...(cambios.asignadoAId === undefined ? {} : { asignadoAId: cambios.asignadoAId }),
         ...(cambios.equipoId === undefined ? {} : { equipoId: cambios.equipoId }),
+        ...(cambios.equipoItId === undefined ? {} : { equipoItId: cambios.equipoItId }),
         ...(cambios.ordenTrabajoId === undefined ? {} : { ordenTrabajoId: cambios.ordenTrabajoId }),
       },
       include: RELACIONES,
@@ -175,6 +185,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
         desde: rutina.desde,
         hasta: rutina.hasta,
         equipoId: rutina.equipoId,
+        equipoItId: rutina.equipoItId,
         asignadoAId: rutina.asignadoAId,
         activa: rutina.activa,
         creadaPorId: rutina.creadaPorId,
@@ -202,6 +213,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
         ...(cambios.desde === undefined ? {} : { desde: cambios.desde }),
         ...(cambios.hasta === undefined ? {} : { hasta: cambios.hasta }),
         ...(cambios.equipoId === undefined ? {} : { equipoId: cambios.equipoId }),
+        ...(cambios.equipoItId === undefined ? {} : { equipoItId: cambios.equipoItId }),
         ...(cambios.asignadoAId === undefined ? {} : { asignadoAId: cambios.asignadoAId }),
         ...(cambios.activa === undefined ? {} : { activa: cambios.activa }),
       },

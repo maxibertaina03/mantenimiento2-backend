@@ -85,8 +85,18 @@ export interface OrdenTrabajo {
   descripcion: string | null;
   tipo: TipoTrabajo;
   estado: EstadoOrdenTrabajo;
-  /** Sobre qué máquina, cuando se sabe y quien carga puede verlas. */
+  /** Sobre qué máquina de planta, cuando se sabe y quien carga puede verlas. */
   equipoId: string | null;
+  /**
+   * Sobre qué equipo de informática: una PC, una impresora, una grabadora.
+   *
+   * Son dos campos y no uno porque son dos cosas distintas, en dos tablas
+   * distintas. Un trabajo es de una o de la otra, nunca de las dos, y eso lo
+   * hace cumplir `validarElEquipo`. Un campo único "activo" con un tipo al lado
+   * sería mas corto de escribir y mucho peor de leer: cada consulta tendría que
+   * preguntar de qué tipo es antes de saber a qué tabla ir.
+   */
+  equipoItId: string | null;
   /**
    * Cuándo se hizo el trabajo.
    *
@@ -138,6 +148,7 @@ export interface DatosNuevaOrdenTrabajo {
   descripcion?: string | null;
   tipo: TipoTrabajo;
   equipoId?: string | null;
+  equipoItId?: string | null;
   abiertaPorId?: string | null;
   /** A quién se le asigna. Si no viene, queda para quien la abre. */
   asignadoAId?: string | null;
@@ -204,6 +215,8 @@ export function crearOrdenTrabajo(
     );
   }
 
+  validarElEquipo(datos.equipoId, datos.equipoItId);
+
   const ejecutor = datos.ejecutor ?? 'INTERNO';
   validarEjecutor(ejecutor, datos.proveedorId);
   validarCosto('El costo de mano de obra', datos.costoManoObra);
@@ -226,6 +239,7 @@ export function crearOrdenTrabajo(
     tipo: datos.tipo,
     estado: yaHecha ? 'CERRADA' : 'ABIERTA',
     equipoId: datos.equipoId ?? null,
+    equipoItId: datos.equipoItId ?? null,
     fecha,
     ejecutor,
     // Se guarda solo el que corresponde: dejar los dos permitiría una orden que
@@ -241,6 +255,25 @@ export function crearOrdenTrabajo(
     cerradaPorId: yaHecha ? asignadoAId : null,
     motivoAnulacion: null,
   };
+}
+
+/**
+ * Un trabajo es sobre una máquina de planta o sobre una de informática.
+ *
+ * Nunca sobre las dos: no existe el arreglo que es al mismo tiempo de la bomba
+ * de recibo y de la PC de recepción. Si se permitiera, el historial de las dos
+ * máquinas mostraría el mismo trabajo y el costo se contaría doble.
+ */
+export function validarElEquipo(
+  equipoId: string | null | undefined,
+  equipoItId: string | null | undefined,
+): void {
+  if (equipoId && equipoItId) {
+    throw new ErrorDatosInvalidos(
+      'Un trabajo es sobre una máquina de planta o sobre un equipo de informática, no sobre ' +
+        'los dos. Elegí uno.',
+    );
+  }
 }
 
 /** Interno lleva quien lo hizo; externo lleva qué proveedor. Nunca los dos. */

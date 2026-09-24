@@ -6,6 +6,7 @@ import {
 } from '../dominio/errores';
 import { Reloj } from '../puertos/reloj';
 import { ConsultaEquiposEnMemoria } from './consulta-equipos-en-memoria';
+import { ConsultaEquiposItEnMemoria } from './consulta-equipos-it-en-memoria';
 import { ConsultaUsuariosEnMemoria } from './consulta-usuarios-en-memoria';
 import { PlanesEnMemoria } from './planes-en-memoria';
 import { RegistrarTrabajoHecho } from './registrar-trabajo-hecho';
@@ -24,6 +25,11 @@ function armar() {
   const equipos = new ConsultaEquiposEnMemoria([
     { id: 'eq-7', nombre: 'Bomba recibo 7', codigo: 'B-007' },
   ]);
+  // El inventario de informatica: una PC, para probar que un trabajo puede ser
+  // de una maquina de planta O de una PC, nunca de las dos.
+  const equiposIt = new ConsultaEquiposItEnMemoria([
+    { id: 'pc-1', nombre: 'Dell Optiplex', codigo: 'PC12' },
+  ]);
   // Dos que trabajan y uno de administracion, que no.
   const usuarios = new ConsultaUsuariosEnMemoria([
     { id: 'u1', nombre: 'Facundo', puedeTrabajar: true },
@@ -35,13 +41,14 @@ function armar() {
 
   return {
     repo,
+    equiposIt,
     stock,
     planes,
-    gestionar: new GestionarOrdenesTrabajo(repo, equipos, usuarios, planes, reloj),
+    gestionar: new GestionarOrdenesTrabajo(repo, equipos, equiposIt, usuarios, planes, reloj),
     materiales: new UsarMateriales(repo, stock),
     consultar: new ConsultarOrdenesTrabajo(repo),
     registrarHecho: new RegistrarTrabajoHecho(
-      new GestionarOrdenesTrabajo(repo, equipos, usuarios, planes, reloj),
+      new GestionarOrdenesTrabajo(repo, equipos, equiposIt, usuarios, planes, reloj),
       new UsarMateriales(repo, stock),
     ),
   };
@@ -521,5 +528,62 @@ describe('registrar de una un trabajo ya hecho', () => {
       'u1',
     );
     expect(orden.estado).toBe('ABIERTA');
+  });
+});
+
+describe('un trabajo sobre un equipo de informatica', () => {
+  it('se puede abrir contra una PC, igual que contra una maquina de planta', async () => {
+    const { gestionar } = armar();
+
+    const orden = await gestionar.crear({ ...NUEVA, equipoItId: 'pc-1' });
+
+    expect(orden.equipoItId).toBe('pc-1');
+    expect(orden.equipoId).toBeNull();
+    expect(orden.equipoItNombre).toBe('Equipo IT pc-1');
+  });
+
+  it('con un id de PC que no existe, no se abre', async () => {
+    // Si no se controlara, quedaria una orden apuntando a un equipo inexistente
+    // y el error recien aparece meses despues, al abrir la ficha.
+    const { gestionar } = armar();
+
+    await expect(gestionar.crear({ ...NUEVA, equipoItId: 'pc-999' })).rejects.toThrow(
+      'No existe el equipo de informática',
+    );
+  });
+
+  it('REGRESION: no se puede atar a una maquina de planta Y a una PC a la vez', async () => {
+    // Si se pudiera, el mismo trabajo aparece en el historial de las dos y el
+    // costo se cuenta dos veces.
+    const { gestionar } = armar();
+
+    await expect(gestionar.crear({ ...NUEVA, equipoId: 'eq-7', equipoItId: 'pc-1' })).rejects.toThrow(
+      /no sobre los dos/,
+    );
+  });
+
+  it('REGRESION: editando tampoco puede terminar con las dos', async () => {
+    // El pedido trae solo la PC, pero la orden ya tenia una maquina de planta.
+    // La regla se mira sobre como quedaria, no sobre lo que vino.
+    const { gestionar } = armar();
+    const orden = await gestionar.crear({ ...NUEVA, equipoId: 'eq-7' });
+
+    await expect(gestionar.editar(orden.id, { equipoItId: 'pc-1' }, 'u1')).rejects.toThrow(
+      /no sobre los dos/,
+    );
+  });
+
+  it('soltando la maquina de planta en el mismo pedido, si', async () => {
+    const { gestionar } = armar();
+    const orden = await gestionar.crear({ ...NUEVA, equipoId: 'eq-7' });
+
+    const editada = await gestionar.editar(
+      orden.id,
+      { equipoId: null, equipoItId: 'pc-1' },
+      'u1',
+    );
+
+    expect(editada.equipoId).toBeNull();
+    expect(editada.equipoItId).toBe('pc-1');
   });
 });

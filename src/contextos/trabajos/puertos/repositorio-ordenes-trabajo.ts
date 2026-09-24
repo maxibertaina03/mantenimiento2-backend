@@ -15,6 +15,8 @@ export interface MaterialUsadoConRelaciones extends MaterialUsado {
 export interface OrdenTrabajoConRelaciones extends OrdenTrabajo {
   equipoNombre: string | null;
   equipoCodigo: string | null;
+  equipoItNombre: string | null;
+  equipoItCodigo: string | null;
   proveedorNombre: string | null;
   planNombre: string | null;
   abiertaPorNombre: string | null;
@@ -27,6 +29,7 @@ export interface FiltroOrdenesTrabajo {
   estado?: EstadoOrdenTrabajo;
   tipo?: TipoTrabajo;
   equipoId?: string;
+  equipoItId?: string;
   /** Busca en el número, el título y la descripción. */
   buscar?: string;
   /** Solo las de una persona, para el filtro "las mías". */

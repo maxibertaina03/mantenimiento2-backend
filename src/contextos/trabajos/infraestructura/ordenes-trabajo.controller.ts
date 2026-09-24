@@ -25,6 +25,7 @@ import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo
 import { RegistrarTrabajoHecho } from '../aplicacion/registrar-trabajo-hecho';
 import { UsarMateriales } from '../aplicacion/usar-materiales';
 import { CONSULTA_EQUIPOS, ConsultaEquipos } from '../puertos/consulta-equipos';
+import { CONSULTA_EQUIPOS_IT, ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { CONSULTA_USUARIOS, ConsultaUsuarios } from '../puertos/consulta-usuarios';
 import { PLANES_DE_MANTENIMIENTO, PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import {
@@ -65,13 +66,21 @@ export class OrdenesTrabajoController {
   constructor(
     @Inject(REPOSITORIO_ORDENES_TRABAJO) repo: RepositorioOrdenesTrabajo,
     @Inject(CONSULTA_EQUIPOS) equipos: ConsultaEquipos,
+    @Inject(CONSULTA_EQUIPOS_IT) equiposIt: ConsultaEquiposIt,
     @Inject(CONSULTA_USUARIOS) private readonly usuarios: ConsultaUsuarios,
     @Inject(PLANES_DE_MANTENIMIENTO) planes: PlanesDeMantenimiento,
     @Inject(STOCK) stock: Stock,
     @Inject(RELOJ_TRABAJOS) reloj: Reloj,
     private readonly permisos: PermisosService,
   ) {
-    this.gestionar = new GestionarOrdenesTrabajo(repo, equipos, usuarios, planes, reloj);
+    this.gestionar = new GestionarOrdenesTrabajo(
+      repo,
+      equipos,
+      equiposIt,
+      usuarios,
+      planes,
+      reloj,
+    );
     this.materiales = new UsarMateriales(repo, stock);
     this.consultar = new ConsultarOrdenesTrabajo(repo);
     this.registrarHecho = new RegistrarTrabajoHecho(this.gestionar, this.materiales);
@@ -104,6 +113,30 @@ export class OrdenesTrabajoController {
     );
   }
 
+  /**
+   * Lo mismo para los equipos de informática, contra su propio permiso.
+   *
+   * Son dos inventarios con dos permisos distintos: quién puede ver las
+   * máquinas de planta y quién puede ver las PC no son necesariamente la misma
+   * gente. Reutilizar `equipos.ver` para las dos cosas le abriría una de las
+   * dos listas a quien solo debería ver la otra.
+   */
+  private async validarEleccionDeEquipoIt(
+    equipoItId: string | null | undefined,
+    usuario?: Usuario,
+  ): Promise<void> {
+    if (equipoItId === undefined || equipoItId === null) return;
+    if (!usuario) return;
+
+    const suyos = await this.permisos.permisosDe(usuario.rol);
+    if (suyos.has(PERMISOS.IT_VER)) return;
+
+    throw new ForbiddenException(
+      'Para relacionar una orden de trabajo con un equipo de informática hace falta permiso ' +
+        'para ver el inventario de informática.',
+    );
+  }
+
   @Permisos(PERMISOS.TRABAJOS_VER)
   @Get()
   @ApiOperation({ summary: 'Listar órdenes de trabajo (paginado, con filtros)' })
@@ -114,6 +147,7 @@ export class OrdenesTrabajoController {
         estado: query.estado,
         tipo: query.tipo,
         equipoId: query.equipoId,
+        equipoItId: query.equipoItId,
         asignadoAId: query.asignadoAId,
       },
       query.pagina ?? 1,
@@ -148,6 +182,7 @@ export class OrdenesTrabajoController {
   @ApiOperation({ summary: 'Abrir una orden de trabajo' })
   async crear(@Body() dto: CrearOrdenTrabajoDto, @UsuarioActual() usuario?: Usuario) {
     await this.validarEleccionDeEquipo(dto.equipoId, usuario);
+    await this.validarEleccionDeEquipoIt(dto.equipoItId, usuario);
     // Un solo endpoint para los dos caminos: abrir una orden, o registrar de
     // una un trabajo que ya se hizo con lo que se usó. Lo que los distingue es
     // si viene la resolución, no una ruta aparte.
@@ -182,6 +217,7 @@ export class OrdenesTrabajoController {
     @UsuarioActual() usuario?: Usuario,
   ) {
     await this.validarEleccionDeEquipo(dto.equipoId, usuario);
+    await this.validarEleccionDeEquipoIt(dto.equipoItId, usuario);
     return this.gestionar.editar(id, dto, usuario?.id ?? null);
   }
 

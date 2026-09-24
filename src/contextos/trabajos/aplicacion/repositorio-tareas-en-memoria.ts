@@ -17,6 +17,7 @@ export class RepositorioTareasEnMemoria implements RepositorioTareas {
       ...tarea,
       asignadoANombre: tarea.asignadoAId ? `Usuario ${tarea.asignadoAId}` : null,
       equipoNombre: tarea.equipoId ? `Equipo ${tarea.equipoId}` : null,
+      equipoItNombre: tarea.equipoItId ? `Equipo IT ${tarea.equipoItId}` : null,
       planNombre: tarea.planId ? `Plan ${tarea.planId}` : null,
       rutinaTitulo: tarea.rutinaId ? `Rutina ${tarea.rutinaId}` : null,
       ordenTrabajoNumero: tarea.ordenTrabajoId ? `OT-${tarea.ordenTrabajoId}` : null,
@@ -81,6 +82,7 @@ export class RepositorioTareasEnMemoria implements RepositorioTareas {
       creadoEn: new Date(),
       asignadoANombre: rutina.asignadoAId ? `Usuario ${rutina.asignadoAId}` : null,
       equipoNombre: rutina.equipoId ? `Equipo ${rutina.equipoId}` : null,
+      equipoItNombre: rutina.equipoItId ? `Equipo IT ${rutina.equipoItId}` : null,
     };
     this.rutinas.push(guardada);
     return guardada;

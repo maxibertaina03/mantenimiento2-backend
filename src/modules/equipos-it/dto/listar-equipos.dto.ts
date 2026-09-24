@@ -41,4 +41,11 @@ export class ListarEquiposDto extends PaginacionDto {
   @IsOptional()
   @IsString()
   sinResponsable?: string;
+
+  @ApiPropertyOptional({
+    description: 'Solo los que todavía no tienen la etiqueta QR impresa.',
+  })
+  @IsOptional()
+  @IsString()
+  sinQr?: string;
 }

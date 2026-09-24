@@ -40,6 +40,8 @@ export class RepositorioOrdenesEnMemoria implements RepositorioOrdenesTrabajo {
       creadoEn: orden.abiertaEn,
       equipoNombre: orden.equipoId ? `Equipo ${orden.equipoId}` : null,
       equipoCodigo: null,
+      equipoItNombre: orden.equipoItId ? `Equipo IT ${orden.equipoItId}` : null,
+      equipoItCodigo: null,
       proveedorNombre: orden.proveedorId ? `Proveedor ${orden.proveedorId}` : null,
       planNombre: orden.planId ? `Plan ${orden.planId}` : null,
       abiertaPorNombre: null,

@@ -2,6 +2,7 @@ import { ErrorNoEsSuyo, ErrorTransicionInvalida } from '../dominio/errores';
 import { Reloj } from '../puertos/reloj';
 import { ConsultarCalendario } from './consultar-calendario';
 import { ConsultaEquiposEnMemoria } from './consulta-equipos-en-memoria';
+import { ConsultaEquiposItEnMemoria } from './consulta-equipos-it-en-memoria';
 import { ConsultaUsuariosEnMemoria } from './consulta-usuarios-en-memoria';
 import { GestionarOrdenesTrabajo } from './gestionar-ordenes-trabajo';
 import { GestionarTareas } from './gestionar-tareas';
@@ -25,6 +26,11 @@ function armar(
   const equipos = new ConsultaEquiposEnMemoria([
     { id: 'eq-7', nombre: 'Bomba recibo 7', codigo: 'B-007' },
   ]);
+  // El inventario de informatica: una PC, para probar que un trabajo puede ser
+  // de una maquina de planta O de una PC, nunca de las dos.
+  const equiposIt = new ConsultaEquiposItEnMemoria([
+    { id: 'pc-1', nombre: 'Dell Optiplex', codigo: 'PC12' },
+  ]);
   const usuarios = new ConsultaUsuariosEnMemoria([
     { id: 'u1', nombre: 'Facundo', puedeTrabajar: true },
     { id: 'u2', nombre: 'Leandro', puedeTrabajar: true },
@@ -35,7 +41,7 @@ function armar(
     vencimientos.map((v) => ({ ...v, tareas: null })),
   );
 
-  const gestionarOrdenes = new GestionarOrdenesTrabajo(ordenes, equipos, usuarios, planes, reloj);
+  const gestionarOrdenes = new GestionarOrdenesTrabajo(ordenes, equipos, equiposIt, usuarios, planes, reloj);
   const registrarHecho = new RegistrarTrabajoHecho(
     gestionarOrdenes,
     new UsarMateriales(ordenes, stock),
@@ -47,7 +53,7 @@ function armar(
     planes,
     ordenes,
     calendario: new ConsultarCalendario(tareas, planes, reloj),
-    gestionar: new GestionarTareas(tareas, equipos, usuarios, registrarHecho, reloj),
+    gestionar: new GestionarTareas(tareas, equipos, equiposIt, usuarios, registrarHecho, reloj),
   };
 }
 

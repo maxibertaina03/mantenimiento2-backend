@@ -8,11 +8,13 @@ import {
   OrdenTrabajo,
   reabrirOrdenTrabajo,
   reasignarOrdenTrabajo,
+  validarElEquipo,
   validarQueEsSuyo,
   TipoTrabajo,
   validarQueSePuedeEliminar,
 } from '../dominio/orden-trabajo';
 import { ConsultaEquipos } from '../puertos/consulta-equipos';
+import { ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { ConsultaUsuarios } from '../puertos/consulta-usuarios';
 import { PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import {
@@ -27,6 +29,7 @@ export interface CambiosOrdenTrabajo {
   descripcion?: string | null;
   tipo?: TipoTrabajo;
   equipoId?: string | null;
+  equipoItId?: string | null;
 }
 
 /**
@@ -40,6 +43,7 @@ export class GestionarOrdenesTrabajo {
   constructor(
     private readonly repo: RepositorioOrdenesTrabajo,
     private readonly equipos: ConsultaEquipos,
+    private readonly equiposIt: ConsultaEquiposIt,
     private readonly usuarios: ConsultaUsuarios,
     private readonly planes: PlanesDeMantenimiento,
     private readonly reloj: Reloj,
@@ -62,6 +66,15 @@ export class GestionarOrdenesTrabajo {
     if (!equipoId) return;
     const equipo = await this.equipos.buscarPorId(equipoId);
     if (!equipo) throw new ErrorNoEncontrado(`No existe el equipo con id ${equipoId}`);
+  }
+
+  /** Lo mismo para los de informática, contra la otra tabla. */
+  private async validarEquipoIt(equipoItId: string | null | undefined): Promise<void> {
+    if (!equipoItId) return;
+    const equipo = await this.equiposIt.buscarPorId(equipoItId);
+    if (!equipo) {
+      throw new ErrorNoEncontrado(`No existe el equipo de informática con id ${equipoItId}`);
+    }
   }
 
   /**
@@ -106,6 +119,7 @@ export class GestionarOrdenesTrabajo {
 
   async crear(datos: DatosNuevaOrdenTrabajo): Promise<OrdenTrabajoConRelaciones> {
     await this.validarEquipo(datos.equipoId);
+    await this.validarEquipoIt(datos.equipoItId);
     await this.validarPlan(datos.planId, datos.equipoId ?? null);
     // El dominio decide a quién queda: al elegido, o a quien la abre.
     const orden = crearOrdenTrabajo(datos, this.reloj.ahora());
@@ -152,6 +166,15 @@ export class GestionarOrdenesTrabajo {
     }
 
     if (cambios.equipoId !== undefined) await this.validarEquipo(cambios.equipoId);
+    if (cambios.equipoItId !== undefined) await this.validarEquipoIt(cambios.equipoItId);
+
+    // La regla de "una máquina o la otra" se mira sobre cómo QUEDARÍA la orden,
+    // no sobre lo que vino en el pedido. Mandar solo el equipo de informática a
+    // una orden que ya tiene uno de planta la dejaría con los dos.
+    validarElEquipo(
+      cambios.equipoId === undefined ? orden.equipoId : cambios.equipoId,
+      cambios.equipoItId === undefined ? orden.equipoItId : cambios.equipoItId,
+    );
 
     const aGuardar: Partial<OrdenTrabajo> = {};
 
@@ -173,6 +196,7 @@ export class GestionarOrdenesTrabajo {
 
     if (cambios.tipo !== undefined) aGuardar.tipo = cambios.tipo;
     if (cambios.equipoId !== undefined) aGuardar.equipoId = cambios.equipoId;
+    if (cambios.equipoItId !== undefined) aGuardar.equipoItId = cambios.equipoItId;
 
     return this.repo.actualizar(id, aGuardar);
   }

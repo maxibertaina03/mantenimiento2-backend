@@ -30,6 +30,9 @@ export class EquipoRespuestaDto {
   llevaEspecificaciones!: boolean;
   @ApiProperty({ enum: EstadoEquipoIT }) estado!: EstadoEquipoIT;
 
+  /** Cuándo se imprimió la etiqueta QR. `null` si todavía no se imprimió. */
+  @ApiPropertyOptional({ nullable: true }) qrGeneradoEn!: Date | null;
+
   // Marca, modelo y ubicación salen de catálogos. Se devuelve el id, para el
   // desplegable, y el nombre, para mostrarlo sin una consulta más.
   @ApiPropertyOptional({ nullable: true }) marcaId!: string | null;
@@ -78,6 +81,7 @@ export class EquipoRespuestaDto {
       tipoNombre: e.tipo?.nombre ?? null,
       llevaEspecificaciones: e.tipo?.llevaEspecificaciones ?? true,
       estado: e.estado,
+      qrGeneradoEn: e.qrGeneradoEn,
       marcaId: e.marcaId,
       marcaNombre: e.marca?.nombre ?? null,
       modeloId: e.modeloId,

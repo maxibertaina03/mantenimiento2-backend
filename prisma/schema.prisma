@@ -460,6 +460,13 @@ model EquipoIT {
   tipoId        String
   estado        EstadoEquipoIT @default(EN_DEPOSITO)
 
+  /// Cuándo se generó la etiqueta con el código QR de este equipo.
+  ///
+  /// Igual que en materiales y en los equipos de planta: es una fecha y no un
+  /// sí/no, para poder reimprimir si cambia el formato y para saber cuáles
+  /// quedan sin pegar.
+  qrGeneradoEn DateTime?
+
   /// Marca y modelo salen de los catalogos que ya usan los equipos de planta:
   /// una sola lista de marcas para toda la empresa. Antes eran texto libre y
   /// convivian "Tp Link" y "Tplink" como dos marcas distintas.
@@ -514,6 +521,9 @@ model EquipoIT {
   responsable  Responsable?         @relation(fields: [responsableId], references: [id], onDelete: SetNull)
   asignaciones AsignacionEquipoIT[]
   credenciales Credencial[]
+  trabajos     OrdenTrabajo[]
+  tareas       TareaProgramada[]
+  rutinas      RutinaTarea[]
 
   @@index([tipoId])
   @@index([estado])
@@ -1112,6 +1122,14 @@ model OrdenTrabajo {
   /// ABIERTA | CERRADA | ANULADA.
   estado String @default("ABIERTA")
 
+  /// Sobre qué equipo de informática, si el trabajo es de una PC, una
+  /// impresora o una grabadora.
+  ///
+  /// Son dos columnas y no una porque son dos tablas distintas: una máquina de
+  /// planta y una PC no comparten nada salvo el hecho de romperse. El dominio
+  /// exige que venga una o la otra, nunca las dos.
+  equipoItId String?
+
   /// Sobre qué máquina, cuando se sabe. Opcional y es una decisión de diseño:
   /// hay trabajos que no son sobre un equipo, y obligar a elegir uno haría que
   /// se cargue cualquiera con tal de poder guardar. Un dato inventado es peor
@@ -1167,6 +1185,7 @@ model OrdenTrabajo {
   creadoEn DateTime @default(now())
 
   equipo     Equipo?                @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  equipoIt   EquipoIT?              @relation(fields: [equipoItId], references: [id], onDelete: SetNull)
   proveedor  Proveedor?             @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
   plan       PlanMantenimiento?     @relation(fields: [planId], references: [id], onDelete: SetNull)
   abiertaPor Usuario?               @relation("TrabajosAbiertos", fields: [abiertaPorId], references: [id])
@@ -1177,6 +1196,7 @@ model OrdenTrabajo {
 
   @@index([estado])
   @@index([equipoId])
+  @@index([equipoItId])
   @@index([asignadoAId])
   @@index([proveedorId])
   @@index([planId])
@@ -1242,6 +1262,8 @@ model TareaProgramada {
   asignadoAId String?
 
   equipoId       String?
+  /// Si la tarea es de una PC y no de una maquina de planta.
+  equipoItId     String?
   /// El plan de mantenimiento que la generó, si vino de uno.
   planId         String?
   /// La rutina que la generó, si se repite.
@@ -1255,6 +1277,7 @@ model TareaProgramada {
   asignadoA    Usuario?           @relation("TareasAsignadas", fields: [asignadoAId], references: [id])
   creadaPor    Usuario?           @relation("TareasCreadas", fields: [creadaPorId], references: [id])
   equipo       Equipo?            @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  equipoIt     EquipoIT?          @relation(fields: [equipoItId], references: [id], onDelete: SetNull)
   plan         PlanMantenimiento? @relation(fields: [planId], references: [id], onDelete: Cascade)
   rutina       RutinaTarea?       @relation(fields: [rutinaId], references: [id], onDelete: Cascade)
   ordenTrabajo OrdenTrabajo?      @relation(fields: [ordenTrabajoId], references: [id], onDelete: SetNull)
@@ -1291,6 +1314,8 @@ model RutinaTarea {
   hasta DateTime?
 
   equipoId    String?
+  /// Si la rutina es de una PC y no de una maquina de planta.
+  equipoItId  String?
   /// A quién le toca siempre. Sin esto, cada repetición nace sin dueño.
   asignadoAId String?
 
@@ -1299,6 +1324,7 @@ model RutinaTarea {
   creadoEn    DateTime @default(now())
 
   equipo    Equipo?           @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  equipoIt  EquipoIT?         @relation(fields: [equipoItId], references: [id], onDelete: SetNull)
   asignadoA Usuario?          @relation("RutinasAsignadas", fields: [asignadoAId], references: [id])
   creadaPor Usuario?          @relation("RutinasCreadas", fields: [creadaPorId], references: [id])
   tareas    TareaProgramada[]

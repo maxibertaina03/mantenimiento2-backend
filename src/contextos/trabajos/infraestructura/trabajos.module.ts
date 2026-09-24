@@ -4,6 +4,7 @@ import { CorreoModule } from '../../../common/correo/correo.module';
 import { EquiposModule } from '../../equipos/infraestructura/equipos.module';
 import { MovimientosStockModule } from '../../../modules/movimientos-stock/movimientos-stock.module';
 import { CONSULTA_EQUIPOS } from '../puertos/consulta-equipos';
+import { CONSULTA_EQUIPOS_IT } from '../puertos/consulta-equipos-it';
 import { CONSULTA_USUARIOS } from '../puertos/consulta-usuarios';
 import { REPOSITORIO_TAREAS } from '../puertos/repositorio-tareas';
 import { PLANES_DE_MANTENIMIENTO } from '../puertos/planes-de-mantenimiento';
@@ -15,6 +16,7 @@ import { CalendarioController } from './calendario.controller';
 import { OrdenesTrabajoController } from './ordenes-trabajo.controller';
 import { PrismaRepositorioTareas } from './prisma-repositorio-tareas';
 import { PrismaConsultaEquipos } from './prisma-consulta-equipos';
+import { PrismaConsultaEquiposIt } from './prisma-consulta-equipos-it';
 import { PlanesPorEquipos } from './planes-por-equipos';
 import { PrismaConsultaUsuarios } from './prisma-consulta-usuarios';
 import { PrismaRepositorioOrdenesTrabajo } from './prisma-repositorio-ordenes-trabajo';
@@ -43,6 +45,7 @@ import { StockPorMovimientos } from './stock-por-movimientos';
   providers: [
     { provide: REPOSITORIO_ORDENES_TRABAJO, useClass: PrismaRepositorioOrdenesTrabajo },
     { provide: CONSULTA_EQUIPOS, useClass: PrismaConsultaEquipos },
+    { provide: CONSULTA_EQUIPOS_IT, useClass: PrismaConsultaEquiposIt },
     { provide: CONSULTA_USUARIOS, useClass: PrismaConsultaUsuarios },
     { provide: PLANES_DE_MANTENIMIENTO, useClass: PlanesPorEquipos },
     { provide: REPOSITORIO_TAREAS, useClass: PrismaRepositorioTareas },

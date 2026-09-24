@@ -53,6 +53,7 @@ try {
       const [usuario] = await tx.$queryRawUnsafe(`select id from usuarios limit 1`);
       const [equipo] = await tx.$queryRawUnsafe(`select id from equipos limit 1`);
       const [proveedor] = await tx.$queryRawUnsafe(`select id from proveedores limit 1`);
+      const [equipoIt] = await tx.$queryRawUnsafe(`select id from equipos_it limit 1`);
       const ahora = new Date();
       const dia = new Date(Date.UTC(2026, 8, 23));
 
@@ -63,7 +64,7 @@ try {
       // que se rompió: registrar un trabajo ya hecho.
       const cerrada = {
         titulo: 'Verificacion', descripcion: 'Detalle', tipo: 'CORRECTIVO', estado: 'CERRADA',
-        equipoId: equipo.id, fecha: dia, ejecutor: 'EXTERNO', proveedorId: proveedor.id,
+        equipoId: equipo.id, equipoItId: null, fecha: dia, ejecutor: 'EXTERNO', proveedorId: proveedor.id,
         costoManoObra: 45000, horasParada: 3.5, planId: null,
         abiertaEn: ahora, abiertaPorId: usuario.id, asignadoAId: usuario.id,
         resolucion: 'Se hizo esto', cerradaEn: ahora, cerradaPorId: usuario.id,
@@ -73,15 +74,40 @@ try {
       const leida = await ordenes.buscarPorId(guardada.id);
       comparar('orden que nace cerrada: vuelve completa', cerrada, leida);
 
+      // Y la misma orden pero sobre un equipo de informatica: el campo es nuevo
+      // y es exactamente el tipo de cosa que el repositorio se olvida de
+      // escribir sin que ningun test en memoria lo note.
+      const deInformatica = {
+        titulo: 'Verificacion IT', descripcion: 'Limpieza', tipo: 'PREVENTIVO', estado: 'ABIERTA',
+        equipoId: null, equipoItId: equipoIt.id, fecha: dia, ejecutor: 'INTERNO', proveedorId: null,
+        costoManoObra: null, horasParada: null, planId: null,
+        abiertaEn: ahora, abiertaPorId: usuario.id, asignadoAId: usuario.id,
+        resolucion: null, cerradaEn: null, cerradaPorId: null, motivoAnulacion: null,
+      };
+      const guardadaIt = await ordenes.crear(deInformatica);
+      comparar(
+        'orden sobre un equipo de informatica: vuelve completa',
+        deInformatica,
+        await ordenes.buscarPorId(guardadaIt.id),
+      );
+
       // ── Tareas programadas ────────────────────────────────────────────────
       const tareas = new PrismaRepositorioTareas(fake);
       const tarea = {
         titulo: 'Verificacion', descripcion: 'Detalle', fecha: dia, estado: 'PENDIENTE',
-        asignadoAId: usuario.id, equipoId: equipo.id, planId: null, rutinaId: null,
+        asignadoAId: usuario.id, equipoId: equipo.id, equipoItId: null, planId: null, rutinaId: null,
         ordenTrabajoId: guardada.id, creadaPorId: usuario.id,
       };
       const tareaGuardada = await tareas.crear(tarea);
       comparar('tarea: vuelve completa', tarea, await tareas.buscarPorId(tareaGuardada.id));
+
+      const tareaIt = { ...tarea, equipoId: null, equipoItId: equipoIt.id, ordenTrabajoId: null };
+      const tareaItGuardada = await tareas.crear(tareaIt);
+      comparar(
+        'tarea de informatica: vuelve completa',
+        tareaIt,
+        await tareas.buscarPorId(tareaItGuardada.id),
+      );
 
       // Y que actualizar tampoco pierda nada.
       const cambios = { estado: 'HECHA', asignadoAId: usuario.id, ordenTrabajoId: guardada.id };
@@ -91,10 +117,19 @@ try {
       const rutina = {
         titulo: 'Verificacion', descripcion: 'Detalle', cadaDias: 7,
         desde: dia, hasta: new Date(Date.UTC(2026, 11, 31)),
-        equipoId: equipo.id, asignadoAId: usuario.id, activa: true, creadaPorId: usuario.id,
+        equipoId: equipo.id, equipoItId: null, asignadoAId: usuario.id, activa: true,
+        creadaPorId: usuario.id,
       };
       const rutinaGuardada = await tareas.crearRutina(rutina);
       comparar('rutina: vuelve completa', rutina, await tareas.buscarRutina(rutinaGuardada.id));
+
+      const rutinaIt = { ...rutina, equipoId: null, equipoItId: equipoIt.id };
+      const rutinaItGuardada = await tareas.crearRutina(rutinaIt);
+      comparar(
+        'rutina de informatica: vuelve completa',
+        rutinaIt,
+        await tareas.buscarRutina(rutinaItGuardada.id),
+      );
 
       throw new Deshacer();
     },

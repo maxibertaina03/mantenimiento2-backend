@@ -20,6 +20,7 @@ import { GestionarTareas } from '../aplicacion/gestionar-tareas';
 import { PLANES_DE_MANTENIMIENTO, PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import { REPOSITORIO_TAREAS, RepositorioTareas } from '../puertos/repositorio-tareas';
 import { CONSULTA_EQUIPOS, ConsultaEquipos } from '../puertos/consulta-equipos';
+import { CONSULTA_EQUIPOS_IT, ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { CONSULTA_USUARIOS, ConsultaUsuarios } from '../puertos/consulta-usuarios';
 import { RELOJ_TRABAJOS, Reloj } from '../puertos/reloj';
 import { STOCK, Stock } from '../puertos/stock';
@@ -61,6 +62,7 @@ export class CalendarioController {
     @Inject(REPOSITORIO_TAREAS) tareas: RepositorioTareas,
     @Inject(REPOSITORIO_ORDENES_TRABAJO) ordenes: RepositorioOrdenesTrabajo,
     @Inject(CONSULTA_EQUIPOS) equipos: ConsultaEquipos,
+    @Inject(CONSULTA_EQUIPOS_IT) equiposIt: ConsultaEquiposIt,
     @Inject(CONSULTA_USUARIOS) private readonly usuarios: ConsultaUsuarios,
     @Inject(PLANES_DE_MANTENIMIENTO) planes: PlanesDeMantenimiento,
     @Inject(STOCK) stock: Stock,
@@ -71,9 +73,10 @@ export class CalendarioController {
     this.gestionar = new GestionarTareas(
       tareas,
       equipos,
+      equiposIt,
       usuarios,
       new RegistrarTrabajoHecho(
-        new GestionarOrdenesTrabajo(ordenes, equipos, usuarios, planes, reloj),
+        new GestionarOrdenesTrabajo(ordenes, equipos, equiposIt, usuarios, planes, reloj),
         new UsarMateriales(ordenes, stock),
       ),
       reloj,
@@ -87,6 +90,7 @@ export class CalendarioController {
     return this.consultar.entre(new Date(query.desde), new Date(query.hasta), {
       asignadoAId: query.asignadoAId,
       equipoId: query.equipoId,
+      equipoItId: query.equipoItId,
       soloPendientes: query.soloPendientes === 'true',
     });
   }
@@ -120,6 +124,7 @@ export class CalendarioController {
       fecha: new Date(dto.fecha),
       asignadoAId: dto.asignadoAId,
       equipoId: dto.equipoId,
+      equipoItId: dto.equipoItId,
       creadaPorId: usuario?.id ?? null,
     });
 
@@ -174,6 +179,7 @@ export class CalendarioController {
       desde: new Date(dto.desde),
       hasta: dto.hasta ? new Date(dto.hasta) : null,
       equipoId: dto.equipoId,
+      equipoItId: dto.equipoItId,
       asignadoAId: dto.asignadoAId,
       creadaPorId: usuario?.id ?? null,
     });

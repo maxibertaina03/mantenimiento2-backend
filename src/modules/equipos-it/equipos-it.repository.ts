@@ -14,6 +14,8 @@ export interface FiltroEquipos {
   ubicacionId?: string;
   /** `true` trae solo los que no tienen responsable asignado. */
   sinResponsable?: boolean;
+  /** `true` trae solo los que todavía no tienen la etiqueta QR impresa. */
+  sinQr?: boolean;
 }
 
 export interface DatosAsignacion {
@@ -47,6 +49,7 @@ export class EquiposItRepository {
       ...(filtro.estado ? { estado: filtro.estado } : {}),
       ...(filtro.marcaId ? { marcaId: filtro.marcaId } : {}),
       ...(filtro.ubicacionId ? { ubicacionId: filtro.ubicacionId } : {}),
+      ...(filtro.sinQr ? { qrGeneradoEn: null } : {}),
       // `sinResponsable` gana sobre `responsableId`: pedir las dos cosas es
       // contradictorio, y dejar las dos devolvería siempre vacío sin explicar
       // por qué.
@@ -132,6 +135,20 @@ export class EquiposItRepository {
       data: conClave,
       include: this.relaciones,
     });
+  }
+
+  /**
+   * Deja constancia de que a estos equipos se les imprimió la etiqueta.
+   *
+   * Es una fecha y no un sí/no: sirve para reimprimir si cambia el formato y
+   * para saber cuáles quedan sin pegar. Devuelve cuántos se marcaron.
+   */
+  async marcarQrGenerado(ids: string[], cuando: Date): Promise<number> {
+    const { count } = await this.prisma.equipoIT.updateMany({
+      where: { id: { in: ids } },
+      data: { qrGeneradoEn: cuando },
+    });
+    return count;
   }
 
   eliminar(id: string): Promise<unknown> {

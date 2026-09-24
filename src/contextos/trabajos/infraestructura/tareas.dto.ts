@@ -46,6 +46,14 @@ export class CrearTareaDto {
   @IsOptional()
   @IsUUID()
   equipoId?: string | null;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Sobre qué equipo de informática. Excluyente con equipoId.',
+  })
+  @IsOptional()
+  @IsUUID()
+  equipoItId?: string | null;
 }
 
 export class AsignarTareaDto {
@@ -102,6 +110,11 @@ export class VerCalendarioDto {
   @IsUUID()
   equipoId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  equipoItId?: string;
+
   @ApiPropertyOptional({ description: 'Solo lo que falta hacer.' })
   @IsOptional()
   @IsString()
@@ -140,6 +153,14 @@ export class CrearRutinaDto {
   @IsOptional()
   @IsUUID()
   equipoId?: string | null;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Sobre qué equipo de informática. Excluyente con equipoId.',
+  })
+  @IsOptional()
+  @IsUUID()
+  equipoItId?: string | null;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'A quién le toca siempre.' })
   @IsOptional()

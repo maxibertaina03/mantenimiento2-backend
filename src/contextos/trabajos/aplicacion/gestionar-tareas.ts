@@ -11,6 +11,7 @@ import {
   validarQueSePuedeCompletar,
 } from '../dominio/tarea';
 import { ConsultaEquipos } from '../puertos/consulta-equipos';
+import { ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { ConsultaUsuarios } from '../puertos/consulta-usuarios';
 import {
   RepositorioTareas,
@@ -42,6 +43,7 @@ export class GestionarTareas {
   constructor(
     private readonly repo: RepositorioTareas,
     private readonly equipos: ConsultaEquipos,
+    private readonly equiposIt: ConsultaEquiposIt,
     private readonly usuarios: ConsultaUsuarios,
     private readonly trabajos: RegistrarTrabajoHecho,
     private readonly reloj: Reloj,
@@ -57,6 +59,14 @@ export class GestionarTareas {
     if (!equipoId) return;
     if (!(await this.equipos.buscarPorId(equipoId))) {
       throw new ErrorNoEncontrado(`No existe el equipo con id ${equipoId}`);
+    }
+  }
+
+  /** Lo mismo para los de informática: una PC, una impresora, una grabadora. */
+  private async validarEquipoIt(equipoItId: string | null | undefined): Promise<void> {
+    if (!equipoItId) return;
+    if (!(await this.equiposIt.buscarPorId(equipoItId))) {
+      throw new ErrorNoEncontrado(`No existe el equipo de informática con id ${equipoItId}`);
     }
   }
 
@@ -79,6 +89,7 @@ export class GestionarTareas {
 
   async crear(datos: DatosNuevaTarea): Promise<TareaConRelaciones> {
     await this.validarEquipo(datos.equipoId);
+    await this.validarEquipoIt(datos.equipoItId);
     await this.validarAsignado(datos.asignadoAId);
     return this.repo.crear(crearTarea(datos));
   }
@@ -120,6 +131,7 @@ export class GestionarTareas {
         // que quien la cargó dijera otra cosa en el título.
         tipo: tarea.planId ? 'PREVENTIVO' : 'CORRECTIVO',
         equipoId: tarea.equipoId,
+        equipoItId: tarea.equipoItId,
         planId: tarea.planId,
         // La fecha del trabajo es la de la tarea: una tarea de ayer que se
         // cierra hoy se hizo ayer. Salvo que la tarea sea futura —un service
@@ -153,6 +165,7 @@ export class GestionarTareas {
 
   async crearRutina(datos: DatosNuevaRutina): Promise<RutinaConRelaciones> {
     await this.validarEquipo(datos.equipoId);
+    await this.validarEquipoIt(datos.equipoItId);
     await this.validarAsignado(datos.asignadoAId);
     return this.repo.crearRutina(crearRutina(datos));
   }

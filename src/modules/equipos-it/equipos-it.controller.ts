@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -18,6 +19,7 @@ import { AsignarEquipoDto } from './dto/asignar-equipo.dto';
 import { CrearEquipoDto } from './dto/crear-equipo.dto';
 import { ImportarEquiposDto } from './dto/importar-equipos.dto';
 import { ListarEquiposDto } from './dto/listar-equipos.dto';
+import { MarcarQrDto } from './dto/marcar-qr.dto';
 import { EquiposItService } from './equipos-it.service';
 import { ImportarEquiposService } from './importacion/importar-equipos.service';
 import { Permisos } from '../../common/auth/decorators/permisos.decorator';
@@ -58,6 +60,20 @@ export class EquiposItController {
     return this.service.listar(query);
   }
 
+  @Permisos(PERMISOS.IT_EDITAR)
+  @Post('qr/marcar-generados')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dejar constancia de que a estos equipos se les imprimió la etiqueta QR',
+    description:
+      'Lo llama la pantalla después de mandar a imprimir, para no volver a imprimir las que ' +
+      'ya están pegadas.',
+  })
+  marcarQrGenerados(@Body() dto: MarcarQrDto) {
+    return this.service.marcarQrGenerado(dto.ids).then((marcados) => ({ marcados }));
+  }
+
+  // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
   @Permisos(PERMISOS.IT_VER)
   @Get('resumen')
   @ApiOperation({ summary: 'Conteo de equipos por tipo y por estado' })

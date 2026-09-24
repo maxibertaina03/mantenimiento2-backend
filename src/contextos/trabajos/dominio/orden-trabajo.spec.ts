@@ -24,6 +24,7 @@ const orden = (cambios: Partial<OrdenTrabajo> = {}): OrdenTrabajo => ({
   tipo: 'CORRECTIVO',
   estado: 'ABIERTA',
   equipoId: null,
+  equipoItId: null,
   fecha: AHORA,
   ejecutor: 'INTERNO',
   proveedorId: null,

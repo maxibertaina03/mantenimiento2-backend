@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { SELECT_NOMBRE_EQUIPO_IT, nombreDeEquipoIt } from './prisma-consulta-equipos-it';
 import {
   Ejecutor,
   EstadoOrdenTrabajo,
@@ -17,6 +18,7 @@ import {
 
 const RELACIONES = {
   equipo: { select: { nombre: true, codigoInterno: true } },
+  equipoIt: { select: SELECT_NOMBRE_EQUIPO_IT },
   proveedor: { select: { nombre: true } },
   plan: { select: { nombre: true } },
   abiertaPor: { select: { nombre: true } },
@@ -66,6 +68,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       tipo: fila.tipo as TipoTrabajo,
       estado: fila.estado as EstadoOrdenTrabajo,
       equipoId: fila.equipoId,
+      equipoItId: fila.equipoItId,
       fecha: fila.fecha,
       ejecutor: fila.ejecutor as Ejecutor,
       proveedorId: fila.proveedorId,
@@ -83,6 +86,8 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       creadoEn: fila.creadoEn,
       equipoNombre: fila.equipo?.nombre ?? null,
       equipoCodigo: fila.equipo?.codigoInterno ?? null,
+      equipoItNombre: fila.equipoIt ? nombreDeEquipoIt(fila.equipoIt) : null,
+      equipoItCodigo: fila.equipoIt?.codigoInterno ?? null,
       proveedorNombre: fila.proveedor?.nombre ?? null,
       planNombre: fila.plan?.nombre ?? null,
       abiertaPorNombre: fila.abiertaPor?.nombre ?? null,
@@ -97,6 +102,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       ...(filtro.estado ? { estado: filtro.estado } : {}),
       ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
       ...(filtro.equipoId ? { equipoId: filtro.equipoId } : {}),
+      ...(filtro.equipoItId ? { equipoItId: filtro.equipoItId } : {}),
       ...(filtro.asignadoAId ? { asignadoAId: filtro.asignadoAId } : {}),
       ...(filtro.desde || filtro.hasta
         ? {
@@ -150,6 +156,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
           tipo: orden.tipo,
           estado: orden.estado,
           equipoId: orden.equipoId,
+          equipoItId: orden.equipoItId,
           fecha: orden.fecha,
           ejecutor: orden.ejecutor,
           proveedorId: orden.proveedorId,
@@ -208,6 +215,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
         ...(cambios.tipo === undefined ? {} : { tipo: cambios.tipo }),
         ...(cambios.estado === undefined ? {} : { estado: cambios.estado }),
         ...(cambios.equipoId === undefined ? {} : { equipoId: cambios.equipoId }),
+        ...(cambios.equipoItId === undefined ? {} : { equipoItId: cambios.equipoItId }),
         ...(cambios.asignadoAId === undefined ? {} : { asignadoAId: cambios.asignadoAId }),
         ...(cambios.ejecutor === undefined ? {} : { ejecutor: cambios.ejecutor }),
         ...(cambios.proveedorId === undefined ? {} : { proveedorId: cambios.proveedorId }),

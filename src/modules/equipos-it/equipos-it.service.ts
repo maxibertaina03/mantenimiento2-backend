@@ -100,6 +100,7 @@ export class EquiposItService {
       marcaId: query.marcaId,
       ubicacionId: query.ubicacionId,
       sinResponsable: query.sinResponsable === 'true',
+      sinQr: query.sinQr === 'true',
     };
 
     const [items, total] = await Promise.all([
@@ -113,6 +114,16 @@ export class EquiposItService {
       pagina: query.pagina,
       limite: query.limite,
     };
+  }
+
+  /**
+   * Deja constancia de que a estos equipos se les imprimió la etiqueta QR.
+   *
+   * El reloj lo pone el service y no la pantalla: la fecha tiene que ser la del
+   * servidor, no la de la máquina desde la que se imprimió.
+   */
+  async marcarQrGenerado(ids: string[]): Promise<number> {
+    return this.repo.marcarQrGenerado(ids, new Date());
   }
 
   async obtener(id: string): Promise<EquipoRespuestaDto> {

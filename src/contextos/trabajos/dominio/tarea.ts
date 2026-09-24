@@ -1,4 +1,5 @@
 import { ErrorDatosInvalidos, ErrorNoEsSuyo, ErrorTransicionInvalida } from './errores';
+import { validarElEquipo } from './orden-trabajo';
 
 /**
  * Una tarea programada: algo que hay que hacer, con fecha y con dueño.
@@ -40,6 +41,8 @@ export interface Tarea {
    */
   asignadoAId: string | null;
   equipoId: string | null;
+  /** O sobre un equipo de informática: una PC, una impresora, una grabadora. */
+  equipoItId: string | null;
   /** El plan de mantenimiento que la generó, si vino de uno. */
   planId: string | null;
   /** La rutina que la generó, si se repite. */
@@ -56,6 +59,7 @@ export interface DatosNuevaTarea {
   fecha: Date;
   asignadoAId?: string | null;
   equipoId?: string | null;
+  equipoItId?: string | null;
   planId?: string | null;
   rutinaId?: string | null;
   creadaPorId?: string | null;
@@ -73,6 +77,8 @@ export function soloElDia(fecha: Date): Date {
 }
 
 export function crearTarea(datos: DatosNuevaTarea): Omit<Tarea, 'id' | 'creadoEn'> {
+  validarElEquipo(datos.equipoId, datos.equipoItId);
+
   const titulo = limpiar(datos.titulo);
   if (titulo === null) {
     throw new ErrorDatosInvalidos(
@@ -89,6 +95,7 @@ export function crearTarea(datos: DatosNuevaTarea): Omit<Tarea, 'id' | 'creadoEn
     estado: 'PENDIENTE',
     asignadoAId: datos.asignadoAId ?? null,
     equipoId: datos.equipoId ?? null,
+    equipoItId: datos.equipoItId ?? null,
     planId: datos.planId ?? null,
     rutinaId: datos.rutinaId ?? null,
     ordenTrabajoId: null,
@@ -182,6 +189,8 @@ export interface Rutina {
   /** Hasta cuándo. Sin esto, para siempre. */
   hasta: Date | null;
   equipoId: string | null;
+  /** O de un equipo de informática. La misma regla que en las tareas. */
+  equipoItId: string | null;
   /** A quién le toca siempre. Sin esto, cada ocurrencia nace sin dueño. */
   asignadoAId: string | null;
   activa: boolean;
@@ -196,11 +205,14 @@ export interface DatosNuevaRutina {
   desde: Date;
   hasta?: Date | null;
   equipoId?: string | null;
+  equipoItId?: string | null;
   asignadoAId?: string | null;
   creadaPorId?: string | null;
 }
 
 export function crearRutina(datos: DatosNuevaRutina): Omit<Rutina, 'id' | 'creadoEn'> {
+  validarElEquipo(datos.equipoId, datos.equipoItId);
+
   const titulo = limpiar(datos.titulo);
   if (titulo === null) {
     throw new ErrorDatosInvalidos('Contá qué hay que hacer en cada repetición.');
@@ -225,6 +237,7 @@ export function crearRutina(datos: DatosNuevaRutina): Omit<Rutina, 'id' | 'cread
     desde,
     hasta,
     equipoId: datos.equipoId ?? null,
+    equipoItId: datos.equipoItId ?? null,
     asignadoAId: datos.asignadoAId ?? null,
     activa: true,
     creadaPorId: datos.creadaPorId ?? null,

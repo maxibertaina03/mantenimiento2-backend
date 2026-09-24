@@ -4,6 +4,7 @@ import { Rutina, Tarea } from '../dominio/tarea';
 export interface TareaConRelaciones extends Tarea {
   asignadoANombre: string | null;
   equipoNombre: string | null;
+  equipoItNombre: string | null;
   planNombre: string | null;
   rutinaTitulo: string | null;
   ordenTrabajoNumero: string | null;
@@ -12,11 +13,13 @@ export interface TareaConRelaciones extends Tarea {
 export interface RutinaConRelaciones extends Rutina {
   asignadoANombre: string | null;
   equipoNombre: string | null;
+  equipoItNombre: string | null;
 }
 
 export interface FiltroTareas {
   asignadoAId?: string;
   equipoId?: string;
+  equipoItId?: string;
   /** Por defecto vienen todas; sirve para ver solo lo que falta hacer. */
   soloPendientes?: boolean;
 }
