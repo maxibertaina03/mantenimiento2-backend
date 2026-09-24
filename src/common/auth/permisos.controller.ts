@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 import type { Usuario } from '@prisma/client';
@@ -25,7 +26,10 @@ class RolParamDto {
 @ApiBearerAuth()
 @Controller('permisos')
 export class PermisosController {
-  constructor(private readonly service: PermisosService) {}
+  constructor(
+    private readonly service: PermisosService,
+    private readonly config: ConfigService,
+  ) {}
 
   /**
    * Lo que puede hacer quien está mirando.
@@ -39,9 +43,25 @@ export class PermisosController {
   @Get('mios')
   @ApiOperation({ summary: 'Los permisos del usuario que está en sesión' })
   async mios(@UsuarioActual() usuario?: Usuario) {
-    if (!usuario) return { rol: null, permisos: [] };
-    const permisos = await this.service.permisosDe(usuario.rol);
-    return { rol: usuario.rol, permisos: [...permisos] };
+    if (usuario) {
+      const permisos = await this.service.permisosDe(usuario.rol);
+      return { rol: usuario.rol, permisos: [...permisos] };
+    }
+
+    // Con AUTH_DISABLED no hay sesión. `usuarios/me` ya contesta ADMIN en ese
+    // caso, y acá se devolvía la lista vacía: el frontend se encontraba con un
+    // administrador sin ningún permiso y escondía todas las pantallas. Trabajar
+    // en local mostraba "Tu rol no tiene acceso a esta sección" en todos lados.
+    //
+    // No abre nada: con AUTH_DISABLED la API ya está completamente abierta y el
+    // guard dejó pasar esto antes de llegar acá. La condición es sobre el valor
+    // exacto "true" para que un typo no la active en producción.
+    if (this.config.get<string>('AUTH_DISABLED') === 'true') {
+      const permisos = await this.service.permisosDe(RolUsuario.ADMIN);
+      return { rol: RolUsuario.ADMIN, permisos: [...permisos] };
+    }
+
+    return { rol: null, permisos: [] };
   }
 
   /**
