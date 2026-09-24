@@ -16,7 +16,12 @@
     "prisma:generate": "prisma generate",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-
+    "local:migrar": "dotenv -e .env -- prisma migrate deploy",
+    "local:seed": "dotenv -e .env -- ts-node prisma/seed.ts",
+    "local:studio": "dotenv -e .env -- prisma studio",
+    "local:api": "dotenv -e .env -- nest start --watch",
+    "local:nueva-migracion": "dotenv -e .env -- node scripts/guardia-entorno.js && dotenv -e .env -- prisma migrate dev",
+    "local:reset": "dotenv -e .env -- node scripts/guardia-entorno.js && dotenv -e .env -- prisma migrate reset --force",
     "prueba:migrar": "dotenv -e .env.prueba -- prisma migrate deploy",
     "prueba:nueva-migracion": "dotenv -e .env.prueba -- node scripts/guardia-entorno.js && dotenv -e .env.prueba -- prisma migrate dev",
     "prueba:reset": "dotenv -e .env.prueba -- node scripts/guardia-entorno.js && dotenv -e .env.prueba -- prisma migrate reset --force",

@@ -5,8 +5,14 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { FiltroExcepcionesHttp } from './common/filters/http-exception.filter';
+import { exigirBaseCorrecta } from './common/prisma/guardia-base';
 
 async function bootstrap() {
+  // Lo PRIMERO, antes de crear la aplicación: si la base no corresponde al
+  // entorno declarado, acá se corta. Después de `NestFactory.create` ya habría
+  // una conexión abierta contra la base equivocada.
+  exigirBaseCorrecta();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // El PDF de una orden viaja en base64 dentro del JSON, y el límite por

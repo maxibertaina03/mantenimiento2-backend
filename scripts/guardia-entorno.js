@@ -7,9 +7,15 @@
  * mismo, y nada en el comando avisa a qué base le está pegando.
  *
  * La regla: los comandos destructivos solo corren si el archivo de entorno
- * declara ENTORNO=prueba. El .env de producción no lo declara, así que apuntarle
- * uno de esos comandos falla acá en vez de borrarle los datos.
+ * declara ENTORNO=local o ENTORNO=prueba. Producción declara
+ * ENTORNO=produccion, y el servidor de Render no declara nada, así que
+ * apuntarle uno de estos comandos falla acá en vez de borrarle los datos.
+ *
+ * `local` se sumó cuando el trabajo pasó a hacerse contra el Postgres de la
+ * máquina: ahí borrar y rehacer la base es lo normal, y tiene que ser cómodo.
+ * Lo que nunca se afloja es el otro lado.
  */
+const PERMITIDOS = ['local', 'prueba'];
 const entorno = process.env.ENTORNO;
 const url = process.env.DATABASE_URL ?? '';
 
@@ -23,7 +29,7 @@ function describir(cadena) {
   }
 }
 
-if (entorno !== 'prueba') {
+if (!PERMITIDOS.includes(entorno)) {
   console.error(
     [
       '',
@@ -33,10 +39,10 @@ if (entorno !== 'prueba') {
       `     ENTORNO       : ${entorno ?? '(sin definir)'}`,
       '',
       '     Este comando puede BORRAR TODOS LOS DATOS, y solo se permite',
-      '     contra la base de prueba (ENTORNO=prueba).',
+      '     contra una base de trabajo (ENTORNO=local o ENTORNO=prueba).',
       '',
-      '     Si querías correrlo en la base de prueba, usá los scripts que ya',
-      '     apuntan a .env.prueba:  npm run prueba:migrar  ·  npm run prueba:reset',
+      '     Si querías correrlo en tu base local, usá los scripts que ya',
+      '     apuntan a .env:  npm run local:migrar  ·  npm run local:reset',
       '',
       '     Si de verdad necesitás tocar producción, hacelo con una migración',
       '     revisada (npm run prisma:deploy), nunca con reset ni migrate dev.',
@@ -46,4 +52,4 @@ if (entorno !== 'prueba') {
   process.exit(1);
 }
 
-console.log(`✅ Entorno de prueba (${describir(url)}). Adelante.`);
+console.log(`✅ Entorno de ${entorno} (${describir(url)}). Adelante.`);
