@@ -251,10 +251,56 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
 
   describe('Equipos IT', () => {
     let notebookId: string;
+    let responsableId: string;
     /** Ids del catálogo de tipos, por nombre. */
     let tipos: Record<string, string> = {};
+    /**
+     * Ids de los catálogos de marca, modelo y ubicación.
+     *
+     * Antes eran texto libre en el alta del equipo. Pasaron a ser catálogos
+     * compartidos con los equipos de planta porque convivían "Tp Link" y
+     * "Tplink" como dos marcas distintas, y "Oficina deposito" con "Oficina
+     * Deposito". Ahora hay que crearlos antes y mandar el id.
+     */
+    const marcas: Record<string, string> = {};
+    const modelos: Record<string, string> = {};
+    const lugares: Record<string, string> = {};
+
+    /** Crea la marca si no está, y devuelve su id. */
+    async function marca(nombre: string): Promise<string> {
+      if (!marcas[nombre]) {
+        const r = await http.post('/api/marcas-equipo').send({ nombre }).expect(201);
+        marcas[nombre] = r.body.id;
+      }
+      return marcas[nombre];
+    }
+
+    async function modelo(nombreMarca: string, nombre: string): Promise<string> {
+      const clave = `${nombreMarca}/${nombre}`;
+      if (!modelos[clave]) {
+        const r = await http
+          .post('/api/modelos-equipo')
+          .send({ marcaId: await marca(nombreMarca), nombre })
+          .expect(201);
+        modelos[clave] = r.body.id;
+      }
+      return modelos[clave];
+    }
+
+    async function lugar(nombre: string): Promise<string> {
+      if (!lugares[nombre]) {
+        const r = await http.post('/api/ubicaciones-equipo').send({ nombre }).expect(201);
+        lugares[nombre] = r.body.id;
+      }
+      return lugares[nombre];
+    }
 
     beforeAll(async () => {
+      // Los equipos se asignan a un RESPONSABLE, no a un usuario del sistema:
+      // mucha gente de planta tiene equipo y no tiene cuenta.
+      const r = await http.post('/api/responsables').send({ nombre: 'Juan Pérez' }).expect(201);
+      responsableId = r.body.id;
+
       const res = await http.get('/api/tipos-equipo').expect(200);
       tipos = Object.fromEntries(
         res.body.map((t: { nombre: string; id: string }) => [t.nombre, t.id]),
@@ -267,8 +313,8 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         .send({
           codigoInterno: 'IT-0042',
           tipoId: tipos['Notebook'],
-          marca: 'Dell',
-          modelo: 'Latitude 5420',
+          marcaId: await marca('Dell'),
+          modeloId: await modelo('Dell', 'Latitude 5420'),
           numeroSerie: 'SN-8F3K2P',
           procesador: 'Intel Core i5-1135G7',
           memoriaRamGb: 16,
@@ -280,14 +326,16 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
           nombreEnRed: 'PC-ADMIN-01',
           accesoRemoto: 'ANYDESK',
           accesoRemotoId: '123 456 789',
-          ubicacion: 'Administración',
+          ubicacionId: await lugar('Administración'),
           proveedorId,
         })
         .expect(201);
 
       expect(res.body).toMatchObject({
         tipoNombre: 'Notebook',
-        marca: 'Dell',
+        // La respuesta trae el nombre resuelto del catalogo, no el texto que
+        // se mando: ahora se manda un id.
+        marcaNombre: 'Dell',
         memoriaRamGb: 16,
         accesoRemoto: 'ANYDESK',
         estado: 'EN_DEPOSITO',
@@ -300,10 +348,10 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         .post('/api/equipos-it')
         .send({
           tipoId: tipos['Cámara de seguridad'],
-          marca: 'Hikvision',
-          modelo: 'DS-2CD1043G0',
+          marcaId: await marca('Hikvision'),
+          modeloId: await modelo('Hikvision', 'DS-2CD1043G0'),
           direccionIp: '192.168.1.90',
-          ubicacion: 'Portón de ingreso',
+          ubicacionId: await lugar('Portón de ingreso'),
         })
         .expect(201);
       expect(res.body.memoriaRamGb).toBeNull();
@@ -315,8 +363,8 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         .post('/api/equipos-it')
         .send({
           tipoId: tipos['Servidor'],
-          marca: 'HP',
-          modelo: 'ProLiant DL380',
+          marcaId: await marca('HP'),
+          modeloId: await modelo('HP', 'ProLiant DL380'),
           procesador: 'Xeon Silver 4210',
           memoriaRamGb: 64,
           discoTipo: 'NVME',
@@ -328,7 +376,11 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
 
       await http
         .post('/api/equipos-it')
-        .send({ tipoId: tipos['Celular'], marca: 'Samsung', modelo: 'Galaxy A54' })
+        .send({
+          tipoId: tipos['Celular'],
+          marcaId: await marca('Samsung'),
+          modeloId: await modelo('Samsung', 'Galaxy A54'),
+        })
         .expect(201);
     });
 
@@ -338,8 +390,8 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         .send({
           codigoInterno: 'IT-0042',
           tipoId: tipos['PC de escritorio'],
-          marca: 'HP',
-          modelo: 'EliteDesk',
+          marcaId: await marca('HP'),
+          modeloId: await modelo('HP', 'EliteDesk'),
         })
         .expect(400);
     });
@@ -349,8 +401,8 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         .post('/api/equipos-it')
         .send({
           tipoId: tipos['PC de escritorio'],
-          marca: 'HP',
-          modelo: 'X',
+          marcaId: await marca('HP'),
+          modeloId: await modelo('HP', 'X'),
           direccionIp: '999.999.1.1',
         })
         .expect(400);
@@ -361,8 +413,8 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         .post('/api/equipos-it')
         .send({
           tipoId: tipos['PC de escritorio'],
-          marca: 'HP',
-          modelo: 'X',
+          marcaId: await marca('HP'),
+          modeloId: await modelo('HP', 'X'),
           direccionMac: 'no-es-mac',
         })
         .expect(400);
@@ -373,7 +425,7 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
       expect(porMarca.body.datos.length).toBe(1);
 
       const porIp = await http.get('/api/equipos-it?buscar=192.168.1.90').expect(200);
-      expect(porIp.body.datos[0].marca).toBe('Hikvision');
+      expect(porIp.body.datos[0].marcaNombre).toBe('Hikvision');
 
       const porRed = await http.get('/api/equipos-it?buscar=PC-ADMIN').expect(200);
       expect(porRed.body.datos[0].codigoInterno).toBe('IT-0042');
@@ -394,25 +446,25 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
     it('ASIGNACIÓN: entregar el equipo lo deja EN_USO', async () => {
       const res = await http
         .patch(`/api/equipos-it/${notebookId}/asignar`)
-        .send({ usuarioId, motivo: 'Ingreso de personal' })
+        .send({ responsableId, motivo: 'Ingreso de personal' })
         .expect(200);
 
       expect(res.body.estado).toBe('EN_USO');
-      expect(res.body.asignadoANombre).toBe('Juan Pérez');
+      expect(res.body.responsableNombre).toBe('Juan Pérez');
     });
 
     it('HISTORIAL: queda registrado el tramo vigente', async () => {
       const res = await http.get(`/api/equipos-it/${notebookId}/asignaciones`).expect(200);
       expect(res.body).toHaveLength(1);
       expect(res.body[0]).toMatchObject({
-        usuarioNombre: 'Juan Pérez',
+        responsableNombre: 'Juan Pérez',
         motivo: 'Ingreso de personal',
         vigente: true,
       });
     });
 
     it('REGRESIÓN: reasignar al mismo usuario se rechaza', async () => {
-      await http.patch(`/api/equipos-it/${notebookId}/asignar`).send({ usuarioId }).expect(400);
+      await http.patch(`/api/equipos-it/${notebookId}/asignar`).send({ responsableId }).expect(400);
     });
 
     it('REGRESIÓN: un equipo asignado no se puede eliminar', async () => {
@@ -422,10 +474,10 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
     it('DEVOLUCIÓN: cierra el tramo anterior y abre uno nuevo', async () => {
       const res = await http
         .patch(`/api/equipos-it/${notebookId}/asignar`)
-        .send({ usuarioId: null, motivo: 'Baja del empleado' })
+        .send({ responsableId: null, motivo: 'Baja del empleado' })
         .expect(200);
       expect(res.body.estado).toBe('EN_DEPOSITO');
-      expect(res.body.asignadoAId).toBeNull();
+      expect(res.body.responsableId).toBeNull();
 
       const historial = await http.get(`/api/equipos-it/${notebookId}/asignaciones`).expect(200);
       expect(historial.body).toHaveLength(2);
@@ -433,7 +485,7 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
       // Solo puede haber UN tramo vigente.
       const vigentes = historial.body.filter((a: any) => a.vigente);
       expect(vigentes).toHaveLength(1);
-      expect(vigentes[0].usuarioNombre).toBeNull(); // depósito
+      expect(vigentes[0].responsableNombre).toBeNull(); // depósito
     });
 
     it('REGRESIÓN: un equipo dado de baja no se puede asignar', async () => {
@@ -441,8 +493,8 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         .post('/api/equipos-it')
         .send({
           tipoId: tipos['PC de escritorio'],
-          marca: 'Viejo',
-          modelo: 'Pentium',
+          marcaId: await marca('Viejo'),
+          modeloId: await modelo('Viejo', 'Pentium'),
           estado: 'DADO_DE_BAJA',
         })
         .expect(201);
@@ -481,7 +533,9 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
       expect(res.body.datos[0]).toMatchObject({
         codigoInterno: 'IMP-PC1',
         tipoNombre: 'PC de escritorio',
-        marca: 'Intel',
+        // La importacion resuelve el texto del CSV contra el catalogo, y la
+        // respuesta trae el nombre resuelto.
+        marcaNombre: 'Intel',
         accesoRemotoId: '737214468',
       });
     });
@@ -511,8 +565,8 @@ describe('Módulos IT y Órdenes de compra (e2e)', () => {
         .post('/api/equipos-it')
         .send({
           tipoId: tipos['PC de escritorio'],
-          marca: 'Lenovo',
-          modelo: 'ThinkCentre',
+          marcaId: await marca('Lenovo'),
+          modeloId: await modelo('Lenovo', 'ThinkCentre'),
           garantiaHasta: '2020-01-01',
         })
         .expect(201);

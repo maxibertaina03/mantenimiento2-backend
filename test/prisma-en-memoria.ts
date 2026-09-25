@@ -39,6 +39,13 @@ export function crearPrismaEnMemoria() {
     renglones: [] as any[],
     contadores: [] as any[],
     permisosRol: [] as any[],
+    // Marca, modelo y ubicacion dejaron de ser texto libre y pasaron a ser
+    // catalogos compartidos con los equipos de planta. El fake no los tenia, y
+    // por eso no se podia crear un equipo de informatica en un e2e.
+    responsables: [] as any[],
+    marcasEquipo: [] as any[],
+    modelosEquipo: [] as any[],
+    ubicacionesEquipo: [] as any[],
     credenciales: [] as any[],
     rotacionesCredencial: [] as any[],
     vistasCredencial: [] as any[],
@@ -159,6 +166,29 @@ export function crearPrismaEnMemoria() {
     `${(++secuencia).toString(16).padStart(8, '0')}-0000-4000-8000-000000000000`;
 
   /** Filtro mínimo: igualdad, `contains` (insensitive), `in`, y rangos gte/lte. */
+  /**
+   * La fila relacionada por ese campo, para poder filtrar por ella.
+   *
+   * Devuelve `undefined` si el campo no es una relacion conocida, que es como
+   * `coincide` distingue "no aplica" de "la relacion existe pero esta vacia".
+   */
+  function relacionadaDe(fila: any, campo: string): any {
+    const porClave: Record<string, [any[], string]> = {
+      marca: [db.marcasEquipo, 'marcaId'],
+      modelo: [db.modelosEquipo, 'modeloId'],
+      ubicacion: [db.ubicacionesEquipo, 'ubicacionId'],
+      responsable: [db.responsables, 'responsableId'],
+      tipo: [db.tiposEquipo, 'tipoId'],
+      categoria: [db.categorias, 'categoriaId'],
+      unidad: [db.unidadesMedida, 'unidadId'],
+      proveedor: [db.proveedores, 'proveedorId'],
+    };
+    const encontrado = porClave[campo];
+    if (!encontrado) return undefined;
+    const [coleccion, clave] = encontrado;
+    return coleccion.find((x: any) => x.id === fila[clave]) ?? null;
+  }
+
   function coincide(fila: any, where: any = {}): boolean {
     return Object.entries(where).every(([campo, cond]: [string, any]) => {
       if (campo === 'OR') return (cond as any[]).some((c) => coincide(fila, c));
@@ -181,6 +211,14 @@ export function crearPrismaEnMemoria() {
         return cond.mode === 'insensitive' ? a.toLowerCase() === b.toLowerCase() : a === b;
       }
       if ('in' in cond) return cond.in.includes(valor);
+
+      // Condicion sobre una relacion: { marca: { nombre: { contains } } }.
+      // Se resuelve buscando la fila relacionada y aplicando la condicion
+      // sobre ella. Sin esto, buscar un equipo por su marca no encontraba
+      // nada: la marca dejo de ser un texto de la fila y paso a ser otra tabla.
+      const relacion = relacionadaDe(fila, campo);
+      if (relacion !== undefined) return relacion === null ? false : coincide(relacion, cond);
+
       if ('gte' in cond || 'lte' in cond) {
         // Los rangos se usan para fechas (movimientos) y para números
         // (stockActual, que es Decimal). Comparar un Decimal como fecha daba
@@ -286,6 +324,22 @@ export function crearPrismaEnMemoria() {
         include.movimientos.orderBy,
       );
     }
+    if (include.responsable) {
+      const r = db.responsables.find((x) => x.id === fila.responsableId);
+      salida.responsable = r ? { nombre: r.nombre, activo: r.activo } : null;
+    }
+    if (include.marca) {
+      const m = db.marcasEquipo.find((x) => x.id === fila.marcaId);
+      salida.marca = m ? { nombre: m.nombre } : null;
+    }
+    if (include.modelo) {
+      const m = db.modelosEquipo.find((x) => x.id === fila.modeloId);
+      salida.modelo = m ? { nombre: m.nombre } : null;
+    }
+    if (include.ubicacion) {
+      const u = db.ubicacionesEquipo.find((x) => x.id === fila.ubicacionId);
+      salida.ubicacion = u ? { nombre: u.nombre } : null;
+    }
     if (include.tipo) {
       const t = db.tiposEquipo.find((x) => x.id === fila.tipoId);
       salida.tipo = t ? { nombre: t.nombre, llevaEspecificaciones: t.llevaEspecificaciones } : null;
@@ -320,11 +374,15 @@ export function crearPrismaEnMemoria() {
     // ── El baul de credenciales ──
     if (include.equipoIt) {
       const e = db.equiposIt.find((x) => x.id === fila.equipoItId);
-      // Marca y modelo son catalogos que este fake todavia no guarda. El
-      // nombre del equipo se arma igual con el codigo interno, que es lo que
-      // usa la pantalla cuando faltan.
+      const marcaDe = db.marcasEquipo.find((m) => m.id === e?.marcaId);
+      const modeloDe = db.modelosEquipo.find((m) => m.id === e?.modeloId);
       salida.equipoIt = e
-        ? { id: e.id, codigoInterno: e.codigoInterno ?? null, marca: null, modelo: null }
+        ? {
+            id: e.id,
+            codigoInterno: e.codigoInterno ?? null,
+            marca: marcaDe ? { nombre: marcaDe.nombre } : null,
+            modelo: modeloDe ? { nombre: modeloDe.nombre } : null,
+          }
         : null;
     }
     if (include.rotadaPor) {
@@ -529,11 +587,15 @@ export function crearPrismaEnMemoria() {
   }
 
   const prisma: any = {
+    // `activo: true` replica el @default del esquema. Sin eso, todo material
+    // creado en un e2e nacia desactivado y las ordenes de compra lo rechazaban
+    // con un 400: era la causa de las 37 fallas de esa suite.
     material: delegate(db.materiales, () => ({
       stockActual: aDecimal(0),
       stockMinimo: aDecimal(0),
       notas: null,
       unidadId: null,
+      activo: true,
     })),
     categoriaMaterial: delegate(db.categorias, () => ({ descripcion: null })),
     proveedor: delegate(db.proveedores, () => ({
@@ -619,6 +681,11 @@ export function crearPrismaEnMemoria() {
     // TODOS los e2e fallaban antes de correr su primer test. No se notaba
     // porque `npm test` no los ejecuta: hay que pedir `npm run test:all`.
     permisoRol: delegate(db.permisosRol),
+
+    responsable: delegate(db.responsables, () => ({ activo: true })),
+    marcaEquipo: delegate(db.marcasEquipo, () => ({ activo: true })),
+    modeloEquipo: delegate(db.modelosEquipo, () => ({ activo: true })),
+    ubicacionEquipo: delegate(db.ubicacionesEquipo, () => ({ activo: true })),
 
     credencial: delegate(db.credenciales, () => ({ activo: true })),
     rotacionCredencial: delegate(db.rotacionesCredencial),
