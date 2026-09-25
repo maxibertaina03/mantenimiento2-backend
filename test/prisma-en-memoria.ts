@@ -13,13 +13,35 @@ export function crearPrismaEnMemoria() {
     categorias: [] as any[],
     proveedores: [] as any[],
     movimientos: [] as any[],
-    usuarios: [] as any[],
+    /**
+     * Un usuario sembrado, para que los e2e puedan entrar como alguien.
+     *
+     * Hace falta porque varias reglas preguntan quien sos: revelar una
+     * contrasenia sin usuario da 403, que es correcto, pero entonces no se
+     * podria probar el camino normal. El guard lo encuentra por el email que
+     * declara USUARIO_DEV en setup-e2e.ts.
+     */
+    usuarios: [
+      {
+        id: 'a0000001-0000-4000-8000-000000000001',
+        nombre: 'Tester',
+        email: 'tester@e2e.local',
+        rol: 'ADMIN',
+        idExterno: 'user_e2e',
+        creadoEn: new Date(),
+        actualizadoEn: new Date(),
+      },
+    ] as any[],
     ediciones: [] as any[],
     equiposIt: [] as any[],
     asignacionesIt: [] as any[],
     ordenes: [] as any[],
     renglones: [] as any[],
     contadores: [] as any[],
+    permisosRol: [] as any[],
+    credenciales: [] as any[],
+    rotacionesCredencial: [] as any[],
+    vistasCredencial: [] as any[],
     unidadesMedida: [
       // Ids con forma de UUID porque los DTO validan @IsUUID().
       {
@@ -295,16 +317,72 @@ export function crearPrismaEnMemoria() {
         .filter((r) => r.ordenId === fila.id)
         .map((r) => hidratar(r, include.renglones.include));
     }
+    // ── El baul de credenciales ──
+    if (include.equipoIt) {
+      const e = db.equiposIt.find((x) => x.id === fila.equipoItId);
+      // Marca y modelo son catalogos que este fake todavia no guarda. El
+      // nombre del equipo se arma igual con el codigo interno, que es lo que
+      // usa la pantalla cuando faltan.
+      salida.equipoIt = e
+        ? { id: e.id, codigoInterno: e.codigoInterno ?? null, marca: null, modelo: null }
+        : null;
+    }
+    if (include.rotadaPor) {
+      const u = db.usuarios.find((x) => x.id === fila.rotadaPorId);
+      salida.rotadaPor = u ? { nombre: u.nombre } : null;
+    }
+    if (include._count?.select?.rotaciones || include._count?.select?.vistas) {
+      salida._count = {
+        ...(include._count.select.rotaciones
+          ? { rotaciones: db.rotacionesCredencial.filter((r) => r.credencialId === fila.id).length }
+          : {}),
+        ...(include._count.select.vistas
+          ? { vistas: db.vistasCredencial.filter((v) => v.credencialId === fila.id).length }
+          : {}),
+      };
+    }
     if (include._count?.select?.ediciones) {
       salida._count = { ediciones: db.ediciones.filter((e) => e.movimientoId === fila.id).length };
     }
     return salida;
   }
 
+  /**
+   * `select` de Prisma: elige campos y, de paso, puede traer relaciones.
+   *
+   * Se resuelve reusando `hidratar` para las relaciones y recortando después a
+   * los campos pedidos. Al principio el fake solo entendía `include`, y por eso
+   * no se podían probar los módulos que usan `select` —credenciales, entre
+   * otros— contra la app de verdad.
+   */
+  function proyectar(fila: any, select: any): any {
+    if (!fila || !select) return fila;
+
+    // Las claves cuyo valor es un objeto son relaciones o _count: eso lo sabe
+    // hacer `hidratar`, que ya conoce cada relación por su nombre.
+    const relaciones: any = {};
+    for (const [campo, valor] of Object.entries(select)) {
+      if (valor && typeof valor === 'object') relaciones[campo] = valor;
+    }
+    const hidratada = hidratar(fila, relaciones);
+
+    const salida: any = {};
+    for (const [campo, valor] of Object.entries(select)) {
+      if (valor === true) salida[campo] = fila[campo] ?? null;
+      else if (valor && typeof valor === 'object') salida[campo] = hidratada[campo] ?? null;
+    }
+    return salida;
+  }
+
+  /** Aplica `select` si vino; si no, `include`. Prisma no acepta los dos juntos. */
+  function devolver(fila: any, { select, include }: any = {}): any {
+    return select ? proyectar(fila, select) : hidratar(fila, include);
+  }
+
   /** Fábrica genérica de delegate Prisma sobre una colección. */
   function delegate(coleccion: any[], defaults: () => any = () => ({})) {
     return {
-      create: async ({ data, include }: any) => {
+      create: async ({ data, include, select }: any) => {
         // `create` anidado (ej: orden con sus renglones) se resuelve aparte.
         const anidados: [string, any[]][] = [];
         const plano: any = {};
@@ -334,7 +412,7 @@ export function crearPrismaEnMemoria() {
             });
           }
         }
-        return hidratar(fila, include);
+        return devolver(fila, { select, include });
       },
       createMany: async ({ data }: any) => {
         for (const d of data) {
@@ -367,25 +445,25 @@ export function crearPrismaEnMemoria() {
           return fila;
         });
       },
-      findMany: async ({ where, skip = 0, take, orderBy, include }: any = {}) => {
+      findMany: async ({ where, skip = 0, take, orderBy, include, select }: any = {}) => {
         const filtradas = ordenar(
           coleccion.filter((f) => coincide(f, where)),
           orderBy,
         );
         const pagina =
           take === undefined ? filtradas.slice(skip) : filtradas.slice(skip, skip + take);
-        return pagina.map((f) => hidratar(f, include));
+        return pagina.map((f) => devolver(f, { select, include }));
       },
-      findUnique: async ({ where, include }: any) => {
+      findUnique: async ({ where, include, select }: any) => {
         const fila = coleccion.find((f) => Object.entries(where).every(([k, v]) => f[k] === v));
-        return fila ? hidratar(fila, include) : null;
+        return fila ? devolver(fila, { select, include }) : null;
       },
-      findFirst: async ({ where, include, orderBy }: any = {}) => {
+      findFirst: async ({ where, include, select, orderBy }: any = {}) => {
         const candidatos = ordenar(
           coleccion.filter((f) => coincide(f, where)),
           orderBy,
         );
-        return candidatos.length > 0 ? hidratar(candidatos[0], include) : null;
+        return candidatos.length > 0 ? devolver(candidatos[0], { select, include }) : null;
       },
       findUniqueOrThrow: async ({ where, include }: any) => {
         const fila = coleccion.find((f) => Object.entries(where).every(([k, v]) => f[k] === v));
@@ -393,11 +471,11 @@ export function crearPrismaEnMemoria() {
         return hidratar(fila, include);
       },
       count: async ({ where }: any = {}) => coleccion.filter((f) => coincide(f, where)).length,
-      update: async ({ where, data, include }: any) => {
+      update: async ({ where, data, include, select }: any) => {
         const fila = coleccion.find((f) => f.id === where.id);
         if (!fila) throw new Error('No encontrado');
         Object.assign(fila, aplanarConnect(data), { actualizadoEn: new Date() });
-        return hidratar(fila, include);
+        return devolver(fila, { select, include });
       },
       upsert: async ({ where, update, create }: any) => {
         const fila = coleccion.find((f) => Object.entries(where).every(([k, v]) => f[k] === v));
@@ -537,7 +615,21 @@ export function crearPrismaEnMemoria() {
       if (/SELECT id FROM materiales/.test(sql)) return [];
       return [];
     },
-    $transaction: async (cb: any) => cb(prisma),
+    // Sin esto, `PermisosService.onModuleInit` reventaba al arrancar la app y
+    // TODOS los e2e fallaban antes de correr su primer test. No se notaba
+    // porque `npm test` no los ejecuta: hay que pedir `npm run test:all`.
+    permisoRol: delegate(db.permisosRol),
+
+    credencial: delegate(db.credenciales, () => ({ activo: true })),
+    rotacionCredencial: delegate(db.rotacionesCredencial),
+    vistaCredencial: delegate(db.vistasCredencial),
+
+    /**
+     * Prisma acepta dos formas y la app usa las dos: una funcion, o una lista
+     * de consultas que se resuelven juntas. Con solo la funcion, el historial
+     * de una credencial reventaba con un 500.
+     */
+    $transaction: async (arg: any) => (Array.isArray(arg) ? Promise.all(arg) : arg(prisma)),
     $connect: async () => undefined,
     $disconnect: async () => undefined,
   };
