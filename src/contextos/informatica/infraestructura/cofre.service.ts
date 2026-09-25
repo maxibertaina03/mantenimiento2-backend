@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Cofre, ErrorDeCofre, generarClave, leerClave } from './cofre';
+import { CofreAes, ErrorDeCofre, generarClave, leerClave } from './cifrado';
 
 /**
  * El cofre, enchufado a la configuración.
@@ -17,7 +17,7 @@ import { Cofre, ErrorDeCofre, generarClave, leerClave } from './cofre';
 @Injectable()
 export class CofreService {
   private readonly logger = new Logger(CofreService.name);
-  private readonly cofre: Cofre | null;
+  private readonly cofre: CofreAes | null;
 
   constructor(config: ConfigService) {
     const valor = config.get<string>('CLAVE_SECRETOS');
@@ -33,7 +33,7 @@ export class CofreService {
     }
 
     try {
-      this.cofre = new Cofre(leerClave(valor));
+      this.cofre = new CofreAes(leerClave(valor));
       this.logger.log('Baúl de credenciales activo.');
     } catch (e) {
       // Una clave mal formada NO se ignora en silencio: es un error de
@@ -47,7 +47,7 @@ export class CofreService {
     return this.cofre !== null;
   }
 
-  private exigir(): Cofre {
+  private exigir(): CofreAes {
     if (!this.cofre) {
       throw new ServiceUnavailableException(
         'El baúl de credenciales no está configurado en este servidor. ' +

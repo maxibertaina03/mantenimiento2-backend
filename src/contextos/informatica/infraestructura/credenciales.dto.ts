@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoCredencial } from '@prisma/client';
+import { CredencialConRelaciones } from '../puertos/repositorio-credenciales';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -14,7 +15,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { PaginacionDto } from '../../../common/dto/paginacion.dto';
-import { EstadoRotacion, estadoDeRotacion } from '../rotacion';
+import { EstadoRotacion, estadoDeRotacion } from '../dominio/rotacion';
 
 /**
  * Los DTO validan la FORMA de lo que llega. Que una contraseña no se pueda
@@ -146,28 +147,6 @@ export class ListarCredencialesDto extends PaginacionDto {
   mostrar?: string;
 }
 
-/** Forma de la fila que llega del repositorio. */
-interface FilaCredencial {
-  id: string;
-  nombre: string;
-  tipo: TipoCredencial;
-  usuario: string | null;
-  url: string | null;
-  notas: string | null;
-  equipoItId: string | null;
-  rotarCadaDias: number | null;
-  rotadaEn: Date;
-  proximaRotacion: Date | null;
-  activo: boolean;
-  creadoEn: Date;
-  equipoIt?: {
-    codigoInterno: string | null;
-    marca: { nombre: string } | null;
-    modelo: { nombre: string } | null;
-  } | null;
-  _count?: { rotaciones: number; vistas: number };
-}
-
 /**
  * Lo que sale por la API.
  *
@@ -196,29 +175,30 @@ export class CredencialRespuestaDto {
   @ApiProperty() activo!: boolean;
   @ApiProperty() creadoEn!: Date;
 
-  static desde(f: FilaCredencial, hoy: Date): CredencialRespuestaDto {
-    const equipo = f.equipoIt;
+  /**
+   * Toma lo que devuelve el contexto, no una fila de Prisma.
+   *
+   * El nombre del equipo ya viene resuelto desde el repositorio: armarlo acá
+   * obligaba a este DTO a conocer cómo se guarda un equipo.
+   */
+  static desde(c: CredencialConRelaciones, hoy: Date): CredencialRespuestaDto {
     return {
-      id: f.id,
-      nombre: f.nombre,
-      tipo: f.tipo,
-      usuario: f.usuario,
-      url: f.url,
-      notas: f.notas,
-      equipoItId: f.equipoItId,
-      equipoItNombre: equipo
-        ? [equipo.codigoInterno, equipo.marca?.nombre, equipo.modelo?.nombre]
-            .filter(Boolean)
-            .join(' ') || null
-        : null,
-      rotarCadaDias: f.rotarCadaDias,
-      rotadaEn: f.rotadaEn,
-      proximaRotacion: f.proximaRotacion,
-      estadoRotacion: estadoDeRotacion(f.proximaRotacion, hoy),
-      rotaciones: f._count?.rotaciones ?? 0,
-      vistas: f._count?.vistas ?? 0,
-      activo: f.activo,
-      creadoEn: f.creadoEn,
+      id: c.id,
+      nombre: c.nombre,
+      tipo: c.tipo as TipoCredencial,
+      usuario: c.usuario,
+      url: c.url,
+      notas: c.notas,
+      equipoItId: c.equipoItId,
+      equipoItNombre: c.equipoItNombre,
+      rotarCadaDias: c.rotarCadaDias,
+      rotadaEn: c.rotadaEn ?? c.creadoEn,
+      proximaRotacion: c.proximaRotacion,
+      estadoRotacion: estadoDeRotacion(c.proximaRotacion, hoy),
+      rotaciones: c.vecesRotada,
+      vistas: c.vecesVista,
+      activo: c.activo,
+      creadoEn: c.creadoEn,
     };
   }
 }

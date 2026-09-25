@@ -62,7 +62,7 @@ export function generarClave(): string {
   return randomBytes(LARGO_DE_CLAVE).toString('base64');
 }
 
-export class Cofre {
+export class CofreAes {
   constructor(private readonly clave: Buffer) {
     if (clave.length !== LARGO_DE_CLAVE) {
       throw new ErrorDeCofre(`La clave tiene que ser de ${LARGO_DE_CLAVE} bytes.`);

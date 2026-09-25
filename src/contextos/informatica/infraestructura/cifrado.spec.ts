@@ -1,4 +1,4 @@
-import { Cofre, ErrorDeCofre, generarClave, leerClave } from './cofre';
+import { CofreAes, ErrorDeCofre, generarClave, leerClave } from './cifrado';
 
 /**
  * El cofre es la unica pieza del sistema donde un error no avisa: si el cifrado
@@ -31,7 +31,7 @@ describe('leerClave', () => {
 });
 
 describe('Cofre', () => {
-  const cofre = new Cofre(CLAVE);
+  const cofre = new CofreAes(CLAVE);
 
   it('lo que se cifra se vuelve a leer igual', () => {
     const secreto = 'Contraseña del correo 2026!';
@@ -66,7 +66,7 @@ describe('Cofre', () => {
   it('REGRESION: con otra clave no se puede descifrar', () => {
     // Es lo que hace que un volcado de la base no sirva por si solo.
     const guardado = cofre.cifrar('Contraseña del router');
-    expect(() => new Cofre(OTRA_CLAVE).descifrar(guardado)).toThrow(/clave del cofre cambió/);
+    expect(() => new CofreAes(OTRA_CLAVE).descifrar(guardado)).toThrow(/clave del cofre cambió/);
   });
 
   it('REGRESION: si el dato fue alterado en la base, falla en vez de devolver basura', () => {
@@ -110,7 +110,7 @@ describe('Cofre', () => {
     it('REGRESION: con otra clave la huella es otra', () => {
       // La huella es un HMAC y no un hash a secas: sin la clave, quien tenga la
       // base no puede probar contrasenas comunes contra las huellas guardadas.
-      expect(new Cofre(OTRA_CLAVE).huella('Verano2026')).not.toBe(cofre.huella('Verano2026'));
+      expect(new CofreAes(OTRA_CLAVE).huella('Verano2026')).not.toBe(cofre.huella('Verano2026'));
     });
 
     it('una huella de otro largo no rompe la comparacion', () => {
