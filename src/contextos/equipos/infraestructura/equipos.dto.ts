@@ -14,6 +14,10 @@ import {
 } from 'class-validator';
 import { PaginacionDto } from '../../../common/dto/paginacion.dto';
 import { ESTADOS_EQUIPO, EstadoEquipo } from '../dominio/estado-equipo';
+import {
+  CLASIFICACIONES_EQUIPO,
+  ClasificacionEquipo,
+} from '../../../common/dominio/renglon-de-compra';
 
 /**
  * Los DTO validan la FORMA de lo que entra (que sea un texto, un uuid, una
@@ -30,6 +34,18 @@ export class CrearEquipoDto {
   @MinLength(1)
   @MaxLength(120)
   nombre!: string;
+
+  /**
+   * Maquina de planta o herramienta.
+   *
+   * Por defecto maquina, que es lo que son los 326 equipos que ya estaban
+   * cargados. Es una categoria por encima del tipo: una prensa es un EQUIPO
+   * de tipo "Prensa"; una amoladora es una HERRAMIENTA.
+   */
+  @ApiPropertyOptional({ enum: CLASIFICACIONES_EQUIPO, default: 'EQUIPO' })
+  @IsOptional()
+  @IsIn(CLASIFICACIONES_EQUIPO)
+  clasificacion?: ClasificacionEquipo;
 
   @ApiPropertyOptional({ example: 'COMP-01' })
   @IsOptional()

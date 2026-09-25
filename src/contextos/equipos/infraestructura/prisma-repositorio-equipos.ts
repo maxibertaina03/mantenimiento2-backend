@@ -4,6 +4,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { sonElMismoNombre } from '../../../common/dominio/nombres';
 import { Equipo } from '../dominio/equipo';
 import { EstadoEquipo } from '../dominio/estado-equipo';
+import { ClasificacionEquipo } from '../../../common/dominio/renglon-de-compra';
 import {
   EquipoConRelaciones,
   FiltroEquipos,
@@ -55,6 +56,7 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
       ubicacionId: fila.ubicacionId,
       tipoId: fila.tipoId,
       estado: fila.estado as EstadoEquipo,
+      clasificacion: fila.clasificacion as ClasificacionEquipo,
       fotoUrl: fila.fotoUrl,
       qrGeneradoEn: fila.qrGeneradoEn,
       proveedorId: fila.proveedorId,

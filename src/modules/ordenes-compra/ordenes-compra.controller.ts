@@ -11,6 +11,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { UseFilters } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Usuario } from '@prisma/client';
 import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decorator';
@@ -24,9 +25,14 @@ import { ComprobantesService } from './comprobantes/comprobantes.service';
 import { OrdenesCompraService } from './ordenes-compra.service';
 import { Permisos } from '../../common/auth/decorators/permisos.decorator';
 import { PERMISOS } from '../../common/auth/permisos';
+import { FiltroErroresDominio } from '../../common/dominio/filtro-errores-dominio';
 
 @ApiTags('Órdenes de compra')
 @ApiBearerAuth()
+// Las reglas de que se puede comprar viven en `common/dominio`, y lanzan
+// errores de dominio en vez de excepciones de Nest. Sin este filtro salian
+// sin traducir y el frontend veia un 500 donde hay un 400.
+@UseFilters(FiltroErroresDominio)
 @Controller('ordenes-compra')
 export class OrdenesCompraController {
   constructor(

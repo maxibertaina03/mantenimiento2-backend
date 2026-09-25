@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { Decimal, aDecimal } from '../../common/dominio/decimal';
+import { ClasificacionEquipo, unidadesDeEquipo } from '../../common/dominio/renglon-de-compra';
 import { OrdenConRelaciones } from './dto/orden-respuesta.dto';
 
 export interface FiltroOrdenes {
@@ -19,10 +20,18 @@ export interface FiltroOrdenes {
 }
 
 export interface DatosRenglon {
-  materialId: string;
+  /** Nulo cuando el renglon es de un equipo y no de un material del paniol. */
+  materialId: string | null;
   cantidad: Decimal;
   precioUnitario?: Decimal | null;
   notas?: string | null;
+
+  /** Lo del equipo. La ficha se crea recien al recibir la mercaderia. */
+  descripcionEquipo?: string | null;
+  clasificacion?: ClasificacionEquipo | null;
+  equipoTipoId?: string | null;
+  equipoMarcaId?: string | null;
+  equipoModeloId?: string | null;
 }
 
 export interface DatosCrearOrden {
@@ -118,6 +127,13 @@ export class OrdenesCompraRepository {
                   ? null
                   : new Prisma.Decimal(r.precioUnitario.toFixed(2)),
               notas: r.notas ?? null,
+              // Lo del equipo viaja con el renglon: la ficha se crea recien
+              // al recibir la mercaderia.
+              descripcionEquipo: r.descripcionEquipo ?? null,
+              clasificacion: r.clasificacion ?? null,
+              equipoTipoId: r.equipoTipoId ?? null,
+              equipoMarcaId: r.equipoMarcaId ?? null,
+              equipoModeloId: r.equipoModeloId ?? null,
             })),
           },
         },
@@ -242,6 +258,54 @@ export class OrdenesCompraRepository {
    * manual de movimientos, para no perder actualizaciones si alguien está
    * cargando stock del mismo material al mismo tiempo.
    */
+
+  /**
+   * Da de alta las fichas de los equipos comprados en un renglon.
+   *
+   * Una por unidad: cinco amoladoras son cinco fichas, cada una con su numero
+   * de serie y su historial. Nacen con lo que se sabe de la compra —que
+   * equipo, de que marca, a que proveedor y cuando entro— y con el resto
+   * vacio, para que alguien lo complete desde la ficha.
+   *
+   * El nombre lleva un numero cuando son varias, porque si no quedan cinco
+   * equipos llamados igual y no hay forma de saber cual es cual en la lista.
+   */
+  private async altaDeEquipos(
+    tx: Prisma.TransactionClient,
+    renglon: {
+      id: string;
+      cantidad: Prisma.Decimal;
+      descripcionEquipo: string | null;
+      clasificacion: ClasificacionEquipo | null;
+      equipoTipoId: string | null;
+      equipoMarcaId: string | null;
+      equipoModeloId: string | null;
+    },
+    proveedorId: string,
+    fechaRecepcion: Date,
+  ): Promise<void> {
+    const unidades = unidadesDeEquipo({
+      descripcionEquipo: renglon.descripcionEquipo,
+      cantidad: Number(renglon.cantidad),
+    });
+    const nombre = (renglon.descripcionEquipo ?? 'Equipo comprado').trim();
+
+    for (let i = 1; i <= unidades; i++) {
+      await tx.equipo.create({
+        data: {
+          nombre: unidades === 1 ? nombre : `${nombre} (${i} de ${unidades})`,
+          clasificacion: renglon.clasificacion ?? 'EQUIPO',
+          tipoId: renglon.equipoTipoId,
+          marcaId: renglon.equipoMarcaId,
+          modeloId: renglon.equipoModeloId,
+          proveedorId,
+          fechaAlta: fechaRecepcion,
+          renglonOrdenCompraId: renglon.id,
+        },
+      });
+    }
+  }
+
   async recibir(params: {
     id: string;
     fechaRecepcion: Date;
@@ -263,12 +327,22 @@ export class OrdenesCompraRepository {
       }
 
       for (const renglon of orden.renglones) {
+        // Los renglones de equipo no mueven stock: al recibirlos se da de alta
+        // una ficha por unidad, que es otro camino. Se saltean aca para que la
+        // parte de stock siga siendo exactamente la de antes.
+        if (!renglon.materialId) {
+          await this.altaDeEquipos(tx, renglon, orden.proveedorId, fechaRecepcion);
+          continue;
+        }
+
+        const materialId = renglon.materialId;
+
         // Lock de la fila del material antes de leer su stock.
         const filas = await tx.$queryRaw<{ stockActual: Prisma.Decimal }[]>`
-          SELECT "stockActual" FROM materiales WHERE id = ${renglon.materialId} FOR UPDATE
+          SELECT "stockActual" FROM materiales WHERE id = ${materialId} FOR UPDATE
         `;
         if (filas.length === 0) {
-          throw new NotFoundException(`No existe el material con id ${renglon.materialId}`);
+          throw new NotFoundException(`No existe el material con id ${materialId}`);
         }
 
         const cantidad = aDecimal(renglon.cantidad);
@@ -276,7 +350,7 @@ export class OrdenesCompraRepository {
 
         const movimiento = await tx.movimientoStock.create({
           data: {
-            materialId: renglon.materialId,
+            materialId,
             tipo: TipoMovimiento.ENTRADA,
             motivo: MotivoMovimiento.COMPRA,
             cantidad,
@@ -290,7 +364,7 @@ export class OrdenesCompraRepository {
         });
 
         await tx.material.update({
-          where: { id: renglon.materialId },
+          where: { id: materialId },
           data: { stockActual: nuevoStock },
         });
 

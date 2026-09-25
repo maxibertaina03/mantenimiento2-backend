@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { EstadoOrdenCompra, Usuario, ViaEnvioOrden } from '@prisma/client';
 import { RespuestaPaginada } from '../../common/dto/paginacion.dto';
+import { claseDelRenglon, unidadesDeEquipo } from '../../common/dominio/renglon-de-compra';
 import { aDecimal } from '../../common/dominio/decimal';
 import { finDelDia, inicioDelDia } from '../../common/dominio/fechas';
 import { MaterialesService } from '../materiales/materiales.service';
@@ -219,24 +220,44 @@ export class OrdenesCompraService {
     // duplica el movimiento de stock: mejor un solo renglón con la suma.
     const vistos = new Set<string>();
     for (const renglon of renglones) {
-      if (vistos.has(renglon.materialId)) {
+      // Primero: que el renglón diga qué se compra, y una sola cosa. Corta acá
+      // y no al recibir, cuando ya no se puede deshacer nada.
+      const clase = claseDelRenglon(renglon);
+
+      if (clase === 'equipo') {
+        // Se valida que las unidades sean enteras: cinco amoladoras son cinco
+        // fichas, y media amoladora no existe. Un equipo puede repetirse en
+        // varios renglones —dos compras distintas del mismo modelo— así que no
+        // entra en el control de duplicados.
+        unidadesDeEquipo(renglon);
+        continue;
+      }
+
+      const materialId = renglon.materialId as string;
+      if (vistos.has(materialId)) {
         throw new BadRequestException(
           'La orden tiene el mismo material en más de un renglón. Unificalos en uno solo.',
         );
       }
-      vistos.add(renglon.materialId);
+      vistos.add(materialId);
       // `obtenerEnUso` y no `obtener`: no tiene sentido comprar algo que se
       // saco de circulacion.
-      await this.materiales.obtenerEnUso(renglon.materialId);
+      await this.materiales.obtenerEnUso(materialId);
     }
   }
 
   private aDatosRenglones(renglones: RenglonOrdenDto[]) {
     return renglones.map((r) => ({
-      materialId: r.materialId,
+      materialId: r.materialId ?? null,
       cantidad: aDecimal(r.cantidad),
       precioUnitario: r.precioUnitario === undefined ? null : aDecimal(r.precioUnitario),
       notas: r.notas ?? null,
+      // Lo del equipo viaja junto: recien al recibir se crea la ficha.
+      descripcionEquipo: r.descripcionEquipo?.trim() || null,
+      clasificacion: r.descripcionEquipo ? (r.clasificacion ?? 'EQUIPO') : null,
+      equipoTipoId: r.equipoTipoId ?? null,
+      equipoMarcaId: r.equipoMarcaId ?? null,
+      equipoModeloId: r.equipoModeloId ?? null,
     }));
   }
 
@@ -377,6 +398,9 @@ export class OrdenesCompraService {
     // puede quedar por detrás del último ajuste del material. Se comprueban
     // TODOS antes de tocar nada, para no dejar media orden recibida.
     for (const renglon of orden.renglones ?? []) {
+      // Los renglones de equipo no mueven stock, asi que no hay ajuste contra
+      // el que comparar: esta regla es solo de los materiales.
+      if (!renglon.materialId) continue;
       await this.movimientos.verificarFechaContraAjustes(renglon.materialId, fechaRecepcion, {
         nombreDelMaterial: renglon.material?.nombre,
       });

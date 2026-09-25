@@ -1,5 +1,6 @@
 import { ErrorDatosInvalidos } from './errores';
 import { EstadoEquipo } from './estado-equipo';
+import { ClasificacionEquipo } from '../../../common/dominio/renglon-de-compra';
 
 export interface Equipo {
   id: string;
@@ -13,6 +14,14 @@ export interface Equipo {
   ubicacionId: string | null;
   tipoId: string | null;
   estado: EstadoEquipo;
+  /**
+   * Si es una maquina de la planta o una herramienta.
+   *
+   * Es una categoria POR ENCIMA del tipo: una prensa es un EQUIPO de tipo
+   * "Prensa"; una amoladora es una HERRAMIENTA. Las herramientas chicas y de
+   * consumo siguen siendo material del paniol, con stock.
+   */
+  clasificacion: ClasificacionEquipo;
   fotoUrl: string | null;
   proveedorId: string | null;
   horasUso: number | null;
@@ -22,6 +31,8 @@ export interface Equipo {
 
 /** Lo mínimo para dar de alta un equipo. */
 export interface DatosNuevoEquipo {
+  /** Maquina o herramienta. Por defecto, maquina. */
+  clasificacion?: ClasificacionEquipo;
   nombre: string;
   codigoInterno?: string | null;
   descripcion?: string | null;
@@ -96,6 +107,7 @@ export function crearEquipo(datos: DatosNuevoEquipo): Omit<Equipo, 'id'> {
     // Un equipo se da de alta operativo: si estuviera roto al comprarlo, se
     // cambia después, pero el caso normal no debería pedir un dato más.
     estado: 'OPERATIVO',
+    clasificacion: datos.clasificacion ?? 'EQUIPO',
     fotoUrl: datos.fotoUrl ?? null,
     proveedorId: datos.proveedorId ?? null,
     horasUso: datos.horasUso ?? null,

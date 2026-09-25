@@ -562,6 +562,12 @@ model AsignacionEquipoIT {
 
 // ═══════════════════════ Módulo Órdenes de Compra ═══════════════════════
 
+/// Una maquina de la planta, o una herramienta.
+enum ClasificacionEquipo {
+  EQUIPO
+  HERRAMIENTA
+}
+
 enum EstadoOrdenCompra {
   BORRADOR // se puede editar libremente
   EMITIDA // enviada al proveedor, esperando la mercadería
@@ -655,7 +661,12 @@ model RenglonOrdenCompra {
   id      String @id @default(uuid())
   ordenId String
 
-  materialId     String
+  /// Que material se compra. Nulo cuando el renglon es de un equipo.
+  ///
+  /// Dejo de ser obligatorio cuando se pudo comprar equipos y herramientas: un
+  /// renglon es de material O de equipo, nunca de los dos, y eso lo hace
+  /// cumplir el dominio.
+  materialId     String?
   cantidad       Decimal  @db.Decimal(14, 3)
   // Precio unitario pactado. Opcional: a veces se pide sin precio cerrado.
   precioUnitario Decimal? @db.Decimal(14, 2)
@@ -665,9 +676,30 @@ model RenglonOrdenCompra {
   // que une el stock con la OC que lo originó.
   movimientoId String? @unique
 
+  /// Que equipo se compra, cuando el renglon no es de material.
+  ///
+  /// Es texto y no un id porque todavia no existe: el equipo se crea recien al
+  /// recibir la mercaderia. Marca, modelo y tipo salen de los catalogos, para
+  /// no volver al texto libre que hizo convivir "Tp Link" con "Tplink".
+  descripcionEquipo String?
+  clasificacion     ClasificacionEquipo?
+  equipoTipoId      String?
+  equipoMarcaId     String?
+  equipoModeloId    String?
+
   orden      OrdenCompra      @relation(fields: [ordenId], references: [id], onDelete: Cascade)
-  material   Material         @relation(fields: [materialId], references: [id])
+  material   Material?        @relation(fields: [materialId], references: [id])
   movimiento MovimientoStock? @relation(fields: [movimientoId], references: [id])
+
+  equipoTipo   TipoEquipoPlanta? @relation(fields: [equipoTipoId], references: [id])
+  equipoMarca  MarcaEquipo?      @relation(fields: [equipoMarcaId], references: [id])
+  equipoModelo ModeloEquipo?     @relation(fields: [equipoModeloId], references: [id])
+
+  /// Los equipos que se dieron de alta al recibir este renglon.
+  ///
+  /// Uno por unidad comprada: cinco amoladoras son cinco fichas, cada una con
+  /// su numero de serie y su historial.
+  equiposGenerados Equipo[]
 
   @@index([ordenId])
   @@index([materialId])
@@ -736,6 +768,9 @@ model TipoEquipoPlanta {
 
   equipos Equipo[]
 
+  /// Los renglones de compra que piden un equipo de este tipo.
+  renglonesCompra RenglonOrdenCompra[]
+
   @@map("tipos_equipo_planta")
 }
 
@@ -758,6 +793,9 @@ model MarcaEquipo {
   equiposIt EquipoIT[]
   modelos   ModeloEquipo[]
 
+  /// Los renglones de compra que piden un equipo de esta marca.
+  renglonesCompra RenglonOrdenCompra[]
+
   @@map("marcas_equipo")
 }
 
@@ -778,6 +816,9 @@ model ModeloEquipo {
 
   marca     MarcaEquipo @relation(fields: [marcaId], references: [id], onDelete: Cascade)
   equipos   Equipo[]
+
+  /// Los renglones de compra que piden un equipo de este modelo.
+  renglonesCompra RenglonOrdenCompra[]
   equiposIt EquipoIT[]
 
   @@unique([marcaId, nombre])
@@ -794,6 +835,17 @@ model Equipo {
 
   nombre      String
   descripcion String?
+
+  /// Si es una maquina de la planta o una herramienta.
+  ///
+  /// Es una categoria POR ENCIMA del tipo: una prensa es un EQUIPO de tipo
+  /// "Prensa", una amoladora es una HERRAMIENTA. El tipo dice que hace; esto,
+  /// de que clase de cosa estamos hablando.
+  ///
+  /// Las herramientas chicas y de consumo —brocas, llaves— NO entran aca:
+  /// esas siguen siendo material del paniol, con stock. Herramienta es lo que
+  /// merece ficha propia e historial de reparaciones.
+  clasificacion ClasificacionEquipo @default(EQUIPO)
 
   /// Marca y modelo salen de catálogos, no son texto libre: es lo que después
   /// permite filtrar y contar. El número de serie sí es texto, porque es único
@@ -828,6 +880,11 @@ model Equipo {
   fechaAlta     DateTime?
   garantiaHasta DateTime?
 
+  /// El renglon de la orden de compra con el que entro, si se compro por el
+  /// sistema. Deja ir de la ficha del equipo a la compra que lo trajo, con su
+  /// remito y su precio.
+  renglonOrdenCompraId String?
+
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
@@ -836,6 +893,7 @@ model Equipo {
   marca          MarcaEquipo?        @relation(fields: [marcaId], references: [id])
   modelo         ModeloEquipo?       @relation(fields: [modeloId], references: [id])
   proveedor      Proveedor?          @relation(fields: [proveedorId], references: [id])
+  renglonCompra  RenglonOrdenCompra? @relation(fields: [renglonOrdenCompraId], references: [id], onDelete: SetNull)
   intervenciones Intervencion[]
   planes         PlanMantenimiento[]
   ordenesTrabajo OrdenTrabajo[]

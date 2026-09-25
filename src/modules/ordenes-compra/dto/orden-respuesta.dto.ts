@@ -20,7 +20,8 @@ export type OrdenConRelaciones = OrdenCompra & {
 
 export class RenglonRespuestaDto {
   @ApiProperty() id!: string;
-  @ApiProperty() materialId!: string;
+  @ApiPropertyOptional({ nullable: true, description: 'Nulo si el renglon es de un equipo' })
+  materialId!: string | null;
   @ApiPropertyOptional({ nullable: true }) materialNombre!: string | null;
   @ApiPropertyOptional({ nullable: true }) unidad!: string | null;
   @ApiProperty({ example: 100 }) cantidad!: number;

@@ -43,6 +43,8 @@ export function crearPrismaEnMemoria() {
     // catalogos compartidos con los equipos de planta. El fake no los tenia, y
     // por eso no se podia crear un equipo de informatica en un e2e.
     responsables: [] as any[],
+    // Los equipos de PLANTA. Los de informatica son otra tabla (equiposIt).
+    equipos: [] as any[],
     marcasEquipo: [] as any[],
     modelosEquipo: [] as any[],
     ubicacionesEquipo: [] as any[],
@@ -683,6 +685,19 @@ export function crearPrismaEnMemoria() {
     permisoRol: delegate(db.permisosRol),
 
     responsable: delegate(db.responsables, () => ({ activo: true })),
+    equipo: delegate(db.equipos, () => ({
+      estado: 'OPERATIVO',
+      clasificacion: 'EQUIPO',
+      codigoInterno: null,
+      descripcion: null,
+      numeroSerie: null,
+      fotoUrl: null,
+      horasUso: null,
+      fechaAlta: null,
+      garantiaHasta: null,
+      qrGeneradoEn: null,
+      renglonOrdenCompraId: null,
+    })),
     marcaEquipo: delegate(db.marcasEquipo, () => ({ activo: true })),
     modeloEquipo: delegate(db.modelosEquipo, () => ({ activo: true })),
     ubicacionEquipo: delegate(db.ubicacionesEquipo, () => ({ activo: true })),

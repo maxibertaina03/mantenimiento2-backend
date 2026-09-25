@@ -33,6 +33,7 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
       numeroSerie: fila.numeroSerie ?? null,
       ubicacionId: fila.ubicacionId ?? null,
       tipoId: fila.tipoId ?? null,
+      clasificacion: fila.clasificacion ?? 'EQUIPO',
       estado: fila.estado ?? 'OPERATIVO',
       fotoUrl: fila.fotoUrl ?? null,
       qrGeneradoEn: fila.qrGeneradoEn ?? null,
