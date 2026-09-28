@@ -5,6 +5,7 @@ import { sonElMismoNombre } from '../../../common/dominio/nombres';
 import { Equipo } from '../dominio/equipo';
 import { EstadoEquipo } from '../dominio/estado-equipo';
 import { ClasificacionEquipo } from '../../../common/dominio/renglon-de-compra';
+import { OpcionConConteo } from '../puertos/repositorio-equipos';
 import {
   EquipoConRelaciones,
   FiltroEquipos,
@@ -176,6 +177,7 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
     if (filtro.marcaId) where.marcaId = filtro.marcaId;
     if (filtro.modeloId) where.modeloId = filtro.modeloId;
     if (filtro.estado) where.estado = filtro.estado;
+    if (filtro.clasificacion) where.clasificacion = filtro.clasificacion;
     // Los que faltan etiquetar: es la lista que se manda a imprimir.
     if (filtro.sinQr) where.qrGeneradoEn = null;
     if (filtro.garantiaVencidaAl) where.garantiaHasta = { lt: filtro.garantiaVencidaAl };
@@ -206,13 +208,43 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
     await this.prisma.equipo.delete({ where: { id } });
   }
 
-  async resumen(): Promise<ResumenEquipos> {
-    // Dos agregados en paralelo: contar por estado, y contar los que necesitan
-    // mantenimiento y no tienen ningun plan activo.
-    const [porEstado, sinPlan, total] = await Promise.all([
-      this.prisma.equipo.groupBy({ by: ['estado'], _count: { _all: true } }),
+  /**
+   * El resumen, contado DENTRO de lo que ya se filtro.
+   *
+   * De aca salen las opciones que ofrece cada desplegable. Contarlas sobre el
+   * filtro actual es lo que hace que al elegir "Herramientas" el desplegable
+   * de tipo deje de ofrecer "Caldera y vapor", sin separar catalogos ni
+   * migrar nada.
+   */
+  async resumen(filtro: Partial<FiltroEquipos> = {}): Promise<ResumenEquipos> {
+    // El mismo `where` del listado, para que los numeros correspondan a lo que
+    // se esta viendo. Sin el tipo ni la ubicacion: son justamente las opciones
+    // que hay que ofrecer, y filtrar por una escondería las demas.
+    const base: Prisma.EquipoWhereInput = {};
+    if (filtro.clasificacion) base.clasificacion = filtro.clasificacion;
+    if (filtro.estado) base.estado = filtro.estado;
+    if (filtro.buscar) {
+      base.OR = [
+        { nombre: { contains: filtro.buscar, mode: 'insensitive' } },
+        { codigoInterno: { contains: filtro.buscar, mode: 'insensitive' } },
+      ];
+    }
+
+    const [
+      porEstado,
+      sinPlan,
+      total,
+      porClasificacion,
+      porTipo,
+      porUbicacion,
+      sinTipo,
+      tipos,
+      ubicaciones,
+    ] = await Promise.all([
+      this.prisma.equipo.groupBy({ by: ['estado'], _count: { _all: true }, where: base }),
       this.prisma.equipo.count({
         where: {
+          ...base,
           // Un equipo dado de baja o fuera de servicio no deberia tener plan:
           // no tiene sentido contarlo como un hueco. El estado va como texto,
           // no como enum de Postgres, asi que se comparan las cadenas.
@@ -220,12 +252,38 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
           planes: { none: { activo: true } },
         },
       }),
-      this.prisma.equipo.count(),
+      this.prisma.equipo.count({ where: base }),
+      this.prisma.equipo.groupBy({ by: ['clasificacion'], _count: { _all: true } }),
+      this.prisma.equipo.groupBy({ by: ['tipoId'], _count: { _all: true }, where: base }),
+      this.prisma.equipo.groupBy({ by: ['ubicacionId'], _count: { _all: true }, where: base }),
+      this.prisma.equipo.count({ where: { ...base, tipoId: null } }),
+      this.prisma.tipoEquipoPlanta.findMany({ select: { id: true, nombre: true } }),
+      this.prisma.ubicacionEquipo.findMany({ select: { id: true, nombre: true } }),
     ]);
+
+    /** Junta el catalogo con los conteos y descarta lo que no tiene nada. */
+    function conConteo(
+      catalogo: { id: string; nombre: string }[],
+      cuentas: Map<string | null, number>,
+    ): OpcionConConteo[] {
+      return catalogo
+        .map((item) => ({ id: item.id, nombre: item.nombre, cantidad: cuentas.get(item.id) ?? 0 }))
+        .filter((o) => o.cantidad > 0)
+        .sort((a, b) => b.cantidad - a.cantidad);
+    }
+
+    const cuentasTipo = new Map(porTipo.map((g) => [g.tipoId, g._count._all]));
+    const cuentasUbicacion = new Map(porUbicacion.map((g) => [g.ubicacionId, g._count._all]));
 
     return {
       total,
       porEstado: Object.fromEntries(porEstado.map((f) => [f.estado, f._count._all])),
+      porClasificacion: Object.fromEntries(
+        porClasificacion.map((f) => [f.clasificacion, f._count._all]),
+      ),
+      tipos: conConteo(tipos, cuentasTipo),
+      ubicaciones: conConteo(ubicaciones, cuentasUbicacion),
+      sinTipo,
       sinPlan,
     };
   }

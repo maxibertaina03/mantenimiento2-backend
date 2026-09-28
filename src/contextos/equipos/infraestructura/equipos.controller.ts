@@ -116,6 +116,7 @@ export class EquiposController {
       marcaId: query.marcaId,
       modeloId: query.modeloId,
       estado: query.estado,
+      clasificacion: query.clasificacion,
       sinQr: query.sinQr === 'true',
       // El corte de garantía es "hoy", y hoy lo dice el reloj del contexto.
       garantiaVencidaAl: query.garantiaVencida === 'true' ? new Date() : undefined,
@@ -142,9 +143,18 @@ export class EquiposController {
   // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
   @Permisos(PERMISOS.EQUIPOS_VER)
   @Get('resumen')
-  @ApiOperation({ summary: 'Cuántos equipos hay, en qué estado, y cuántos sin plan' })
-  resumen() {
-    return this.repo.resumen();
+  @ApiOperation({
+    summary: 'Cuántos equipos hay y qué opciones de filtro tienen algo',
+    description:
+      'Los tipos y ubicaciones que devuelve son SOLO los que tienen equipos dentro del filtro ' +
+      'que se le pase. Es lo que evita ofrecer 49 ubicaciones cuando 33 están vacías.',
+  })
+  resumen(@Query() query: ListarEquiposDto) {
+    return this.repo.resumen({
+      clasificacion: query.clasificacion,
+      estado: query.estado,
+      buscar: query.buscar,
+    });
   }
 
   @Permisos(PERMISOS.EQUIPOS_VER)

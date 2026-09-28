@@ -126,7 +126,23 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
       (e) => e.estado === 'OPERATIVO' || e.estado === 'EN_REPARACION',
     ).length;
 
-    return { total: this.filas.length, porEstado, sinPlan };
+    const porClasificacion: Record<string, number> = {};
+    for (const e of this.filas) {
+      const c = e.clasificacion ?? 'EQUIPO';
+      porClasificacion[c] = (porClasificacion[c] ?? 0) + 1;
+    }
+
+    return {
+      total: this.filas.length,
+      porEstado,
+      porClasificacion,
+      // El doble no tiene catalogos: las opciones con conteo las arma el
+      // repositorio de verdad, con una consulta agrupada.
+      tipos: [],
+      ubicaciones: [],
+      sinTipo: this.filas.filter((e) => !e.tipoId).length,
+      sinPlan,
+    };
   }
 
   async marcarQrGenerado(ids: string[], cuando: Date): Promise<number> {

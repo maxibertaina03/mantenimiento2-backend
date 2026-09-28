@@ -135,6 +135,14 @@ export class ListarEquiposDto extends PaginacionDto {
   @IsIn(ESTADOS_EQUIPO)
   estado?: EstadoEquipo;
 
+  @ApiPropertyOptional({
+    enum: CLASIFICACIONES_EQUIPO,
+    description: 'Solo máquinas, o solo herramientas',
+  })
+  @IsOptional()
+  @IsIn(CLASIFICACIONES_EQUIPO)
+  clasificacion?: ClasificacionEquipo;
+
   @ApiPropertyOptional({ description: 'Solo los que ya no están en garantía' })
   @IsOptional()
   @IsIn(['true', 'false'])

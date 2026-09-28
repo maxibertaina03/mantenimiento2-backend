@@ -1,5 +1,6 @@
 import { Equipo } from '../dominio/equipo';
 import { EstadoEquipo } from '../dominio/estado-equipo';
+import { ClasificacionEquipo } from '../../../common/dominio/renglon-de-compra';
 
 /** Un equipo con los nombres de sus relaciones, para mostrarlo sin más consultas. */
 export interface EquipoConRelaciones extends Equipo {
@@ -20,6 +21,8 @@ export interface FiltroEquipos {
   marcaId?: string;
   modeloId?: string;
   estado?: EstadoEquipo;
+  /** Solo maquinas, o solo herramientas. */
+  clasificacion?: ClasificacionEquipo;
   /** Solo los que todavía no tienen etiqueta QR generada. */
   sinQr?: boolean;
   /** Solo los que ya no están en garantía, comparando contra esta fecha. */
@@ -73,7 +76,14 @@ export interface RepositorioEquipos {
    * el tiempo: son 326 equipos y no tiene sentido traerlos para contarlos en
    * memoria cada vez que alguien entra al sistema.
    */
-  resumen(): Promise<ResumenEquipos>;
+  /**
+   * El resumen contado DENTRO de un filtro.
+   *
+   * Toma un filtro parcial: la paginacion no aplica cuando lo que se cuenta es
+   * el total, y el tipo y la ubicacion tampoco, porque son justamente las
+   * opciones que hay que ofrecer.
+   */
+  resumen(filtro?: Partial<FiltroEquipos>): Promise<ResumenEquipos>;
   /**
    * Deja constancia de que a estos equipos ya se les generó la etiqueta QR.
    *
@@ -85,8 +95,29 @@ export interface RepositorioEquipos {
 }
 
 /** Cuántos equipos hay y en qué estado, para la pantalla de inicio. */
+/**
+ * Una opcion de filtro con cuantos equipos tiene DENTRO de lo que ya se filtro.
+ *
+ * El conteo no es decoracion: el catalogo tiene 49 ubicaciones y solo 16
+ * tienen algo, asi que dos de cada tres opciones no llevaban a ningun lado.
+ * Con el numero al lado, las vacias no se ofrecen.
+ */
+export interface OpcionConConteo {
+  id: string;
+  nombre: string;
+  cantidad: number;
+}
+
 export interface ResumenEquipos {
   total: number;
+  /** Cuantos son maquinas y cuantos herramientas. */
+  porClasificacion: Record<string, number>;
+  /** Los tipos que tienen algo, dentro del filtro actual. */
+  tipos: OpcionConConteo[];
+  /** Las ubicaciones que tienen algo, dentro del filtro actual. */
+  ubicaciones: OpcionConConteo[];
+  /** Equipos sin tipo cargado: no se pueden encontrar con ningun filtro. */
+  sinTipo: number;
   /** Cuántos hay en cada estado. Los estados sin equipos no aparecen. */
   porEstado: Record<string, number>;
   /**
