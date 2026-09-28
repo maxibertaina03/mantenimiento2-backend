@@ -93,27 +93,33 @@ if (!EJECUTAR) {
   process.exit(0);
 }
 
-await prisma.$transaction(async (tx) => {
-  // Los tipos nuevos, creados solo si no estaban.
-  const ids = {};
-  for (const [clave, nombre] of Object.entries(TIPOS)) {
-    const existente = await tx.tipoEquipoPlanta.findFirst({ where: { nombre } });
-    ids[clave] = existente
-      ? existente.id
-      : (await tx.tipoEquipoPlanta.create({ data: { nombre } })).id;
-  }
+// El timeout por defecto de una transaccion interactiva son 5 segundos, y
+// contra una base remota veintiuna escrituras no entran. Se vencia a la mitad
+// y deshacia todo: correcto, pero nunca terminaba.
+await prisma.$transaction(
+  async (tx) => {
+    // Los tipos nuevos, creados solo si no estaban.
+    const ids = {};
+    for (const [clave, nombre] of Object.entries(TIPOS)) {
+      const existente = await tx.tipoEquipoPlanta.findFirst({ where: { nombre } });
+      ids[clave] = existente
+        ? existente.id
+        : (await tx.tipoEquipoPlanta.create({ data: { nombre } })).id;
+    }
 
-  for (const equipo of aMover) {
-    const destino = REPARTO[equipo.nombre];
-    await tx.equipo.update({
-      where: { id: equipo.id },
-      data: {
-        clasificacion: 'HERRAMIENTA',
-        ...(destino ? { tipoId: ids[destino] } : {}),
-      },
-    });
-  }
-});
+    for (const equipo of aMover) {
+      const destino = REPARTO[equipo.nombre];
+      await tx.equipo.update({
+        where: { id: equipo.id },
+        data: {
+          clasificacion: 'HERRAMIENTA',
+          ...(destino ? { tipoId: ids[destino] } : {}),
+        },
+      });
+      }
+  },
+  { timeout: 120_000, maxWait: 30_000 },
+);
 
 const despues = {
   equipos: await prisma.equipo.count(),
