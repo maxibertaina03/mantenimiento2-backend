@@ -1,7 +1,23 @@
 import { Equipo, crearEquipo, normalizarTexto } from '../dominio/equipo';
 import { ClasificacionEquipo } from '../../../common/dominio/renglon-de-compra';
+import { CARPETAS_DE_HERRAMIENTAS } from '../dominio/importacion';
 import { RepositorioEquipos } from '../puertos/repositorio-equipos';
 import { RepositorioUbicaciones } from '../puertos/repositorio-ubicaciones';
+
+/**
+ * Si el sector dice que lo que entra es una herramienta.
+ *
+ * El servidor no puede depender de que la pantalla le reenvie la
+ * clasificacion: la deteccion la hace el, y una pantalla vieja en el navegador
+ * de alguien manda solo nombre y sector. Asi paso: noventa y seis herramientas
+ * del taller entraron como maquinas porque el cliente estaba cacheado.
+ *
+ * El sector viene de la carpeta, asi que la respuesta ya esta ahi.
+ */
+function clasificacionPorUbicacion(ubicacion: string): ClasificacionEquipo {
+  const limpia = ubicacion.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return CARPETAS_DE_HERRAMIENTAS.includes(limpia) ? 'HERRAMIENTA' : 'EQUIPO';
+}
 
 /** Una fila confirmada por quien importa, ya revisada en la pantalla. */
 export interface EquipoAImportar {
@@ -115,7 +131,7 @@ export class ImportarEquipos {
             nombre: fila.nombre,
             ubicacionId,
             descripcion: fila.descripcion,
-            clasificacion: fila.clasificacion,
+            clasificacion: fila.clasificacion ?? clasificacionPorUbicacion(fila.ubicacion),
           }),
         );
         yaExisten.add(clave);
