@@ -65,8 +65,10 @@ export class DetectarImportacionDto {
   rutas!: string[];
 
   @ApiPropertyOptional({
-    description: 'Carpetas a dejar afuera. Por defecto, taller y manuales.',
-    example: ['taller', 'manuales'],
+    description:
+      'Carpetas a dejar afuera. Por defecto solo "manuales", que son PDF. ' +
+      '"Taller" ya no se excluye: entra marcado como herramienta.',
+    example: ['manuales'],
   })
   @IsOptional()
   @IsArray()
