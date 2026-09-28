@@ -1,4 +1,5 @@
 import { Equipo, crearEquipo, normalizarTexto } from '../dominio/equipo';
+import { ClasificacionEquipo } from '../../../common/dominio/renglon-de-compra';
 import { RepositorioEquipos } from '../puertos/repositorio-equipos';
 import { RepositorioUbicaciones } from '../puertos/repositorio-ubicaciones';
 
@@ -7,6 +8,13 @@ export interface EquipoAImportar {
   nombre: string;
   ubicacion: string;
   descripcion?: string | null;
+  /**
+   * Maquina o herramienta. Por defecto maquina.
+   *
+   * Viene de la carpeta: lo que esta en "Taller" son herramientas. Asi entran
+   * clasificadas y no hay que recategorizar cien fichas a mano.
+   */
+  clasificacion?: ClasificacionEquipo;
 }
 
 export interface ResultadoImportacion {
@@ -103,7 +111,12 @@ export class ImportarEquipos {
         }
 
         aCrear.push(
-          crearEquipo({ nombre: fila.nombre, ubicacionId, descripcion: fila.descripcion }),
+          crearEquipo({
+            nombre: fila.nombre,
+            ubicacionId,
+            descripcion: fila.descripcion,
+            clasificacion: fila.clasificacion,
+          }),
         );
         yaExisten.add(clave);
       } catch (error) {

@@ -1,3 +1,4 @@
+import { ClasificacionEquipo } from '../../../common/dominio/renglon-de-compra';
 import { normalizarTexto } from './equipo';
 
 /**
@@ -27,6 +28,14 @@ export interface EquipoDetectado {
   ubicacion: string;
   ruta: string;
   advertencias: Advertencia[];
+  /**
+   * Si lo que entra es una maquina o una herramienta.
+   *
+   * Sale de la carpeta: lo que esta en "Taller" son herramientas. Antes esa
+   * carpeta se descartaba entera porque no habia donde ponerlas; ahora entran
+   * clasificadas y no hay que recategorizar cien fichas a mano.
+   */
+  clasificacion: ClasificacionEquipo;
 }
 
 export interface ArchivoDescartado {
@@ -46,10 +55,21 @@ const EXTENSIONES_IMAGEN = ['.jpg', '.jpeg', '.png', '.webp', '.heic'];
 /**
  * Carpetas que no son equipos de planta.
  *
- * "Taller" son herramientas —alicates, amoladoras, calibres—, que van a su
- * propio módulo. "manuales" son PDF, no equipos.
+ * "manuales" son PDF, no equipos.
+ *
+ * "Taller" estuvo acá mientras no hubo dónde poner una herramienta: se
+ * descartaba entera. Desde que existe la clasificación, entra como cualquier
+ * otra carpeta y lo suyo queda marcado como HERRAMIENTA.
  */
-export const CARPETAS_EXCLUIDAS_POR_DEFECTO = ['taller', 'manuales'];
+export const CARPETAS_EXCLUIDAS_POR_DEFECTO = ['manuales'];
+
+/**
+ * Carpetas cuyo contenido son herramientas y no máquinas.
+ *
+ * Se compara por nombre de carpeta, sin distinguir mayúsculas ni acentos, por
+ * lo mismo que las excluidas: la carpeta la nombró una persona.
+ */
+export const CARPETAS_DE_HERRAMIENTAS = ['taller'];
 
 /**
  * Nombres que delatan un equipo de sistemas.
@@ -145,6 +165,7 @@ export function detectarEquipos(
       continue;
     }
 
+    const esHerramienta = CARPETAS_DE_HERRAMIENTAS.includes(carpeta.toLowerCase());
     const nombre = nombreDesdeArchivo(archivo);
     if (nombre === null) {
       descartados.push({ ruta, motivo: 'sin_nombre' });
@@ -161,7 +182,13 @@ export function detectarEquipos(
     if (pareceIT(nombre)) advertencias.push('posible_equipo_it');
     if (esNombreAutomatico(nombre)) advertencias.push('nombre_automatico');
 
-    equipos.push({ nombre, ubicacion, ruta, advertencias });
+    equipos.push({
+      nombre,
+      ubicacion,
+      ruta,
+      advertencias,
+      clasificacion: esHerramienta ? 'HERRAMIENTA' : 'EQUIPO',
+    });
   }
 
   // Los posibles duplicados solo se ven mirando el conjunto.

@@ -3,11 +3,16 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import {
+  CLASIFICACIONES_EQUIPO,
+  ClasificacionEquipo,
+} from '../../../common/dominio/renglon-de-compra';
 
 /** Una fila ya revisada en la pantalla de importación. */
 export class FilaImportacionDto {
@@ -26,6 +31,15 @@ export class FilaImportacionDto {
   @IsString()
   @MaxLength(1000)
   descripcion?: string | null;
+
+  @ApiPropertyOptional({
+    enum: CLASIFICACIONES_EQUIPO,
+    default: 'EQUIPO',
+    description: 'Lo que viene de la carpeta "Taller" entra como HERRAMIENTA',
+  })
+  @IsOptional()
+  @IsIn(CLASIFICACIONES_EQUIPO)
+  clasificacion?: ClasificacionEquipo;
 }
 
 export class ImportarEquiposDto {

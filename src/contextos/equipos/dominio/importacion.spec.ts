@@ -32,15 +32,25 @@ describe('detectarEquipos', () => {
     expect(ubicaciones).toEqual(['Caldera', 'Tinas']);
   });
 
-  it('REGRESION: Taller queda afuera — son herramientas, no equipos', () => {
-    // Sus 103 archivos son alicates, amoladoras y calibres. Van a su propio
-    // modulo; mezclarlos ensuciaria el inventario de maquinas.
-    const { equipos, descartados } = detectarEquipos([
+  it('REGRESION: lo de Taller entra, y entra como HERRAMIENTA', () => {
+    // Sus 103 archivos son alicates, amoladoras y calibres. La carpeta se
+    // descartaba entera mientras no hubo donde poner una herramienta; desde
+    // que existe la clasificacion entran marcadas, y no hay que recategorizar
+    // cien fichas a mano.
+    const { equipos } = detectarEquipos([
       ruta('Taller/Amoladora 1.jpg'),
       ruta('Caldera/Compresor 1.jpg'),
     ]);
-    expect(equipos.map((e) => e.nombre)).toEqual(['Compresor 1']);
-    expect(descartados[0]).toEqual({ ruta: 'Taller/Amoladora 1.jpg', motivo: 'carpeta_excluida' });
+
+    expect(equipos.map((e) => e.nombre).sort()).toEqual(['Amoladora 1', 'Compresor 1']);
+    expect(equipos.find((e) => e.nombre === 'Amoladora 1')?.clasificacion).toBe('HERRAMIENTA');
+    expect(equipos.find((e) => e.nombre === 'Compresor 1')?.clasificacion).toBe('EQUIPO');
+  });
+
+  it('REGRESION: el taller queda como su ubicacion, no se pierde', () => {
+    // Saber que una amoladora esta en el taller es la mitad del dato.
+    const { equipos } = detectarEquipos([ruta('Taller/Amoladora 1.jpg')]);
+    expect(equipos[0].ubicacion).toBe('Taller');
   });
 
   it('los manuales tampoco: son PDF, no equipos', () => {
@@ -157,12 +167,19 @@ describe('detectarEquipos — advertencias', () => {
 });
 
 describe('las carpetas excluidas por defecto', () => {
-  it('son taller y manuales', () => {
-    expect(CARPETAS_EXCLUIDAS_POR_DEFECTO).toEqual(['taller', 'manuales']);
+  it('es solo manuales: son PDF, no equipos', () => {
+    // Taller salio de esta lista cuando hubo donde poner una herramienta.
+    expect(CARPETAS_EXCLUIDAS_POR_DEFECTO).toEqual(['manuales']);
   });
 
   it('la comparacion no distingue mayusculas', () => {
-    const { equipos } = detectarEquipos([ruta('TALLER/Amoladora.jpg'), ruta('Manuales/x.jpg')]);
+    const { equipos } = detectarEquipos([ruta('Manuales/x.jpg')]);
     expect(equipos).toHaveLength(0);
+  });
+
+  it('REGRESION: TALLER en mayusculas tambien es herramienta', () => {
+    // La carpeta la nombro una persona: puede venir de cualquier forma.
+    const { equipos } = detectarEquipos([ruta('TALLER/Amoladora.jpg')]);
+    expect(equipos[0].clasificacion).toBe('HERRAMIENTA');
   });
 });
