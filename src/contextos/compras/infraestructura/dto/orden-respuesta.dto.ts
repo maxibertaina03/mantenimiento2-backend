@@ -22,6 +22,13 @@ export class RenglonRespuestaDto {
     nullable: true,
   })
   movimientoId!: string | null;
+  @ApiPropertyOptional({
+    description: 'Qué equipo o herramienta se compra. Nulo si el renglón es de un material',
+    nullable: true,
+  })
+  descripcionEquipo!: string | null;
+  @ApiPropertyOptional({ enum: ['EQUIPO', 'HERRAMIENTA'], nullable: true })
+  clasificacion!: 'EQUIPO' | 'HERRAMIENTA' | null;
 
   static desde(r: RenglonConRelaciones): RenglonRespuestaDto {
     const cantidad = aNumero(r.cantidad);
@@ -36,6 +43,10 @@ export class RenglonRespuestaDto {
       subtotal: precioUnitario === null ? null : Number((cantidad * precioUnitario).toFixed(2)),
       notas: r.notas,
       movimientoId: r.movimientoId,
+      // Sin esto, un renglón de equipo llegaba a la pantalla, al PDF y al
+      // proveedor sin decir qué se compraba.
+      descripcionEquipo: r.descripcionEquipo ?? null,
+      clasificacion: r.clasificacion ?? null,
     };
   }
 }

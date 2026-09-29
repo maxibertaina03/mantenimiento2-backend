@@ -174,6 +174,32 @@ describe('Compra de equipos y herramientas (e2e)', () => {
     });
   });
 
+  describe('la orden dice que equipo se compra', () => {
+    it('REGRESION: el renglon trae la descripcion y la clasificacion', async () => {
+      // Sin esto, la pantalla, el PDF y el mensaje al proveedor mostraban el
+      // renglon sin nombre.
+      const orden = await http
+        .post('/api/ordenes-compra')
+        .send({
+          proveedorId,
+          renglones: [
+            { descripcionEquipo: 'Pistola de calor', cantidad: 1, clasificacion: 'HERRAMIENTA' },
+            { materialId, cantidad: 3 },
+          ],
+        })
+        .expect(201);
+
+      const r = await http.get(`/api/ordenes-compra/${orden.body.id}`).expect(200);
+      const equipo = r.body.renglones.find((x: { materialId: string | null }) => !x.materialId);
+      const material = r.body.renglones.find((x: { materialId: string | null }) => x.materialId);
+      expect(equipo).toMatchObject({
+        descripcionEquipo: 'Pistola de calor',
+        clasificacion: 'HERRAMIENTA',
+      });
+      expect(material).toMatchObject({ descripcionEquipo: null, clasificacion: null });
+    });
+  });
+
   describe('editar la orden antes de mandarla', () => {
     it('REGRESION: editar un borrador conserva lo del equipo', async () => {
       // Editar reemplaza todos los renglones. Si al recrearlos se pierde la

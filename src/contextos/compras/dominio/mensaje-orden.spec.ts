@@ -57,6 +57,18 @@ describe('destinatarios', () => {
 });
 
 describe('armarMensaje', () => {
+  it('REGRESION: un renglon de equipo dice que equipo se compra', () => {
+    // Antes salia "Material", y el proveedor no sabia que le estaban pidiendo.
+    const { cuerpo } = armarMensaje(
+      orden({
+        renglones: [
+          { materialNombre: null, descripcionEquipo: 'Amoladora 115mm', unidad: null, cantidad: 2 },
+        ],
+      }),
+    );
+    expect(cuerpo).toContain('• Amoladora 115mm — 2');
+  });
+
   it('el asunto lleva el numero de orden', () => {
     expect(armarMensaje(orden()).asunto).toContain('OC-2026-0007');
   });

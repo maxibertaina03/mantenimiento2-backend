@@ -52,6 +52,8 @@ export interface RenglonConRelaciones {
   precioUnitario: Decimal | null;
   notas: string | null;
   movimientoId: string | null;
+  descripcionEquipo?: string | null;
+  clasificacion?: ClasificacionEquipo | null;
   material?: { nombre: string; unidad?: { simbolo: string } | null } | null;
 }
 

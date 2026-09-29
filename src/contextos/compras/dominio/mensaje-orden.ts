@@ -8,7 +8,13 @@ export interface OrdenParaMensaje {
   proveedorEmail: string | null;
   observaciones: string | null;
   total: number | null;
-  renglones: { materialNombre: string | null; unidad: string | null; cantidad: number }[];
+  renglones: {
+    materialNombre: string | null;
+    /** Cuando el renglón es de un equipo o herramienta y no de un material. */
+    descripcionEquipo?: string | null;
+    unidad: string | null;
+    cantidad: number;
+  }[];
 }
 
 /** Un e-mail plausible; lo mínimo para no mandar a una dirección rota. */
@@ -40,7 +46,7 @@ export function armarMensaje(orden: OrdenParaMensaje): MensajeOrden {
   const detalle = orden.renglones
     .map((r) => {
       const cantidad = `${r.cantidad}${r.unidad ? ` ${r.unidad}` : ''}`;
-      return `• ${r.materialNombre ?? 'Material'} — ${cantidad}`;
+      return `• ${r.materialNombre ?? r.descripcionEquipo ?? 'Material'} — ${cantidad}`;
     })
     .join('\n');
 
