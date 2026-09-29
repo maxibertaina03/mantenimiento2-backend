@@ -181,6 +181,13 @@ export class OrdenesCompraRepository {
                 ? null
                 : new Prisma.Decimal(r.precioUnitario.toFixed(2)),
             notas: r.notas ?? null,
+            // Faltaban: editar un borrador dejaba los renglones de equipo sin
+            // decir qué se compraba, y la orden ya no se podía recibir.
+            descripcionEquipo: r.descripcionEquipo ?? null,
+            clasificacion: r.clasificacion ?? null,
+            equipoTipoId: r.equipoTipoId ?? null,
+            equipoMarcaId: r.equipoMarcaId ?? null,
+            equipoModeloId: r.equipoModeloId ?? null,
           })),
         });
       }

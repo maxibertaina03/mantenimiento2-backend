@@ -174,6 +174,46 @@ describe('Compra de equipos y herramientas (e2e)', () => {
     });
   });
 
+  describe('editar la orden antes de mandarla', () => {
+    it('REGRESION: editar un borrador conserva lo del equipo', async () => {
+      // Editar reemplaza todos los renglones. Si al recrearlos se pierde la
+      // descripcion del equipo, el renglon queda sin decir que se compra y la
+      // compra no se puede recibir, o entra sin la ficha que tenia que crear.
+      const orden = await http
+        .post('/api/ordenes-compra')
+        .send({
+          proveedorId,
+          renglones: [
+            { descripcionEquipo: 'Escalera extensible', cantidad: 1, clasificacion: 'HERRAMIENTA' },
+          ],
+        })
+        .expect(201);
+
+      await http
+        .patch(`/api/ordenes-compra/${orden.body.id}`)
+        .send({
+          renglones: [
+            { descripcionEquipo: 'Escalera extensible', cantidad: 2, clasificacion: 'HERRAMIENTA' },
+          ],
+        })
+        .expect(200);
+
+      await http.patch(`/api/ordenes-compra/${orden.body.id}/emitir`).send({}).expect(200);
+      await http
+        .patch(`/api/ordenes-compra/${orden.body.id}/recibir`)
+        .send({ remito: '0001-00005678' })
+        .expect(200);
+
+      const equipos = await http.get('/api/equipos?buscar=Escalera extensible').expect(200);
+      expect(equipos.body.datos).toHaveLength(2);
+      expect(
+        equipos.body.datos.every(
+          (e: { clasificacion: string }) => e.clasificacion === 'HERRAMIENTA',
+        ),
+      ).toBe(true);
+    });
+  });
+
   describe('el paniol no se entera', () => {
     it('REGRESION: comprar un equipo no genera ningun movimiento de stock', async () => {
       // Es la linea que separa los dos caminos. Si un equipo moviera stock,
