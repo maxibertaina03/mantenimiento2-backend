@@ -37,6 +37,8 @@ export function crearPrismaEnMemoria() {
     asignacionesIt: [] as any[],
     ordenes: [] as any[],
     renglones: [] as any[],
+    // Por dónde salió cada orden. Sin esto, registrar un WhatsApp daba 500.
+    enviosOrden: [] as any[],
     contadores: [] as any[],
     permisosRol: [] as any[],
     // Marca, modelo y ubicacion dejaron de ser texto libre y pasaron a ser
@@ -667,6 +669,10 @@ export function crearPrismaEnMemoria() {
       precioUnitario: null,
       notas: null,
       movimientoId: null,
+    })),
+    envioOrden: delegate(db.enviosOrden, () => ({
+      usuarioId: null,
+      enviadoEn: new Date(),
     })),
 
     // El repositorio usa SELECT ... FOR UPDATE para tomar lock del material.
