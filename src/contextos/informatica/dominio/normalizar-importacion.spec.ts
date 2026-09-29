@@ -1,4 +1,3 @@
-import { EstadoEquipoIT } from '@prisma/client';
 import {
   MARCA_POR_DEFECTO,
   normalizarEstado,
@@ -7,7 +6,7 @@ import {
   normalizarTexto,
   normalizarTipo,
   separarMarcaYModelo,
-} from './normalizar';
+} from './normalizar-importacion';
 
 /**
  * Los casos salen del inventario real que se va a importar (planilla de Notion),
@@ -85,11 +84,11 @@ describe('normalizarTipo', () => {
 
 describe('normalizarEstado', () => {
   it.each([
-    ['En uso', EstadoEquipoIT.EN_USO],
-    ['Activo', EstadoEquipoIT.EN_USO],
-    ['Disponible', EstadoEquipoIT.EN_DEPOSITO],
-    ['En reparación', EstadoEquipoIT.EN_REPARACION],
-    ['Dado de baja', EstadoEquipoIT.DADO_DE_BAJA],
+    ['En uso', 'EN_USO'],
+    ['Activo', 'EN_USO'],
+    ['Disponible', 'EN_DEPOSITO'],
+    ['En reparación', 'EN_REPARACION'],
+    ['Dado de baja', 'DADO_DE_BAJA'],
   ])('mapea "%s"', (entrada, esperado) => {
     expect(normalizarEstado(entrada)).toBe(esperado);
   });
@@ -97,9 +96,9 @@ describe('normalizarEstado', () => {
   it('sin dato asume EN_DEPOSITO, no EN_USO', () => {
     // Decir que un equipo está en uso sin saberlo es peor que decir que está
     // guardado: lo segundo se corrige mirando, lo primero pasa desapercibido.
-    expect(normalizarEstado(undefined)).toBe(EstadoEquipoIT.EN_DEPOSITO);
-    expect(normalizarEstado('')).toBe(EstadoEquipoIT.EN_DEPOSITO);
-    expect(normalizarEstado('cualquier cosa')).toBe(EstadoEquipoIT.EN_DEPOSITO);
+    expect(normalizarEstado(undefined)).toBe('EN_DEPOSITO');
+    expect(normalizarEstado('')).toBe('EN_DEPOSITO');
+    expect(normalizarEstado('cualquier cosa')).toBe('EN_DEPOSITO');
   });
 });
 

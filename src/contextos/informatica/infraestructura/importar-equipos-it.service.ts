@@ -1,22 +1,22 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Responsable } from '@prisma/client';
 import type { TipoEquipo } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { TiposEquipoRepository } from '../../tipos-equipo/tipos-equipo.repository';
+import { TiposEquipoRepository } from '../../../modules/tipos-equipo/tipos-equipo.repository';
 import { claveDeComparacion, sonElMismoNombre } from '../../../common/dominio/nombres';
 import {
   FilaImportacionDto,
   ImportarEquiposDto,
   ResultadoImportacionDto,
-} from '../dto/importar-equipos.dto';
-import { EquiposItRepository } from '../equipos-it.repository';
+} from './equipos-it/importar-equipos.dto';
+import { REPOSITORIO_EQUIPOS_IT, RepositorioEquiposIt } from '../puertos/repositorio-equipos-it';
 import {
   normalizarEstado,
   normalizarIdAccesoRemoto,
   normalizarNombrePersona,
   normalizarTipo,
   separarMarcaYModelo,
-} from './normalizar';
+} from '../dominio/normalizar-importacion';
 
 /**
  * Importación masiva del inventario desde una planilla.
@@ -41,11 +41,11 @@ import {
  *   los equipos ante cualquier volcado de la base.
  */
 @Injectable()
-export class ImportarEquiposService {
-  private readonly logger = new Logger(ImportarEquiposService.name);
+export class ImportarEquiposItService {
+  private readonly logger = new Logger(ImportarEquiposItService.name);
 
   constructor(
-    private readonly repo: EquiposItRepository,
+    @Inject(REPOSITORIO_EQUIPOS_IT) private readonly repo: RepositorioEquiposIt,
     private readonly tipos: TiposEquipoRepository,
     private readonly prisma: PrismaService,
   ) {}

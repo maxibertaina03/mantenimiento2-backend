@@ -1,25 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  AsignacionEquipoIT,
-  EquipoIT,
-  EstadoEquipoIT,
-  TipoAccesoRemoto,
-  TipoDisco,
-} from '@prisma/client';
-
-export type EquipoConRelaciones = EquipoIT & {
-  tipo?: { nombre: string; llevaEspecificaciones: boolean } | null;
-  proveedor?: { nombre: string } | null;
-  marca?: { nombre: string } | null;
-  modelo?: { nombre: string } | null;
-  ubicacion?: { nombre: string } | null;
-  responsable?: { nombre: string; activo?: boolean } | null;
-};
-
-export type AsignacionConRelaciones = AsignacionEquipoIT & {
-  responsable?: { nombre: string } | null;
-  registradoPor?: { nombre: string } | null;
-};
+import { EstadoEquipoIT, TipoAccesoRemoto, TipoDisco } from '@prisma/client';
+import { garantiaVencida } from '../../dominio/equipo-it';
+import { AsignacionIt, EquipoItConRelaciones } from '../../puertos/repositorio-equipos-it';
 
 export class EquipoRespuestaDto {
   @ApiProperty() id!: string;
@@ -73,42 +55,19 @@ export class EquipoRespuestaDto {
 
   @ApiProperty() creadoEn!: Date;
 
-  static desde(e: EquipoConRelaciones): EquipoRespuestaDto {
+  /**
+   * Toma lo que devuelve el contexto, no una fila de Prisma.
+   *
+   * Los nombres de los catálogos ya vienen resueltos desde el repositorio.
+   */
+  static desde(e: EquipoItConRelaciones): EquipoRespuestaDto {
     return {
-      id: e.id,
-      codigoInterno: e.codigoInterno,
-      tipoId: e.tipoId,
-      tipoNombre: e.tipo?.nombre ?? null,
-      llevaEspecificaciones: e.tipo?.llevaEspecificaciones ?? true,
-      estado: e.estado,
-      qrGeneradoEn: e.qrGeneradoEn,
-      marcaId: e.marcaId,
-      marcaNombre: e.marca?.nombre ?? null,
-      modeloId: e.modeloId,
-      modeloNombre: e.modelo?.nombre ?? null,
-      numeroSerie: e.numeroSerie,
-      procesador: e.procesador,
-      memoriaRamGb: e.memoriaRamGb,
-      discoTipo: e.discoTipo,
-      discoCapacidadGb: e.discoCapacidadGb,
-      sistemaOperativo: e.sistemaOperativo,
-      direccionIp: e.direccionIp,
-      direccionMac: e.direccionMac,
-      nombreEnRed: e.nombreEnRed,
-      accesoRemoto: e.accesoRemoto,
-      accesoRemotoId: e.accesoRemotoId,
-      ubicacionId: e.ubicacionId,
-      ubicacionNombre: e.ubicacion?.nombre ?? null,
-      proveedorId: e.proveedorId,
-      proveedorNombre: e.proveedor?.nombre ?? null,
-      fechaCompra: e.fechaCompra,
-      garantiaHasta: e.garantiaHasta,
-      // Se calcula acá para que la UI no tenga que repetir la regla.
-      garantiaVencida: e.garantiaHasta ? e.garantiaHasta.getTime() < Date.now() : false,
-      notas: e.notas,
-      responsableId: e.responsableId,
-      responsableNombre: e.responsable?.nombre ?? null,
-      creadoEn: e.creadoEn,
+      ...e,
+      estado: e.estado as EstadoEquipoIT,
+      discoTipo: e.discoTipo as TipoDisco | null,
+      accesoRemoto: e.accesoRemoto as TipoAccesoRemoto,
+      // Se calcula acá para que la pantalla no tenga que repetir la regla.
+      garantiaVencida: garantiaVencida(e.garantiaHasta, new Date()),
     };
   }
 }
@@ -127,17 +86,7 @@ export class AsignacionRespuestaDto {
   @ApiPropertyOptional({ nullable: true }) notas!: string | null;
   @ApiProperty({ description: 'true si es la asignación actual' }) vigente!: boolean;
 
-  static desde(a: AsignacionConRelaciones): AsignacionRespuestaDto {
-    return {
-      id: a.id,
-      responsableId: a.responsableId,
-      responsableNombre: a.responsable?.nombre ?? null,
-      registradoPorNombre: a.registradoPor?.nombre ?? null,
-      desde: a.desde,
-      hasta: a.hasta,
-      motivo: a.motivo,
-      notas: a.notas,
-      vigente: a.hasta === null,
-    };
+  static desde(a: AsignacionIt): AsignacionRespuestaDto {
+    return { ...a, vigente: a.hasta === null };
   }
 }

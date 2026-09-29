@@ -1,8 +1,8 @@
 import { EstadoEquipoIT } from '@prisma/client';
-import { ImportarEquiposService } from './importar-equipos.service';
-import { EquiposItRepository } from '../equipos-it.repository';
+import { ImportarEquiposItService } from './importar-equipos-it.service';
+import { RepositorioEquiposIt } from '../puertos/repositorio-equipos-it';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { TiposEquipoRepository } from '../../tipos-equipo/tipos-equipo.repository';
+import { TiposEquipoRepository } from '../../../modules/tipos-equipo/tipos-equipo.repository';
 
 /**
  * Las filas de estos tests son las del inventario real que se va a importar.
@@ -74,8 +74,8 @@ function armar(opciones: { existentes?: Record<string, any> } = {}) {
     modeloEquipo,
     ubicacionEquipo,
     tipos,
-    service: new ImportarEquiposService(
-      repo as unknown as EquiposItRepository,
+    service: new ImportarEquiposItService(
+      repo as unknown as RepositorioEquiposIt,
       tipos as unknown as TiposEquipoRepository,
       prisma as unknown as PrismaService,
     ),

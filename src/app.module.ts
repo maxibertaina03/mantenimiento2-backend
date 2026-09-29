@@ -8,7 +8,6 @@ import { ProveedoresModule } from './modules/proveedores/proveedores.module';
 import { CategoriasMaterialModule } from './modules/categorias-material/categorias-material.module';
 import { EstanteriasMaterialModule } from './modules/estanterias-material/estanterias-material.module';
 import { InformaticaModule } from './contextos/informatica/infraestructura/informatica.module';
-import { EquiposItModule } from './modules/equipos-it/equipos-it.module';
 import { CorreoModule } from './common/correo/correo.module';
 import { EquiposModule } from './contextos/equipos/infraestructura/equipos.module';
 import { TrabajosModule } from './contextos/trabajos/infraestructura/trabajos.module';
@@ -35,7 +34,6 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     MaterialesModule,
     MovimientosStockModule,
     OrdenesCompraModule,
-    EquiposItModule,
     InformaticaModule,
     ResponsablesModule,
     CorreoModule,

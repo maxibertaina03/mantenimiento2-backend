@@ -1,4 +1,4 @@
-import { EstadoEquipoIT } from '@prisma/client';
+import { EstadoEquipoIt } from './equipo-it';
 
 /**
  * Traducción de una planilla de inventario (Notion, Excel) a los datos que
@@ -19,17 +19,17 @@ export function normalizarTexto(valor: string): string {
   );
 }
 
-const ESTADOS: Record<string, EstadoEquipoIT> = {
-  'en uso': EstadoEquipoIT.EN_USO,
-  activo: EstadoEquipoIT.EN_USO,
-  disponible: EstadoEquipoIT.EN_DEPOSITO,
-  'en deposito': EstadoEquipoIT.EN_DEPOSITO,
-  deposito: EstadoEquipoIT.EN_DEPOSITO,
-  'en reparacion': EstadoEquipoIT.EN_REPARACION,
-  reparacion: EstadoEquipoIT.EN_REPARACION,
-  'dado de baja': EstadoEquipoIT.DADO_DE_BAJA,
-  baja: EstadoEquipoIT.DADO_DE_BAJA,
-  inactivo: EstadoEquipoIT.DADO_DE_BAJA,
+const ESTADOS: Record<string, EstadoEquipoIt> = {
+  'en uso': 'EN_USO',
+  activo: 'EN_USO',
+  disponible: 'EN_DEPOSITO',
+  'en deposito': 'EN_DEPOSITO',
+  deposito: 'EN_DEPOSITO',
+  'en reparacion': 'EN_REPARACION',
+  reparacion: 'EN_REPARACION',
+  'dado de baja': 'DADO_DE_BAJA',
+  baja: 'DADO_DE_BAJA',
+  inactivo: 'DADO_DE_BAJA',
 };
 
 /**
@@ -139,10 +139,10 @@ export function normalizarTipo<T extends TipoBuscable>(
   return parcial ? parcial[1] : null;
 }
 
-export function normalizarEstado(valor: string | undefined): EstadoEquipoIT {
+export function normalizarEstado(valor: string | undefined): EstadoEquipoIt {
   const clave = normalizarTexto(valor ?? '');
   // Sin dato, lo más seguro es asumir que está en depósito y no en uso.
-  return ESTADOS[clave] ?? EstadoEquipoIT.EN_DEPOSITO;
+  return ESTADOS[clave] ?? 'EN_DEPOSITO';
 }
 
 /**

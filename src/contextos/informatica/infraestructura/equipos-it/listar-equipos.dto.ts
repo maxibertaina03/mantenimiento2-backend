@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { EstadoEquipoIT } from '@prisma/client';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { PaginacionDto } from '../../../common/dto/paginacion.dto';
+import { PaginacionDto } from '../../../../common/dto/paginacion.dto';
 
 /** Filtros del listado de equipos IT. */
 export class ListarEquiposDto extends PaginacionDto {
