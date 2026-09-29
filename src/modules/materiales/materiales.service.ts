@@ -245,6 +245,10 @@ export class MaterialesService {
           : { estanteria: { disconnect: true }, fila: null }
         : {}),
       ...(dto.fila !== undefined && estanteriaFinal ? { fila: dto.fila } : {}),
+      // "Sacar de circulación". Faltaba esta línea: el DTO aceptaba `activo`, la
+      // pantalla lo mandaba, el servidor contestaba 200 y lo descartaba. Nunca
+      // se desactivó ningún material, y quien lo intentó creyó que sí.
+      ...(dto.activo !== undefined ? { activo: dto.activo } : {}),
     });
     return MaterialRespuestaDto.desde(actualizado);
   }
