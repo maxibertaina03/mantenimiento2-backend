@@ -14,7 +14,7 @@ import { TrabajosModule } from './contextos/trabajos/infraestructura/trabajos.mo
 import { TiposEquipoModule } from './modules/tipos-equipo/tipos-equipo.module';
 import { UnidadesMedidaModule } from './modules/unidades-medida/unidades-medida.module';
 import { PanolModule } from './contextos/panol/infraestructura/panol.module';
-import { OrdenesCompraModule } from './modules/ordenes-compra/ordenes-compra.module';
+import { ComprasModule } from './contextos/compras/infraestructura/compras.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 
 @Module({
@@ -31,7 +31,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     CategoriasMaterialModule,
     EstanteriasMaterialModule,
     PanolModule, // materiales y movimientos de stock
-    OrdenesCompraModule,
+    ComprasModule, // ordenes de compra, comprobantes y envio
     InformaticaModule,
     ResponsablesModule,
     CorreoModule,

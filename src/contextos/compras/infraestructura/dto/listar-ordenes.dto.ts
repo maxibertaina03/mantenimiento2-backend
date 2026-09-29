@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { EstadoOrdenCompra } from '@prisma/client';
 import { IsEnum, IsISO8601, IsOptional, IsString, IsUUID } from 'class-validator';
-import { PaginacionDto } from '../../../common/dto/paginacion.dto';
+import { PaginacionDto } from '../../../../common/dto/paginacion.dto';
 
 export class ListarOrdenesDto extends PaginacionDto {
   @ApiPropertyOptional({ description: 'Busca por número de orden o nombre de proveedor' })

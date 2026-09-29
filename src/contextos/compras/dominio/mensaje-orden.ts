@@ -1,4 +1,15 @@
-import { OrdenRespuestaDto } from '../dto/orden-respuesta.dto';
+/**
+ * Lo que el mensaje necesita saber de la orden: la forma en que la ve el
+ * proveedor, con los nombres y el total ya calculados.
+ */
+export interface OrdenParaMensaje {
+  numero: string;
+  proveedorNombre: string | null;
+  proveedorEmail: string | null;
+  observaciones: string | null;
+  total: number | null;
+  renglones: { materialNombre: string | null; unidad: string | null; cantidad: number }[];
+}
 
 /** Un e-mail plausible; lo mínimo para no mandar a una dirección rota. */
 export function esEmailValido(valor: string | null | undefined): boolean {
@@ -25,7 +36,7 @@ export interface MensajeOrden {
  * ni el texto ni los destinatarios. Si los mandara, cualquiera con una sesión
  * podría usar la casilla de la empresa para escribirle a quien quisiera.
  */
-export function armarMensaje(orden: OrdenRespuestaDto): MensajeOrden {
+export function armarMensaje(orden: OrdenParaMensaje): MensajeOrden {
   const detalle = orden.renglones
     .map((r) => {
       const cantidad = `${r.cantidad}${r.unidad ? ` ${r.unidad}` : ''}`;
@@ -76,7 +87,7 @@ export interface Destinatarios {
  * sin destinatario no falla, simplemente no le llega a nadie.
  */
 export function destinatarios(
-  orden: OrdenRespuestaDto,
+  orden: OrdenParaMensaje,
   mailAdministracion: string | null,
 ): Destinatarios {
   const interno = (mailAdministracion ?? '').trim();

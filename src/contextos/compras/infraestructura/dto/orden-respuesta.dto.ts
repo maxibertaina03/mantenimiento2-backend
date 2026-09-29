@@ -1,22 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EstadoOrdenCompra, OrdenCompra, RenglonOrdenCompra } from '@prisma/client';
-import { aNumero } from '../../../common/dominio/decimal';
-
-export type RenglonConRelaciones = RenglonOrdenCompra & {
-  material?: { nombre: string; unidad?: { simbolo: string } | null } | null;
-};
-
-export type OrdenConRelaciones = OrdenCompra & {
-  proveedor?: {
-    nombre: string;
-    cuit: string | null;
-    email: string | null;
-    telefono: string | null;
-  } | null;
-  creadoPor?: { nombre: string } | null;
-  recibidaPor?: { nombre: string } | null;
-  renglones?: RenglonConRelaciones[];
-};
+import { EstadoOrdenCompra } from '@prisma/client';
+import { aNumero } from '../../../../common/dominio/decimal';
+import type {
+  OrdenConRelaciones,
+  RenglonConRelaciones,
+} from '../../puertos/repositorio-ordenes-compra';
 
 export class RenglonRespuestaDto {
   @ApiProperty() id!: string;

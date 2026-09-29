@@ -8,8 +8,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { TipoComprobante } from '@prisma/client';
 import type { Usuario } from '@prisma/client';
-import { AlmacenSupabase } from '../../../common/almacen/almacen-supabase';
-import { PrismaService } from '../../../common/prisma/prisma.service';
+import { AlmacenSupabase } from '../../../../common/almacen/almacen-supabase';
+import { PrismaService } from '../../../../common/prisma/prisma.service';
 
 /**
  * Lo que se acepta como comprobante.

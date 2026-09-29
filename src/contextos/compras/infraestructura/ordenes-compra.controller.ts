@@ -14,7 +14,7 @@ import {
 import { UseFilters } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Usuario } from '@prisma/client';
-import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decorator';
+import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.decorator';
 import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
@@ -23,9 +23,9 @@ import { EnviarOrdenDto, RegistrarWhatsappDto } from './dto/enviar-orden.dto';
 import { AdjuntarComprobanteDto } from './comprobantes/comprobantes.dto';
 import { ComprobantesService } from './comprobantes/comprobantes.service';
 import { OrdenesCompraService } from './ordenes-compra.service';
-import { Permisos } from '../../common/auth/decorators/permisos.decorator';
-import { PERMISOS } from '../../common/auth/permisos';
-import { FiltroErroresDominio } from '../../common/dominio/filtro-errores-dominio';
+import { Permisos } from '../../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../../common/auth/permisos';
+import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 
 @ApiTags('Órdenes de compra')
 @ApiBearerAuth()

@@ -15,7 +15,7 @@ import {
 import {
   CLASIFICACIONES_EQUIPO,
   ClasificacionEquipo,
-} from '../../../common/dominio/renglon-de-compra';
+} from '../../../../common/dominio/renglon-de-compra';
 
 export class RenglonOrdenDto {
   /**

@@ -1,7 +1,7 @@
 import { EstadoOrdenCompra } from '@prisma/client';
-import { OrdenesCompraRepository } from './ordenes-compra.repository';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { aDecimal } from '../../common/dominio/decimal';
+import { PrismaRepositorioOrdenesCompra } from './prisma-repositorio-ordenes-compra';
+import { PrismaService } from '../../../common/prisma/prisma.service';
+import { aDecimal } from '../../../common/dominio/decimal';
 
 /**
  * El fake de Prisma que usan los E2E hace matching por texto sobre el SQL, asi
@@ -48,10 +48,10 @@ const paramsRecibir = {
   notas: null,
 };
 
-describe('OrdenesCompraRepository.recibir()', () => {
+describe('PrismaRepositorioOrdenesCompra.recibir()', () => {
   it('REGRESION: el id del material NO se castea a ::uuid', async () => {
     const { prisma, sqlEjecutado } = crearPrismaFalso();
-    const repo = new OrdenesCompraRepository(prisma);
+    const repo = new PrismaRepositorioOrdenesCompra(prisma);
 
     await repo.recibir(paramsRecibir);
 
@@ -63,7 +63,7 @@ describe('OrdenesCompraRepository.recibir()', () => {
 
   it('toma lock del material antes de tocar el stock', async () => {
     const { prisma, sqlEjecutado } = crearPrismaFalso();
-    const repo = new OrdenesCompraRepository(prisma);
+    const repo = new PrismaRepositorioOrdenesCompra(prisma);
 
     await repo.recibir(paramsRecibir);
 
@@ -72,7 +72,7 @@ describe('OrdenesCompraRepository.recibir()', () => {
 
   it('genera un movimiento por renglon y lo enlaza', async () => {
     const { prisma, tx } = crearPrismaFalso();
-    const repo = new OrdenesCompraRepository(prisma);
+    const repo = new PrismaRepositorioOrdenesCompra(prisma);
 
     await repo.recibir(paramsRecibir);
 
@@ -82,7 +82,7 @@ describe('OrdenesCompraRepository.recibir()', () => {
 
   it('el movimiento lleva la referencia de la orden', async () => {
     const { prisma, tx } = crearPrismaFalso();
-    const repo = new OrdenesCompraRepository(prisma);
+    const repo = new PrismaRepositorioOrdenesCompra(prisma);
 
     await repo.recibir(paramsRecibir);
 
@@ -94,7 +94,7 @@ describe('OrdenesCompraRepository.recibir()', () => {
 
   it('suma la cantidad del renglon al stock', async () => {
     const { prisma, tx } = crearPrismaFalso();
-    const repo = new OrdenesCompraRepository(prisma);
+    const repo = new PrismaRepositorioOrdenesCompra(prisma);
 
     await repo.recibir(paramsRecibir);
 
@@ -104,7 +104,7 @@ describe('OrdenesCompraRepository.recibir()', () => {
 
   it('deja la orden en RECIBIDA', async () => {
     const { prisma, tx } = crearPrismaFalso();
-    const repo = new OrdenesCompraRepository(prisma);
+    const repo = new PrismaRepositorioOrdenesCompra(prisma);
 
     await repo.recibir(paramsRecibir);
 
@@ -120,9 +120,9 @@ describe('OrdenesCompraRepository.recibir()', () => {
  * El caso real es al reves de como uno lo imagina: se tiene el papel en la mano
  * y se quiere encontrar la orden, no la orden para ver el papel.
  */
-describe('OrdenesCompraRepository - buscar por comprobante', () => {
+describe('PrismaRepositorioOrdenesCompra - buscar por comprobante', () => {
   it('REGRESION: el buscador tambien mira remito y factura', () => {
-    const repo = new OrdenesCompraRepository({} as never);
+    const repo = new PrismaRepositorioOrdenesCompra({} as never);
     const where = (repo as never as { aWhere(f: unknown): { OR?: unknown[] } }).aWhere({
       buscar: 'R-0001-00045678',
     });

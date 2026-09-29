@@ -1,5 +1,5 @@
-import { CLAVE_PERMISOS } from '../../common/auth/decorators/permisos.decorator';
-import { PERMISOS, PRESETS, Permiso, puede } from '../../common/auth/permisos';
+import { CLAVE_PERMISOS } from '../../../common/auth/decorators/permisos.decorator';
+import { PERMISOS, PRESETS, Permiso, puede } from '../../../common/auth/permisos';
 import { OrdenesCompraController } from './ordenes-compra.controller';
 
 /** Los permisos que exige un método del controller, según su decorador. */

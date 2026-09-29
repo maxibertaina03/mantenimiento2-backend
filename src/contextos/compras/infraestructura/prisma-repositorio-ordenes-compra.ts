@@ -6,43 +6,27 @@ import {
   TipoMovimiento,
   ViaEnvioOrden,
 } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { Decimal, aDecimal } from '../../common/dominio/decimal';
-import { ClasificacionEquipo, unidadesDeEquipo } from '../../common/dominio/renglon-de-compra';
-import { OrdenConRelaciones } from './dto/orden-respuesta.dto';
+import { PrismaService } from '../../../common/prisma/prisma.service';
+import { aDecimal } from '../../../common/dominio/decimal';
+import { ClasificacionEquipo, unidadesDeEquipo } from '../../../common/dominio/renglon-de-compra';
+import {
+  DatosCrearOrden,
+  DatosRecepcion,
+  EnvioConUsuario,
+  FiltroOrdenes,
+  OrdenConRelaciones,
+  RepositorioOrdenesCompra,
+} from '../puertos/repositorio-ordenes-compra';
 
-export interface FiltroOrdenes {
-  buscar?: string;
-  estado?: EstadoOrdenCompra;
-  proveedorId?: string;
-  fechaDesde?: Date;
-  fechaHasta?: Date;
-}
-
-export interface DatosRenglon {
-  /** Nulo cuando el renglon es de un equipo y no de un material del paniol. */
-  materialId: string | null;
-  cantidad: Decimal;
-  precioUnitario?: Decimal | null;
-  notas?: string | null;
-
-  /** Lo del equipo. La ficha se crea recien al recibir la mercaderia. */
-  descripcionEquipo?: string | null;
-  clasificacion?: ClasificacionEquipo | null;
-  equipoTipoId?: string | null;
-  equipoMarcaId?: string | null;
-  equipoModeloId?: string | null;
-}
-
-export interface DatosCrearOrden {
-  proveedorId: string;
-  observaciones?: string | null;
-  creadoPorId?: string | null;
-  renglones: DatosRenglon[];
-}
-
+/**
+ * Adaptador Prisma del puerto `RepositorioOrdenesCompra`.
+ *
+ * La recepción vive entera acá, en una transacción: suma el stock con el lock
+ * de cada material, da de alta las fichas de los equipos y cierra la orden.
+ * Se movió desde el módulo viejo sin cambiar su lógica.
+ */
 @Injectable()
-export class OrdenesCompraRepository {
+export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra {
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly relaciones = {
@@ -237,7 +221,7 @@ export class OrdenesCompraRepository {
     });
   }
 
-  listarEnvios(ordenId: string) {
+  listarEnvios(ordenId: string): Promise<EnvioConUsuario[]> {
     return this.prisma.envioOrden.findMany({
       where: { ordenId },
       orderBy: { enviadoEn: 'desc' },
@@ -248,7 +232,7 @@ export class OrdenesCompraRepository {
   cambiarEstado(
     id: string,
     estado: EstadoOrdenCompra,
-    extra: Prisma.OrdenCompraUpdateInput = {},
+    extra: { emitidaEn?: Date } = {},
   ): Promise<OrdenConRelaciones> {
     return this.prisma.ordenCompra.update({
       where: { id },
@@ -313,15 +297,7 @@ export class OrdenesCompraRepository {
     }
   }
 
-  async recibir(params: {
-    id: string;
-    fechaRecepcion: Date;
-    recibidaPorId: string | null;
-    referencia: string;
-    remito: string | null;
-    factura: string | null;
-    notas?: string | null;
-  }): Promise<OrdenConRelaciones> {
+  async recibir(params: DatosRecepcion): Promise<OrdenConRelaciones> {
     const { id, fechaRecepcion, recibidaPorId, referencia, remito, factura, notas } = params;
 
     return this.prisma.$transaction(async (tx) => {

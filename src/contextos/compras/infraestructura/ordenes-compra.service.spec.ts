@@ -7,12 +7,12 @@ import {
 import { EstadoOrdenCompra, Usuario } from '@prisma/client';
 import { OrdenesCompraService } from './ordenes-compra.service';
 import { ConfigService } from '@nestjs/config';
-import { CorreoService } from '../../common/correo/correo.service';
-import { OrdenesCompraRepository } from './ordenes-compra.repository';
-import { ProveedoresService } from '../proveedores/proveedores.service';
-import { MaterialesService } from '../../contextos/panol/infraestructura/materiales/materiales.service';
-import { MovimientosStockService } from '../../contextos/panol/infraestructura/movimientos/movimientos-stock.service';
-import { aDecimal } from '../../common/dominio/decimal';
+import { CorreoService } from '../../../common/correo/correo.service';
+import { PrismaRepositorioOrdenesCompra } from './prisma-repositorio-ordenes-compra';
+import { ProveedoresService } from '../../../modules/proveedores/proveedores.service';
+import { MaterialesService } from '../../panol/infraestructura/materiales/materiales.service';
+import { MovimientosStockService } from '../../panol/infraestructura/movimientos/movimientos-stock.service';
+import { aDecimal } from '../../../common/dominio/decimal';
 
 const ordenBase = {
   id: 'oc-1',
@@ -100,7 +100,7 @@ function armar(orden: any = ordenBase) {
     correo,
     config,
     service: new OrdenesCompraService(
-      repo as unknown as OrdenesCompraRepository,
+      repo as unknown as PrismaRepositorioOrdenesCompra,
       proveedores as unknown as ProveedoresService,
       materiales as unknown as MaterialesService,
       movimientos as unknown as MovimientosStockService,

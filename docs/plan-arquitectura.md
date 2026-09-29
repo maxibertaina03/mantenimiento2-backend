@@ -64,7 +64,7 @@ pañol está repartido en cinco módulos que solo tienen sentido juntos.
 | `equipos` | máquinas de planta, planes, intervenciones, avisos | **hecho** |
 | `trabajos` | órdenes de trabajo, tareas, rutinas, calendario | **hecho** |
 | `panol` | materiales y movimientos de stock (los catálogos quedan como módulos) | **hecho** (en develop) |
-| `compras` | órdenes de compra, comprobantes, envío, proveedores | a hacer |
+| `compras` | órdenes de compra, comprobantes y envío (proveedores queda como módulo) | **hecho** (en develop) |
 | `informatica` | equipos IT y credenciales (tipos y responsables quedan como módulos) | **hecho** (en develop) |
 | `usuarios` | auth y permisos | queda como módulo |
 
@@ -149,6 +149,28 @@ los 506 materiales, con respuestas idénticas antes y después.
 estados (BORRADOR → EMITIDA → RECIBIDA / ANULADA), mueve stock al recibir y
 manda correo a proveedores de verdad. Se toca cuando el patrón ya se probó dos
 veces.
+
+**Cómo quedó (2026-09-29).** El ciclo de vida, el comprobante obligatorio y
+la revisión de los renglones son funciones puras en `compras/dominio`; el
+armado del correo también. Dos casos de uso: gestionar las órdenes y
+enviarlas.
+
+- La recepción sigue siendo UNA transacción en el adaptador Prisma —stock con
+  lock, fichas de equipo y cierre de la orden—, movida sin cambiar su lógica.
+  Partirla para que pase por el pañol haría posible una orden recibida a
+  medias. Lo que sí pasa por el pañol, por su puerta pública, es la pregunta:
+  si el material se puede comprar y si la fecha choca con un ajuste.
+- Proveedores quedó como módulo (es un catálogo) y comprobantes como un
+  service de infraestructura (es casi solo el almacén de archivos).
+- Igual que el pañol, traduce sus errores a las excepciones de antes. Los del
+  renglón (`ErrorRenglonInvalido`) ya salían por el filtro de dominio y se
+  dejan pasar, para que sigan saliendo igual.
+
+Antes de moverlo, la red encontró un error de producción: editar un borrador
+perdía los datos del equipo de sus renglones y la orden ya no se podía
+recibir. Se arregló en un commit aparte (ninguna orden real estaba afectada).
+Después del refactor, los 163 e2e y la comparación de 63 pedidos contra la
+copia de producción (`scripts/caracterizar-compras.mjs`) dan idéntico.
 
 ## Qué mejora esto, y qué no
 

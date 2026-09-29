@@ -1,9 +1,9 @@
-import { OrdenRespuestaDto } from '../dto/orden-respuesta.dto';
+import type { OrdenParaMensaje } from './mensaje-orden';
 import { armarMensaje, destinatarios, esEmailValido } from './mensaje-orden';
 
 const ADMIN = 'administracion@lacteoslastres.com.ar';
 
-const orden = (over: Partial<OrdenRespuestaDto> = {}) =>
+const orden = (over: Partial<OrdenParaMensaje> = {}) =>
   ({
     numero: 'OC-2026-0007',
     proveedorNombre: 'Ferretería Central',
@@ -12,7 +12,7 @@ const orden = (over: Partial<OrdenRespuestaDto> = {}) =>
     total: 1000,
     renglones: [{ materialNombre: 'Cable 2.5mm', unidad: 'm', cantidad: 100 }],
     ...over,
-  }) as OrdenRespuestaDto;
+  }) as OrdenParaMensaje;
 
 describe('destinatarios', () => {
   it('el proveedor recibe y administracion queda en copia', () => {

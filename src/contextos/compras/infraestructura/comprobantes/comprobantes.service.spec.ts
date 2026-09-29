@@ -4,7 +4,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../../common/prisma/prisma.service';
+import { PrismaService } from '../../../../common/prisma/prisma.service';
 import { ComprobantesService } from './comprobantes.service';
 
 /**
