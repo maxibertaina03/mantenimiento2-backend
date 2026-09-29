@@ -13,8 +13,7 @@ import { EquiposModule } from './contextos/equipos/infraestructura/equipos.modul
 import { TrabajosModule } from './contextos/trabajos/infraestructura/trabajos.module';
 import { TiposEquipoModule } from './modules/tipos-equipo/tipos-equipo.module';
 import { UnidadesMedidaModule } from './modules/unidades-medida/unidades-medida.module';
-import { MaterialesModule } from './modules/materiales/materiales.module';
-import { MovimientosStockModule } from './modules/movimientos-stock/movimientos-stock.module';
+import { PanolModule } from './contextos/panol/infraestructura/panol.module';
 import { OrdenesCompraModule } from './modules/ordenes-compra/ordenes-compra.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 
@@ -31,8 +30,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     ProveedoresModule,
     CategoriasMaterialModule,
     EstanteriasMaterialModule,
-    MaterialesModule,
-    MovimientosStockModule,
+    PanolModule, // materiales y movimientos de stock
     OrdenesCompraModule,
     InformaticaModule,
     ResponsablesModule,

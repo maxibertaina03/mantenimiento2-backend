@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { ErrorFechaDetrasDeUnAjuste } from './errores';
 
 /**
  * Fecha en formato legible, sin la hora.
@@ -39,7 +39,7 @@ export function verificarNoQuedaDetrasDeUnAjuste(
   if (fechaDelMovimiento.getTime() >= fechaDelUltimoAjuste.getTime()) return;
 
   const material = nombreDelMaterial ? ` de "${nombreDelMaterial}"` : '';
-  throw new BadRequestException(
+  throw new ErrorFechaDetrasDeUnAjuste(
     `La fecha ${comoFecha(fechaDelMovimiento)} es anterior al último ajuste de stock` +
       `${material}, que es del ${comoFecha(fechaDelUltimoAjuste)}. ` +
       'Un ajuste fija el stock en un valor y borra lo anterior, así que un movimiento ' +

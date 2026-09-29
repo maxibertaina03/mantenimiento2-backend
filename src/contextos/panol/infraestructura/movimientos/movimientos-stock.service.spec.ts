@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { MotivoMovimiento, RolUsuario, TipoMovimiento, Usuario } from '@prisma/client';
-import { MovimientosStockService, MOTIVOS_POR_TIPO } from './movimientos-stock.service';
-import { RepositorioMovimientos } from './movimientos-stock.puerto';
-import { Decimal, aDecimal } from '../../common/dominio/decimal';
+import { MovimientosStockService } from './movimientos-stock.service';
+import { MOTIVOS_POR_TIPO } from '../../dominio/movimiento';
+import { RepositorioMovimientos } from '../../puertos/repositorio-movimientos';
+import { Decimal, aDecimal } from '../../../../common/dominio/decimal';
 
 /**
  * Doble del repositorio que simula el material en memoria y ejecuta el

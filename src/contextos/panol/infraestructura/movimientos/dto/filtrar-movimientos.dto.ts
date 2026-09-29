@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MotivoMovimiento, TipoMovimiento } from '@prisma/client';
 import { IsEnum, IsISO8601, IsOptional, IsUUID } from 'class-validator';
-import { PaginacionDto } from '../../../common/dto/paginacion.dto';
+import { PaginacionDto } from '../../../../../common/dto/paginacion.dto';
 
 /**
  * Filtros del listado de movimientos. Extiende la paginación.

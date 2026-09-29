@@ -18,8 +18,8 @@ import { MarcarQrMaterialesDto } from './dto/marcar-qr.dto';
 import { ActualizarMaterialDto } from './dto/actualizar-material.dto';
 import { ListarMaterialesDto } from './dto/listar-materiales.dto';
 import { MaterialesService } from './materiales.service';
-import { Permisos } from '../../common/auth/decorators/permisos.decorator';
-import { PERMISOS } from '../../common/auth/permisos';
+import { Permisos } from '../../../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../../../common/auth/permisos';
 
 @ApiTags('Materiales')
 @Controller('materiales')

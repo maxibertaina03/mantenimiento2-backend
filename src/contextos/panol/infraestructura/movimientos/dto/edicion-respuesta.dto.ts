@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import type { EdicionConUsuario } from '../movimientos-stock.puerto';
+import type { EdicionConUsuario } from '../../../puertos/repositorio-movimientos';
 
 /** Registro de auditoría de una edición de movimiento. */
 export class EdicionRespuestaDto {

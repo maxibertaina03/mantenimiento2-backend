@@ -1,9 +1,9 @@
 import { MotivoMovimiento, TipoMovimiento } from '@prisma/client';
 import { MovimientosStockService } from './movimientos-stock.service';
-import { MovimientosStockRepository } from './movimientos-stock.repository';
-import { RepositorioMovimientos } from './movimientos-stock.puerto';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { Decimal, aDecimal } from '../../common/dominio/decimal';
+import { PrismaRepositorioMovimientos } from './prisma-repositorio-movimientos';
+import { RepositorioMovimientos } from '../../puertos/repositorio-movimientos';
+import { PrismaService } from '../../../../common/prisma/prisma.service';
+import { Decimal, aDecimal } from '../../../../common/dominio/decimal';
 
 /** Repo falso con stock en memoria (mismo patron que el spec principal). */
 function crearRepoFalso(stockInicial = 0) {
@@ -154,7 +154,7 @@ describe('Casos limite y riesgos', () => {
         movimientoStock: { findFirst: jest.fn(async () => null) },
         material: { findUnique: jest.fn(async () => ({ nombre: 'Material', activo: true })) },
       } as unknown as PrismaService;
-      const service = new MovimientosStockService(new MovimientosStockRepository(prisma));
+      const service = new MovimientosStockService(new PrismaRepositorioMovimientos(prisma));
 
       const salida = () =>
         service.crear({

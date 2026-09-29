@@ -1,8 +1,8 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TipoMovimiento } from '@prisma/client';
-import { MovimientosStockRepository } from './movimientos-stock.repository';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { Decimal, aDecimal } from '../../common/dominio/decimal';
+import { PrismaRepositorioMovimientos } from './prisma-repositorio-movimientos';
+import { PrismaService } from '../../../../common/prisma/prisma.service';
+import { Decimal, aDecimal } from '../../../../common/dominio/decimal';
 
 /**
  * Prisma falso en memoria: implementa lo justo que usa el repositorio para poder
@@ -67,12 +67,12 @@ const validarStockNoNegativo = (stock: Decimal) => {
   }
 };
 
-describe('MovimientosStockRepository', () => {
+describe('PrismaRepositorioMovimientos', () => {
   describe('crearConActualizacionDeStock()', () => {
     it('lanza 404 si el material no existe', async () => {
       const { prisma, existeMaterial } = crearPrismaFalso();
       existeMaterial.valor = false;
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
       await expect(
         repo.crearConActualizacionDeStock({ materialId: 'no-existe' } as any, (s) => s),
       ).rejects.toBeInstanceOf(NotFoundException);
@@ -80,7 +80,7 @@ describe('MovimientosStockRepository', () => {
 
     it('toma lock de la fila del material antes de calcular', async () => {
       const { prisma, tx } = crearPrismaFalso({ stockInicial: 100 });
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
 
       await repo.crearConActualizacionDeStock(
         {
@@ -103,7 +103,7 @@ describe('MovimientosStockRepository', () => {
       // 42883 y era imposible cargar un movimiento de stock.
       // El fake no valida SQL, asi que este chequeo es la unica red que queda.
       const { prisma, tx } = crearPrismaFalso({ stockInicial: 10 });
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
 
       await repo.crearConActualizacionDeStock(
         {
@@ -121,7 +121,7 @@ describe('MovimientosStockRepository', () => {
 
     it('persiste el movimiento y el nuevo stock en la misma transaccion', async () => {
       const { prisma, tx, material } = crearPrismaFalso({ stockInicial: 100 });
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
 
       await repo.crearConActualizacionDeStock(
         {
@@ -140,7 +140,7 @@ describe('MovimientosStockRepository', () => {
 
     it('si calcularNuevoStock lanza, no se persiste nada', async () => {
       const { prisma, tx, material } = crearPrismaFalso({ stockInicial: 10 });
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
 
       await expect(
         repo.crearConActualizacionDeStock({ materialId: 'mat-1' } as any, () => {
@@ -174,7 +174,7 @@ describe('MovimientosStockRepository', () => {
         { tipo: 'SALIDA', cantidad: 30 },
         { tipo: 'ENTRADA', cantidad: 5 },
       ]);
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
 
       await repo.editarConAuditoria({
         id: 'mov-3',
@@ -193,7 +193,7 @@ describe('MovimientosStockRepository', () => {
         { tipo: 'AJUSTE', cantidad: 8 },
         { tipo: 'ENTRADA', cantidad: 2 },
       ]);
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
 
       await repo.editarConAuditoria({
         id: 'mov-3',
@@ -212,7 +212,7 @@ describe('MovimientosStockRepository', () => {
         { tipo: 'ENTRADA', cantidad: 10 },
         { tipo: 'SALIDA', cantidad: 10 },
       ]);
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
 
       // Se edita la ENTRADA bajandola a 1 => 1 - 10 = -9. Debe rechazarse.
       await expect(
@@ -235,7 +235,7 @@ describe('MovimientosStockRepository', () => {
         { tipo: 'ENTRADA', cantidad: 0.1 },
         { tipo: 'ENTRADA', cantidad: 0.2 },
       ]);
-      const repo = new MovimientosStockRepository(prisma);
+      const repo = new PrismaRepositorioMovimientos(prisma);
 
       await repo.editarConAuditoria({
         id: 'mov-2',

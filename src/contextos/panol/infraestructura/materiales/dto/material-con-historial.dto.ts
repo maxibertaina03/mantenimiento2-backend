@@ -1,16 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  CategoriaMaterial,
-  Material,
-  MovimientoStock,
-  MotivoMovimiento,
-  TipoMovimiento,
-} from '@prisma/client';
+import { MotivoMovimiento, TipoMovimiento } from '@prisma/client';
+import type {
+  MaterialConHistorial,
+  MovimientoDelHistorial,
+} from '../../../puertos/repositorio-materiales';
 import { MaterialRespuestaDto } from './material-respuesta.dto';
 
 /**
  * Ítem de historial: forma resumida de un movimiento para mostrar dentro del material.
- * Se mantiene local al módulo materiales para no acoplarlo al módulo de movimientos.
+ * Separada del DTO de movimientos para no acoplar la ficha del material a él.
  */
 export class HistorialMovimientoDto {
   @ApiProperty()
@@ -40,7 +38,7 @@ export class HistorialMovimientoDto {
   @ApiPropertyOptional({ nullable: true })
   notas!: string | null;
 
-  static desde(m: MovimientoStock): HistorialMovimientoDto {
+  static desde(m: MovimientoDelHistorial): HistorialMovimientoDto {
     return {
       id: m.id,
       tipo: m.tipo,
@@ -55,11 +53,6 @@ export class HistorialMovimientoDto {
   }
 }
 
-type MaterialConRelaciones = Material & {
-  categoria?: CategoriaMaterial | null;
-  movimientos: MovimientoStock[];
-};
-
 /**
  * Material con su historial completo de movimientos (orden cronológico descendente).
  */
@@ -67,7 +60,7 @@ export class MaterialConHistorialDto extends MaterialRespuestaDto {
   @ApiProperty({ type: [HistorialMovimientoDto] })
   movimientos!: HistorialMovimientoDto[];
 
-  static desdeMaterial(m: MaterialConRelaciones): MaterialConHistorialDto {
+  static desdeMaterial(m: MaterialConHistorial): MaterialConHistorialDto {
     return {
       ...MaterialRespuestaDto.desde(m),
       movimientos: m.movimientos.map(HistorialMovimientoDto.desde),

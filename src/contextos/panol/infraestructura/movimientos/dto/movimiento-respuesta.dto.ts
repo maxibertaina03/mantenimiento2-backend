@@ -1,13 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MotivoMovimiento, MovimientoStock, TipoMovimiento } from '@prisma/client';
-
-/** Movimiento con sus relaciones (nombres) para listar/exportar. */
-export type MovimientoConRelaciones = MovimientoStock & {
-  material?: { nombre: string } | null;
-  proveedor?: { nombre: string } | null;
-  usuario?: { nombre: string } | null;
-  _count?: { ediciones: number };
-};
+import { MotivoMovimiento, TipoMovimiento } from '@prisma/client';
+import type { MovimientoConRelaciones } from '../../../puertos/repositorio-movimientos';
 
 export class MovimientoRespuestaDto {
   @ApiProperty()

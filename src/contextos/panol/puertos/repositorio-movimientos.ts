@@ -1,15 +1,33 @@
-import { MotivoMovimiento, TipoMovimiento } from '@prisma/client';
-import { Decimal } from '../../common/dominio/decimal';
-import { MovimientoConRelaciones } from './dto/movimiento-respuesta.dto';
+import { Decimal } from '../../../common/dominio/decimal';
+import { MotivoMovimiento, TipoMovimiento } from '../dominio/movimiento';
 
 /**
  * Puerto (interfaz) del repositorio de movimientos.
  *
- * El service depende de ESTA abstracción, no de la implementación Prisma. Eso
- * invierte la dependencia (el dominio deja de conocer la infraestructura) y
- * permite testear el service sin base de datos ni mocks de Prisma.
+ * El caso de uso depende de ESTA abstracción, no de la implementación Prisma.
+ * Eso invierte la dependencia (el dominio deja de conocer la infraestructura) y
+ * permite probar las reglas sin base de datos ni mocks de Prisma.
  */
 export const REPOSITORIO_MOVIMIENTOS = Symbol('REPOSITORIO_MOVIMIENTOS');
+
+/** Un movimiento tal como está guardado, con los nombres de lo que referencia. */
+export interface MovimientoConRelaciones {
+  id: string;
+  materialId: string;
+  tipo: TipoMovimiento;
+  motivo: MotivoMovimiento;
+  cantidad: Decimal;
+  fecha: Date;
+  proveedorId: string | null;
+  usuarioId: string | null;
+  referenciaTrabajo: string | null;
+  notas: string | null;
+  creadoEn: Date;
+  material?: { nombre: string } | null;
+  proveedor?: { nombre: string } | null;
+  usuario?: { nombre: string } | null;
+  _count?: { ediciones: number };
+}
 
 /** Filtro de listado expresado en lenguaje de dominio (sin tipos de Prisma). */
 export interface FiltroMovimientos {
@@ -93,8 +111,8 @@ export interface RepositorioMovimientos {
   /**
    * Nombre y estado del material, o null si no existe.
    *
-   * Va por el puerto y no por el módulo de materiales para no atar los dos
-   * módulos entre sí por un dato que son dos columnas.
+   * Va por este puerto y no por el de materiales para no atar los dos casos
+   * de uso entre sí por un dato que son dos columnas.
    */
   datosDelMaterial(materialId: string): Promise<{ nombre: string; activo: boolean } | null>;
 

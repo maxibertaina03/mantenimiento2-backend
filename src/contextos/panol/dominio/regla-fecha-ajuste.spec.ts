@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { ErrorFechaDetrasDeUnAjuste } from './errores';
 import { verificarNoQuedaDetrasDeUnAjuste } from './regla-fecha-ajuste';
 
 const f = (iso: string) => new Date(`${iso}T12:00:00.000Z`);
@@ -26,7 +26,7 @@ describe('verificarNoQuedaDetrasDeUnAjuste', () => {
     // porque el ajuste posterior borra lo anterior. El desacuerdo no se veia
     // hasta que alguien editaba cualquier movimiento del material.
     expect(() => verificarNoQuedaDetrasDeUnAjuste(f('2026-08-15'), f('2026-09-01'))).toThrow(
-      BadRequestException,
+      ErrorFechaDetrasDeUnAjuste,
     );
   });
 
@@ -37,7 +37,7 @@ describe('verificarNoQuedaDetrasDeUnAjuste', () => {
     try {
       verificarNoQuedaDetrasDeUnAjuste(f('2026-08-15'), f('2026-09-01'), 'Rodamiento 6204');
     } catch (e) {
-      mensaje = (e as BadRequestException).message;
+      mensaje = (e as ErrorFechaDetrasDeUnAjuste).message;
     }
 
     expect(mensaje).toContain('15/8/2026');
@@ -51,7 +51,7 @@ describe('verificarNoQuedaDetrasDeUnAjuste', () => {
     try {
       verificarNoQuedaDetrasDeUnAjuste(f('2026-08-15'), f('2026-09-01'));
     } catch (e) {
-      mensaje = (e as BadRequestException).message;
+      mensaje = (e as ErrorFechaDetrasDeUnAjuste).message;
     }
     expect(mensaje).not.toContain('""');
   });
@@ -61,6 +61,8 @@ describe('verificarNoQuedaDetrasDeUnAjuste', () => {
     // ordenan igual entre si y el desacuerdo aparece lo mismo.
     const ajuste = new Date('2026-09-01T12:00:00.000Z');
     const antes = new Date('2026-09-01T11:59:00.000Z');
-    expect(() => verificarNoQuedaDetrasDeUnAjuste(antes, ajuste)).toThrow(BadRequestException);
+    expect(() => verificarNoQuedaDetrasDeUnAjuste(antes, ajuste)).toThrow(
+      ErrorFechaDetrasDeUnAjuste,
+    );
   });
 });

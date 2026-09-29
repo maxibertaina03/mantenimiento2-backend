@@ -63,9 +63,9 @@ pañol está repartido en cinco módulos que solo tienen sentido juntos.
 |---|---|---|
 | `equipos` | máquinas de planta, planes, intervenciones, avisos | **hecho** |
 | `trabajos` | órdenes de trabajo, tareas, rutinas, calendario | **hecho** |
-| `panol` | materiales, movimientos de stock, categorías, estanterías, unidades | a hacer |
+| `panol` | materiales y movimientos de stock (los catálogos quedan como módulos) | **hecho** (en develop) |
 | `compras` | órdenes de compra, comprobantes, envío, proveedores | a hacer |
-| `informatica` | equipos IT, tipos, responsables, credenciales | a hacer |
+| `informatica` | equipos IT y credenciales (tipos y responsables quedan como módulos) | **hecho** (en develop) |
 | `usuarios` | auth y permisos | queda como módulo |
 
 ## El riesgo real, y cómo se evita
@@ -121,6 +121,27 @@ hoy están repartidas entre dos services.
 
 Acá aparece el trabajo de reagrupar de verdad: cinco módulos entran, un
 contexto sale.
+
+**Cómo quedó (2026-09-29).** Entraron materiales y movimientos; categorías,
+estanterías y unidades siguieron como módulos, igual que tipos y responsables
+en informática: son catálogos, y se los consulta por un puerto angosto.
+
+- Las reglas de stock —qué hace cada tipo de movimiento, que nada quede
+  negativo, el ajuste que no se puede pisar por detrás, quién corrige qué— son
+  funciones puras en `panol/dominio`.
+- La transacción con `SELECT ... FOR UPDATE` y el recálculo del historial al
+  editar se movieron **sin cambiar una línea** de lógica al adaptador Prisma.
+- El pañol **no** usa `FiltroErroresDominio`: traduce sus errores a las mismas
+  excepciones de Nest de antes (`traducir-errores.ts`). Así la respuesta es
+  idéntica byte a byte, y órdenes de compra —que no es un contexto— sigue
+  recibiendo un 400 y no un 500 cuando el stock no alcanza.
+- `MaterialesService` y `MovimientosStockService` conservan nombre y firmas:
+  compras y trabajos solo cambiaron la ruta del import.
+
+Dos redes lo verificaron: los e2e HTTP (`test/panol.e2e-spec.ts`, escritos
+antes de mover nada) y una comparación contra la copia local de producción
+(`scripts/caracterizar-panol.mjs`): 42 pedidos, incluida la suma del stock de
+los 506 materiales, con respuestas idénticas antes y después.
 
 ### Fase 3 — `compras` (3-4 sesiones)
 

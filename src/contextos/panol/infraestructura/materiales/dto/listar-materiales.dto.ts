@@ -9,7 +9,7 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
-import { PaginacionDto } from '../../../common/dto/paginacion.dto';
+import { PaginacionDto } from '../../../../../common/dto/paginacion.dto';
 
 /** Campos por los que se puede ordenar el listado. */
 export const ORDENES_MATERIAL = ['nombre', 'stock', 'categoria', 'unidad'] as const;

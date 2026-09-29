@@ -1,25 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, TipoMovimiento } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { Decimal, aDecimal } from '../../common/dominio/decimal';
-import { MovimientoConRelaciones } from './dto/movimiento-respuesta.dto';
+import { PrismaService } from '../../../../common/prisma/prisma.service';
+import { Decimal, aDecimal } from '../../../../common/dominio/decimal';
 import {
   DatosCrearMovimiento,
   DatosEditarMovimiento,
   EdicionConUsuario,
   FiltroMovimientos,
+  MovimientoConRelaciones,
   RepositorioMovimientos,
-} from './movimientos-stock.puerto';
-
-// Re-export por compatibilidad con importadores previos.
-export type { DatosCrearMovimiento, DatosEditarMovimiento };
+} from '../../puertos/repositorio-movimientos';
 
 /**
  * Adaptador Prisma del puerto `RepositorioMovimientos`.
- * Es el único lugar del módulo que habla el lenguaje de Prisma.
+ * Es el único lugar de los movimientos que habla el lenguaje de Prisma.
  */
 @Injectable()
-export class MovimientosStockRepository implements RepositorioMovimientos {
+export class PrismaRepositorioMovimientos implements RepositorioMovimientos {
   constructor(private readonly prisma: PrismaService) {}
 
   // Incluye los nombres de material/proveedor/usuario y si tuvo ediciones.

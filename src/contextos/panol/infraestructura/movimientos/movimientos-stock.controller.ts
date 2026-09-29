@@ -1,13 +1,13 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Usuario } from '@prisma/client';
-import { UsuarioActual } from '../../common/auth/decorators/usuario-actual.decorator';
+import { UsuarioActual } from '../../../../common/auth/decorators/usuario-actual.decorator';
 import { ActualizarMovimientoDto } from './dto/actualizar-movimiento.dto';
 import { CrearMovimientoDto } from './dto/crear-movimiento.dto';
 import { FiltrarMovimientosDto } from './dto/filtrar-movimientos.dto';
 import { MovimientosStockService } from './movimientos-stock.service';
-import { Permisos } from '../../common/auth/decorators/permisos.decorator';
-import { PERMISOS } from '../../common/auth/permisos';
+import { Permisos } from '../../../../common/auth/decorators/permisos.decorator';
+import { PERMISOS } from '../../../../common/auth/permisos';
 
 @ApiTags('Movimientos de stock')
 @ApiBearerAuth()

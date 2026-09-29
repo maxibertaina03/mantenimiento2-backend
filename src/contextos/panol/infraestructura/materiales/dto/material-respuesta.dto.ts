@@ -1,11 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CategoriaMaterial, Material, UnidadMedida } from '@prisma/client';
-
-type MaterialConRelaciones = Material & {
-  categoria?: CategoriaMaterial | null;
-  unidad?: UnidadMedida | null;
-  estanteria?: { nombre: string } | null;
-};
+import type { MaterialConRelaciones } from '../../../puertos/repositorio-materiales';
 
 /**
  * DTO de salida del material. Convierte los Decimal de Prisma a number

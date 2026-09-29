@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../../../common/auth/auth.module';
 import { CorreoModule } from '../../../common/correo/correo.module';
 import { EquiposModule } from '../../equipos/infraestructura/equipos.module';
-import { MovimientosStockModule } from '../../../modules/movimientos-stock/movimientos-stock.module';
+import { PanolModule } from '../../panol/infraestructura/panol.module';
 import { CONSULTA_EQUIPOS } from '../puertos/consulta-equipos';
 import { CONSULTA_EQUIPOS_IT } from '../puertos/consulta-equipos-it';
 import { CONSULTA_USUARIOS } from '../puertos/consulta-usuarios';
@@ -30,9 +30,8 @@ import { StockPorMovimientos } from './stock-por-movimientos';
  * dominio y los casos de uso solo conocen las interfaces, y por eso se prueban
  * con las implementaciones en memoria sin cambiar una línea.
  *
- * Importa el módulo de movimientos porque el pañol de verdad vive ahí. Pasa por
- * el service del otro módulo, no por su base: las reglas de stock siguen siendo
- * suyas.
+ * Importa el pañol porque el stock de verdad vive ahí. Pasa por su service,
+ * no por su base: las reglas de stock siguen siendo suyas.
  *
  * Y el de auth porque el controlador pregunta si quien carga puede ver equipos,
  * para decidir si lo deja atar la orden a una máquina. `AuthModule` no es
@@ -40,7 +39,7 @@ import { StockPorMovimientos } from './stock-por-movimientos';
  * importa. Olvidarlo no rompe la compilación, rompe el arranque.
  */
 @Module({
-  imports: [MovimientosStockModule, AuthModule, EquiposModule, CorreoModule],
+  imports: [PanolModule, AuthModule, EquiposModule, CorreoModule],
   controllers: [OrdenesTrabajoController, CalendarioController],
   providers: [
     { provide: REPOSITORIO_ORDENES_TRABAJO, useClass: PrismaRepositorioOrdenesTrabajo },

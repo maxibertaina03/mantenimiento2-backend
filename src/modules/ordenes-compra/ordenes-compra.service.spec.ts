@@ -10,8 +10,8 @@ import { ConfigService } from '@nestjs/config';
 import { CorreoService } from '../../common/correo/correo.service';
 import { OrdenesCompraRepository } from './ordenes-compra.repository';
 import { ProveedoresService } from '../proveedores/proveedores.service';
-import { MaterialesService } from '../materiales/materiales.service';
-import { MovimientosStockService } from '../movimientos-stock/movimientos-stock.service';
+import { MaterialesService } from '../../contextos/panol/infraestructura/materiales/materiales.service';
+import { MovimientosStockService } from '../../contextos/panol/infraestructura/movimientos/movimientos-stock.service';
 import { aDecimal } from '../../common/dominio/decimal';
 
 const ordenBase = {

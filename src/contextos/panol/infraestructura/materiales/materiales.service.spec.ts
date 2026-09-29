@@ -1,8 +1,20 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MaterialesService } from './materiales.service';
-import { MaterialesRepository } from './materiales.repository';
-import { CategoriasMaterialService } from '../categorias-material/categorias-material.service';
-import { UnidadesMedidaService } from '../unidades-medida/unidades-medida.service';
+import { aDatosDeAlta, aDatosDeCambio, aOrden, aWhere } from './prisma-repositorio-materiales';
+import { ConsultaCatalogos } from '../../puertos/consulta-catalogos';
+import { RepositorioMateriales } from '../../puertos/repositorio-materiales';
+
+/*
+ * Prueba la puerta de Nest de punta a punta: la fachada, el caso de uso y el
+ * dominio, con el repositorio en memoria. Lo que el caso de uso le pide al
+ * repositorio se pasa por las mismas funciones con las que el adaptador Prisma
+ * arma su consulta, así las aserciones siguen mirando el `where` y los datos
+ * que llegan a la base, como antes de mover el módulo.
+ */
+/** Lo que llega a Prisma al dar de alta. */
+const alta = (repo: any) => aDatosDeAlta(repo.crear.mock.calls[0][0]);
+/** Lo que llega a Prisma al editar. */
+const cambio = (repo: any) => aDatosDeCambio(repo.actualizar.mock.calls[0][1]);
 
 const categoria = { id: 'cat-1', nombre: 'Electricidad', descripcion: null };
 const unidadMetro = { id: 'uni-1', nombre: 'Metro', simbolo: 'm', orden: 90, activo: true };
@@ -24,7 +36,6 @@ const material = {
 function armar() {
   const repo = {
     crear: jest.fn<Promise<any>, any[]>(async () => material),
-    buscarTodos: jest.fn<Promise<any>, any[]>(async () => [material]),
     contar: jest.fn<Promise<any>, any[]>(async () => 1),
     buscarPorId: jest.fn<Promise<any>, any[]>(async () => material),
     buscarConHistorial: jest.fn<Promise<any>, any[]>(async () => ({
@@ -41,26 +52,22 @@ function armar() {
     contarSinStockMinimo: jest.fn<Promise<any>, any[]>(async () => 0),
     marcarQrGenerado: jest.fn<Promise<any>, any[]>(async (ids: string[]) => ids.length),
     idsBajoStock: jest.fn<Promise<any>, any[]>(async () => ['mat-1', 'mat-2']),
-    buscarTodosOrdenado: jest.fn<Promise<any>, any[]>(async () => [material]),
+    listar: jest.fn<Promise<any>, any[]>(async () => [material]),
     asignarUnidadMasiva: jest.fn<Promise<any>, any[]>(async () => 831),
   };
 
-  const categorias = {
-    obtener: jest.fn<Promise<any>, any[]>(async () => categoria),
-  };
-
-  const unidades = {
-    obtener: jest.fn<Promise<any>, any[]>(async () => unidadMetro),
+  // Categoría y unidad existen por defecto; el 404 se prueba aparte.
+  const catalogos = {
+    existeCategoria: jest.fn<Promise<boolean>, any[]>(async () => true),
+    existeUnidad: jest.fn<Promise<boolean>, any[]>(async () => true),
   };
 
   return {
     repo,
-    categorias,
-    unidades,
+    catalogos,
     service: new MaterialesService(
-      repo as unknown as MaterialesRepository,
-      categorias as unknown as CategoriasMaterialService,
-      unidades as unknown as UnidadesMedidaService,
+      repo as unknown as RepositorioMateriales,
+      catalogos as unknown as ConsultaCatalogos,
     ),
   };
 }
@@ -68,14 +75,14 @@ function armar() {
 describe('MaterialesService', () => {
   describe('crear()', () => {
     it('valida que la categoria exista antes de crear', async () => {
-      const { service, categorias } = armar();
+      const { service, catalogos } = armar();
       await service.crear({ nombre: 'X', unidadId: 'uni-1', categoriaId: 'cat-1' } as any);
-      expect(categorias.obtener).toHaveBeenCalledWith('cat-1');
+      expect(catalogos.existeCategoria).toHaveBeenCalledWith('cat-1');
     });
 
     it('propaga el 404 si la categoria no existe', async () => {
-      const { service, categorias } = armar();
-      categorias.obtener.mockRejectedValue(new NotFoundException('no existe'));
+      const { service, catalogos } = armar();
+      catalogos.existeCategoria.mockResolvedValue(false);
       await expect(
         service.crear({ nombre: 'X', unidadId: 'uni-1', categoriaId: 'fantasma' } as any),
       ).rejects.toBeInstanceOf(NotFoundException);
@@ -89,13 +96,13 @@ describe('MaterialesService', () => {
         categoriaId: 'cat-1',
         stockActual: 999,
       } as any);
-      expect(repo.crear.mock.calls[0][0]).not.toHaveProperty('stockActual');
+      expect(alta(repo)).not.toHaveProperty('stockActual');
     });
 
     it('stockMinimo por defecto es 0', async () => {
       const { service, repo } = armar();
       await service.crear({ nombre: 'X', unidadId: 'uni-1', categoriaId: 'cat-1' } as any);
-      expect(repo.crear.mock.calls[0][0].stockMinimo).toBe(0);
+      expect(alta(repo).stockMinimo).toBe(0);
     });
   });
 
@@ -106,25 +113,25 @@ describe('MaterialesService', () => {
       // mirar pidiendolos con `mostrar`.
       const { service, repo } = armar();
       await service.listar({ pagina: 1, limite: 20, skip: 0 } as any);
-      expect(repo.buscarTodosOrdenado.mock.calls[0][2]).toEqual({ activo: true });
+      expect(aWhere(repo.listar.mock.calls[0][0])).toEqual({ activo: true });
     });
 
     it('mostrar=todos trae tambien los jubilados', async () => {
       const { service, repo } = armar();
       await service.listar({ pagina: 1, limite: 20, skip: 0, mostrar: 'todos' } as any);
-      expect(repo.buscarTodosOrdenado.mock.calls[0][2]).toEqual({});
+      expect(aWhere(repo.listar.mock.calls[0][0])).toEqual({});
     });
 
     it('mostrar=inactivos trae solo los jubilados', async () => {
       const { service, repo } = armar();
       await service.listar({ pagina: 1, limite: 20, skip: 0, mostrar: 'inactivos' } as any);
-      expect(repo.buscarTodosOrdenado.mock.calls[0][2]).toEqual({ activo: false });
+      expect(aWhere(repo.listar.mock.calls[0][0])).toEqual({ activo: false });
     });
 
     it('con busqueda filtra por nombre sin distinguir mayusculas', async () => {
       const { service, repo } = armar();
       await service.listar({ pagina: 1, limite: 20, skip: 0, buscar: 'cable' } as any);
-      expect(repo.buscarTodosOrdenado.mock.calls[0][2]).toEqual({
+      expect(aWhere(repo.listar.mock.calls[0][0])).toEqual({
         activo: true,
         nombre: { contains: 'cable', mode: 'insensitive' },
       });
@@ -176,15 +183,15 @@ describe('MaterialesService', () => {
 
   describe('actualizar()', () => {
     it('valida la nueva categoria si se envia', async () => {
-      const { service, categorias } = armar();
+      const { service, catalogos } = armar();
       await service.actualizar('mat-1', { categoriaId: 'cat-2' } as any);
-      expect(categorias.obtener).toHaveBeenCalledWith('cat-2');
+      expect(catalogos.existeCategoria).toHaveBeenCalledWith('cat-2');
     });
 
     it('no toca la categoria si no se envia', async () => {
       const { service, repo } = armar();
       await service.actualizar('mat-1', { nombre: 'Nuevo' } as any);
-      expect(repo.actualizar.mock.calls[0][1]).not.toHaveProperty('categoria');
+      expect(cambio(repo)).not.toHaveProperty('categoria');
     });
   });
   describe('asignarUnidadMasiva()', () => {
@@ -203,8 +210,8 @@ describe('MaterialesService', () => {
 
     it('REGRESION: valida la unidad ANTES de tocar ningun material', async () => {
       // Sin esto el updateMany fallaria a mitad con un error de FK poco claro.
-      const { service, repo, unidades } = armar();
-      unidades.obtener.mockRejectedValue(new NotFoundException('no existe'));
+      const { service, repo, catalogos } = armar();
+      catalogos.existeUnidad.mockResolvedValue(false);
       await expect(service.asignarUnidadMasiva({ unidadId: 'fantasma' })).rejects.toBeInstanceOf(
         NotFoundException,
       );
@@ -224,9 +231,9 @@ describe('MaterialesService', () => {
 
 describe('MaterialesService - listar() con filtros', () => {
   /** El `where` con el que se consulto el listado. */
-  const filtro = (repo: any) => repo.buscarTodosOrdenado.mock.calls[0][2];
+  const filtro = (repo: any) => aWhere(repo.listar.mock.calls[0][0]);
   /** El `orderBy` con el que se consulto el listado. */
-  const orden = (repo: any) => repo.buscarTodosOrdenado.mock.calls[0][3];
+  const orden = (repo: any) => aOrden(repo.listar.mock.calls[0][1]);
 
   it('sin filtros la unica condicion es esconder los jubilados', async () => {
     const { service, repo } = armar();
@@ -326,7 +333,7 @@ describe('MaterialesService - listar() con filtros', () => {
     // las paginas 1 y 2 pueden repetir o saltear filas.
     const { service, repo } = armar();
     for (const campo of ['stock', 'categoria', 'unidad'] as const) {
-      repo.buscarTodosOrdenado.mockClear();
+      repo.listar.mockClear();
       await service.listar({ skip: 0, limite: 20, pagina: 1, ordenarPor: campo } as any);
       expect(orden(repo).at(-1)).toEqual({ nombre: 'asc' });
     }
@@ -348,7 +355,7 @@ describe('MaterialesService - listar() con filtros', () => {
     // Si no, la paginacion mostraria "1 de 831" filtrando por una categoria.
     const { service, repo } = armar();
     await service.listar({ skip: 0, limite: 20, pagina: 1, categoriaId: 'cat-1' } as any);
-    expect(repo.contar).toHaveBeenCalledWith(filtro(repo));
+    expect(repo.contar).toHaveBeenCalledWith(repo.listar.mock.calls[0][0]);
   });
 });
 
@@ -395,7 +402,7 @@ describe('MaterialesService - nombres duplicados', () => {
       unidadId: 'uni-1',
     } as any);
 
-    expect(repo.crear.mock.calls[0][0].nombre).toBe('Rodamiento 6204');
+    expect(alta(repo).nombre).toBe('Rodamiento 6204');
   });
 
   it('un nombre libre se crea sin problema', async () => {
@@ -462,7 +469,7 @@ describe('MaterialesService - cobertura de las alertas', () => {
 
 describe('MaterialesService - etiquetas QR', () => {
   /** El `where` que el service le arma al repositorio. */
-  const filtro = (repo: any) => repo.buscarTodosOrdenado.mock.calls[0][2];
+  const filtro = (repo: any) => aWhere(repo.listar.mock.calls[0][0]);
 
   it('el filtro sinQr pide solo los que no tienen etiqueta', async () => {
     // Es la lista que se manda a imprimir: reimprimir las que ya estan pegadas
@@ -493,14 +500,14 @@ describe('MaterialesService - etiquetas QR', () => {
 });
 
 describe('MaterialesService - ubicacion en el deposito', () => {
-  const filtro = (repo: any) => repo.buscarTodosOrdenado.mock.calls[0][2];
+  const filtro = (repo: any) => aWhere(repo.listar.mock.calls[0][0]);
   const nuevo = { nombre: 'Rodamiento 6204', categoriaId: 'cat-1', unidadId: 'uni-1' };
 
   it('guarda estanteria y fila juntas', async () => {
     const { service, repo } = armar();
     await service.crear({ ...nuevo, estanteriaId: 'est-1', fila: 3 } as any);
 
-    const datos = repo.crear.mock.calls[0][0];
+    const datos = alta(repo);
     expect(datos.estanteria).toEqual({ connect: { id: 'est-1' } });
     expect(datos.fila).toBe(3);
   });
@@ -509,7 +516,7 @@ describe('MaterialesService - ubicacion en el deposito', () => {
     // Ubicar "en la estanteria A" ya sirve, aunque no se sepa la fila.
     const { service, repo } = armar();
     await service.crear({ ...nuevo, estanteriaId: 'est-1' } as any);
-    expect(repo.crear.mock.calls[0][0].fila).toBeNull();
+    expect(alta(repo).fila).toBeNull();
   });
 
   it('REGRESION: una fila sin estanteria se rechaza', async () => {
@@ -538,7 +545,7 @@ describe('MaterialesService - ubicacion en el deposito', () => {
     const { service, repo } = armar();
     await service.crear(nuevo as any);
     expect(repo.crear).toHaveBeenCalled();
-    expect(repo.crear.mock.calls[0][0].estanteria).toBeUndefined();
+    expect(alta(repo).estanteria).toBeUndefined();
   });
 
   it('REGRESION: vaciar la estanteria vacia tambien la fila', async () => {
@@ -548,7 +555,7 @@ describe('MaterialesService - ubicacion en el deposito', () => {
 
     await service.actualizar('mat-1', { estanteriaId: null } as any);
 
-    const cambios = repo.actualizar.mock.calls[0][1];
+    const cambios = cambio(repo);
     expect(cambios.estanteria).toEqual({ disconnect: true });
     expect(cambios.fila).toBeNull();
   });
@@ -570,7 +577,7 @@ describe('MaterialesService - ubicacion en el deposito', () => {
     repo.buscarPorId.mockResolvedValue({ ...material, estanteriaId: 'est-1', fila: 3 });
 
     await service.actualizar('mat-1', { fila: 5 } as any);
-    expect(repo.actualizar.mock.calls[0][1].fila).toBe(5);
+    expect(cambio(repo).fila).toBe(5);
   });
 
   it('el filtro por estanteria llega al where', async () => {
