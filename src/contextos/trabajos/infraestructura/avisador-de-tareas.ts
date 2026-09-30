@@ -15,6 +15,16 @@ import { TareaConRelaciones } from '../puertos/repositorio-tareas';
  * abierto, así que para la mitad del equipo este correo no llega. Razón de más
  * para que no sea el único camino.
  */
+/**
+ * APAGADO a pedido (2026-09-30): por ahora no se le manda correo a nadie
+ * cuando le asignan una tarea. La tarea se sigue viendo en Hoy y en el
+ * Calendario, que es el aviso de verdad.
+ *
+ * El código queda entero a propósito. Para volver a mandar los correos,
+ * cambiar esto a `true` y desplegar.
+ */
+const AVISAR_POR_CORREO = false;
+
 @Injectable()
 export class AvisadorDeTareas {
   private readonly logger = new Logger(AvisadorDeTareas.name);
@@ -25,6 +35,7 @@ export class AvisadorDeTareas {
   ) {}
 
   async avisarAsignacion(tarea: TareaConRelaciones): Promise<void> {
+    if (!AVISAR_POR_CORREO) return;
     if (!tarea.asignadoAId) return;
 
     try {

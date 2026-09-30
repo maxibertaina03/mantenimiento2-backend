@@ -7,9 +7,12 @@
 name: Avisos de mantenimiento
 
 on:
-  schedule:
-    # 07:00 en Argentina (UTC-3). GitHub interpreta el cron en UTC.
-    - cron: '0 10 * * *'
+  # APAGADO a pedido (2026-09-30): por ahora no sale el correo diario de los
+  # servicios que vencen. Para volver a prenderlo, descomentar estas tres
+  # lineas y hacer push a main. El boton manual de abajo sigue disponible.
+  # schedule:
+  #   # 07:00 en Argentina (UTC-3). GitHub interpreta el cron en UTC.
+  #   - cron: '0 10 * * *'
   # Para dispararlo a mano desde la pestaña Actions, sin esperar a mañana.
   workflow_dispatch:
     inputs:
