@@ -65,7 +65,8 @@ console.log(`  Recibida:   ${orden.recibidaEn ? orden.recibidaEn.toISOString() :
 console.log(`\n  Renglones (${orden.renglones.length}):`);
 for (const r of orden.renglones) {
   console.log(
-    `    ${r.material.nombre}  x${r.cantidad}` +
+    // Un renglón es de un material o de un equipo: el de equipo no tiene material.
+    `    ${r.material?.nombre ?? `[${r.clasificacion ?? 'EQUIPO'}] ${r.descripcionEquipo}`}  x${r.cantidad}` +
       `  movimiento: ${r.movimientoId ?? 'ninguno'}`,
   );
 }
@@ -84,6 +85,21 @@ if (conMovimiento.length > 0) {
   process.exit(1);
 }
 
+// La otra guarda: fichas de equipo que ya creó la recepción. Borrar la orden
+// las dejaría sin saber de qué compra vinieron.
+const fichas = await prisma.equipo.count({
+  where: { renglonOrdenCompraId: { in: orden.renglones.map((r) => r.id) } },
+});
+console.log(`  Fichas de equipo creadas por esta orden (${fichas})`);
+if (fichas > 0) {
+  abortar(
+    `la orden ya dio de alta ${fichas} ficha(s) de equipo al recibirse. Una orden recibida se ` +
+      'conserva: anulala, no la borres.',
+  );
+  await prisma.$disconnect();
+  process.exit(1);
+}
+
 if (orden.comprobantes.length > 0) {
   console.log(
     '\n  AVISO: tiene comprobantes adjuntos. La fila se borra, pero el archivo queda en Supabase.',
@@ -95,6 +111,7 @@ const antes = {
   renglones: await prisma.renglonOrdenCompra.count(),
   movimientos: await prisma.movimientoStock.count(),
   materiales: await prisma.material.count(),
+  equipos: await prisma.equipo.count(),
 };
 
 if (!EJECUTAR) {
@@ -114,6 +131,7 @@ const despues = {
   renglones: await prisma.renglonOrdenCompra.count(),
   movimientos: await prisma.movimientoStock.count(),
   materiales: await prisma.material.count(),
+  equipos: await prisma.equipo.count(),
 };
 
 console.log(`\nÓrdenes:     ${antes.ordenes} -> ${despues.ordenes}  (esperado ${antes.ordenes - 1})`);
@@ -123,12 +141,14 @@ console.log(
 );
 console.log(`Movimientos: ${antes.movimientos} -> ${despues.movimientos}  (esperado IGUAL)`);
 console.log(`Materiales:  ${antes.materiales} -> ${despues.materiales}  (esperado IGUAL)`);
+console.log(`Equipos:     ${antes.equipos} -> ${despues.equipos}  (esperado IGUAL)`);
 
 const bien =
   despues.ordenes === antes.ordenes - 1 &&
   despues.renglones === antes.renglones - orden.renglones.length &&
   despues.movimientos === antes.movimientos &&
-  despues.materiales === antes.materiales;
+  despues.materiales === antes.materiales &&
+  despues.equipos === antes.equipos;
 
 console.log(bien ? '\nOK: se borró exactamente lo previsto.' : '\nATENCIÓN: las cuentas no dan.');
 
