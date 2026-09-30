@@ -17,8 +17,24 @@ export interface EquipoReferenciado {
   codigo: string | null;
 }
 
+/**
+ * Un componente montado en la máquina, y el lapso en que estuvo ahí.
+ *
+ * Es lo que permite que el historial de la desnatadora incluya lo que se le
+ * hizo a su electrobomba, pero solo mientras la bomba estaba montada en ella:
+ * lo de antes o lo de después es de otra máquina.
+ */
+export interface VentanaDeComponente {
+  equipoId: string;
+  desde: Date;
+  /** null mientras sigue montado. */
+  hasta: Date | null;
+}
+
 export interface ConsultaEquipos {
   buscarPorId(id: string): Promise<EquipoReferenciado | null>;
+  /** Los componentes de todos los niveles, cada uno con su lapso dentro de esta máquina. */
+  ventanasDeComponentes(equipoId: string): Promise<VentanaDeComponente[]>;
 }
 
 export const CONSULTA_EQUIPOS = Symbol('ConsultaEquipos');

@@ -41,6 +41,13 @@ export function crearPrismaEnMemoria() {
     enviosOrden: [] as any[],
     // Los manuales en PDF de los equipos (el archivo va al almacén, no acá).
     manuales: [] as any[],
+    // Tramos de equipos montados dentro de otros (la bomba en la desnatadora).
+    montajes: [] as any[],
+    // Las ordenes de trabajo y lo que se uso en cada una. Hasta que hizo falta
+    // probar el historial de una maquina con sus componentes, ningun e2e las
+    // creaba.
+    ordenesTrabajo: [] as any[],
+    materialesUsados: [] as any[],
     contadores: [] as any[],
     permisosRol: [] as any[],
     // Marca, modelo y ubicacion dejaron de ser texto libre y pasaron a ser
@@ -198,6 +205,7 @@ export function crearPrismaEnMemoria() {
   function coincide(fila: any, where: any = {}): boolean {
     return Object.entries(where).every(([campo, cond]: [string, any]) => {
       if (campo === 'OR') return (cond as any[]).some((c) => coincide(fila, c));
+      if (campo === 'AND') return (cond as any[]).every((c) => coincide(fila, c));
       const valor = fila[campo];
       // `undefined` es "sin condición"; `null` explícito es IS NULL, igual que
       // en Prisma. Confundirlos hacía que { unidadId: null } matcheara todo.
@@ -225,16 +233,18 @@ export function crearPrismaEnMemoria() {
       const relacion = relacionadaDe(fila, campo);
       if (relacion !== undefined) return relacion === null ? false : coincide(relacion, cond);
 
-      if ('gte' in cond || 'lte' in cond) {
+      if ('gte' in cond || 'lte' in cond || 'lt' in cond || 'gt' in cond) {
         // Los rangos se usan para fechas (movimientos) y para números
         // (stockActual, que es Decimal). Comparar un Decimal como fecha daba
         // NaN y el filtro pasaba cualquier cosa.
-        const limite = cond.gte ?? cond.lte;
+        const limite = cond.gte ?? cond.lte ?? cond.lt ?? cond.gt;
         const esFecha = valor instanceof Date || limite instanceof Date;
         const aNum = (v: any) => (esFecha ? new Date(v).getTime() : Number(v));
         const t = aNum(valor);
         if ('gte' in cond && t < aNum(cond.gte)) return false;
         if ('lte' in cond && t > aNum(cond.lte)) return false;
+        if ('lt' in cond && t >= aNum(cond.lt)) return false;
+        if ('gt' in cond && t <= aNum(cond.gt)) return false;
         return true;
       }
       return valor === cond;
@@ -352,6 +362,40 @@ export function crearPrismaEnMemoria() {
     }
     if (include._count?.select?.materiales) {
       salida._count = { materiales: db.materiales.filter((m) => m.unidadId === fila.id).length };
+    }
+    // ── Ordenes de trabajo ──
+    if (include.equipo) {
+      const e = db.equipos.find((x) => x.id === fila.equipoId);
+      salida.equipo = e ? { nombre: e.nombre, codigoInterno: e.codigoInterno ?? null } : null;
+    }
+    if (include.plan) salida.plan = null;
+    if (include.abiertaPor) {
+      const u = db.usuarios.find((x) => x.id === fila.abiertaPorId);
+      salida.abiertaPor = u ? { nombre: u.nombre } : null;
+    }
+    if (include.cerradaPor) {
+      const u = db.usuarios.find((x) => x.id === fila.cerradaPorId);
+      salida.cerradaPor = u ? { nombre: u.nombre } : null;
+    }
+    if (include.materiales && 'titulo' in fila) {
+      salida.materiales = db.materialesUsados.filter((m) => m.ordenTrabajoId === fila.id);
+    }
+    if (include.equipoPadre) {
+      const e = db.equipos.find((x) => x.id === fila.equipoPadreId);
+      salida.equipoPadre = e ? { nombre: e.nombre } : null;
+    }
+    if (include.componente) {
+      const e = db.equipos.find((x) => x.id === fila.componenteId);
+      salida.componente = e ? { nombre: e.nombre } : null;
+    }
+    if (include._count?.select?.componentes) {
+      salida._count = { componentes: db.equipos.filter((e) => e.equipoPadreId === fila.id).length };
+    }
+    if (include.montajesComoPieza) {
+      const pedido = include.montajesComoPieza;
+      salida.montajesComoPieza = db.montajes
+        .filter((m) => m.componenteId === fila.id && coincide(m, pedido.where))
+        .slice(0, pedido.take ?? Infinity);
     }
     if (include._count?.select?.equipos) {
       salida._count = { equipos: db.equiposIt.filter((e) => e.tipoId === fila.id).length };
@@ -676,6 +720,34 @@ export function crearPrismaEnMemoria() {
       notas: null,
       movimientoId: null,
     })),
+    ordenTrabajo: delegate(db.ordenesTrabajo, () => ({
+      descripcion: null,
+      estado: 'ABIERTA',
+      equipoId: null,
+      equipoItId: null,
+      fecha: new Date(),
+      ejecutor: 'INTERNO',
+      proveedorId: null,
+      costoManoObra: null,
+      horasParada: null,
+      planId: null,
+      abiertaEn: new Date(),
+      abiertaPorId: null,
+      asignadoAId: null,
+      resolucion: null,
+      cerradaEn: null,
+      cerradaPorId: null,
+      motivoAnulacion: null,
+      creadoEn: new Date(),
+    })),
+    materialUsadoTrabajo: delegate(db.materialesUsados, () => ({ creadoEn: new Date() })),
+    montajeEquipo: delegate(db.montajes, () => ({
+      desde: new Date(),
+      hasta: null,
+      motivo: null,
+      registradoPorId: null,
+      creadoEn: new Date(),
+    })),
     manualEquipo: delegate(db.manuales, () => ({
       subidoPorId: null,
       subidoEn: new Date(),
@@ -713,6 +785,7 @@ export function crearPrismaEnMemoria() {
       garantiaHasta: null,
       qrGeneradoEn: null,
       renglonOrdenCompraId: null,
+      equipoPadreId: null,
     })),
     marcaEquipo: delegate(db.marcasEquipo, () => ({ activo: true })),
     modeloEquipo: delegate(db.modelosEquipo, () => ({ activo: true })),

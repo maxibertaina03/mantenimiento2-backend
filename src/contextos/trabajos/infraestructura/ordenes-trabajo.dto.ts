@@ -258,6 +258,16 @@ export class ListarOrdenesTrabajoDto {
   @IsUUID()
   equipoId?: string;
 
+  @ApiPropertyOptional({
+    enum: ['true', 'false'],
+    description:
+      'Con equipoId: suma los trabajos de sus componentes, cada uno solo mientras estuvo ' +
+      'montado en ese equipo.',
+  })
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  incluirComponentes?: string;
+
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
   @IsUUID()

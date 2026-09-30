@@ -11,6 +11,11 @@ export interface EquipoConRelaciones extends Equipo {
   marcaNombre: string | null;
   modeloNombre: string | null;
   proveedorNombre: string | null;
+  /** En qué equipo está montado hoy, o null si va suelto. */
+  equipoPadreId: string | null;
+  equipoPadreNombre: string | null;
+  /** Cuántos equipos tiene montados, en el primer nivel. */
+  cantidadComponentes: number;
 }
 
 /** Cómo se pide el listado. Con ~250 equipos, filtrar en memoria no es opción. */

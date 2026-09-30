@@ -29,6 +29,11 @@ export interface FiltroOrdenesTrabajo {
   estado?: EstadoOrdenTrabajo;
   tipo?: TipoTrabajo;
   equipoId?: string;
+  /**
+   * Con `equipoId`: suma los trabajos de sus componentes, cada uno solo dentro
+   * del lapso en que estuvo montado en ese equipo.
+   */
+  componentes?: { equipoId: string; desde: Date; hasta: Date | null }[];
   equipoItId?: string;
   /** Busca en el número, el título y la descripción. */
   buscar?: string;

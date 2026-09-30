@@ -75,7 +75,7 @@ export class OrdenesTrabajoController {
   ) {
     this.gestionar = new GestionarOrdenesTrabajo(repo, equipos, equiposIt, usuarios, planes, reloj);
     this.materiales = new UsarMateriales(repo, stock);
-    this.consultar = new ConsultarOrdenesTrabajo(repo);
+    this.consultar = new ConsultarOrdenesTrabajo(repo, equipos);
     this.registrarHecho = new RegistrarTrabajoHecho(this.gestionar, this.materiales);
   }
 
@@ -140,6 +140,7 @@ export class OrdenesTrabajoController {
         estado: query.estado,
         tipo: query.tipo,
         equipoId: query.equipoId,
+        incluirComponentes: query.incluirComponentes === 'true',
         equipoItId: query.equipoItId,
         asignadoAId: query.asignadoAId,
       },

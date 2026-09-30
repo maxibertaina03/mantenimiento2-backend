@@ -97,11 +97,31 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
     };
   }
 
-  private where(filtro: FiltroOrdenesTrabajo): Prisma.OrdenTrabajoWhereInput {
+  /**
+   * El equipo pedido, o el equipo más sus componentes, cada componente solo
+   * con lo abierto mientras estuvo montado ahí.
+   */
+  private porEquipo(filtro: FiltroOrdenesTrabajo): Prisma.OrdenTrabajoWhereInput {
+    if (!filtro.equipoId) return {};
+    if (!filtro.componentes?.length) return { equipoId: filtro.equipoId };
     return {
+      OR: [
+        { equipoId: filtro.equipoId },
+        ...filtro.componentes.map((c) => ({
+          equipoId: c.equipoId,
+          abiertaEn: { gte: c.desde, ...(c.hasta ? { lt: c.hasta } : {}) },
+        })),
+      ],
+    };
+  }
+
+  private where(filtro: FiltroOrdenesTrabajo): Prisma.OrdenTrabajoWhereInput {
+    // Va en un AND aparte porque la búsqueda por texto también usa `OR`, y dos
+    // `OR` sueltos en el mismo objeto se pisarían.
+    return {
+      AND: [this.porEquipo(filtro)],
       ...(filtro.estado ? { estado: filtro.estado } : {}),
       ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
-      ...(filtro.equipoId ? { equipoId: filtro.equipoId } : {}),
       ...(filtro.equipoItId ? { equipoItId: filtro.equipoItId } : {}),
       ...(filtro.asignadoAId ? { asignadoAId: filtro.asignadoAId } : {}),
       ...(filtro.desde || filtro.hasta

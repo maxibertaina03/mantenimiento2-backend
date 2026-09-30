@@ -5,6 +5,7 @@ import {
   OrdenTrabajoConRelaciones,
   RepositorioOrdenesTrabajo,
 } from '../puertos/repositorio-ordenes-trabajo';
+import { ConsultaEquipos } from '../puertos/consulta-equipos';
 
 export interface PaginaDeOrdenes {
   datos: OrdenTrabajoConRelaciones[];
@@ -19,13 +20,22 @@ export interface OrdenTrabajoConResumen extends OrdenTrabajoConRelaciones {
 }
 
 export class ConsultarOrdenesTrabajo {
-  constructor(private readonly repo: RepositorioOrdenesTrabajo) {}
+  /** `equipos` es opcional: solo hace falta para sumar los componentes. */
+  constructor(
+    private readonly repo: RepositorioOrdenesTrabajo,
+    private readonly equipos?: ConsultaEquipos,
+  ) {}
 
   async listar(
-    filtro: FiltroOrdenesTrabajo,
+    pedido: FiltroOrdenesTrabajo & { incluirComponentes?: boolean },
     pagina: number,
     limite: number,
   ): Promise<PaginaDeOrdenes> {
+    const { incluirComponentes, ...filtro } = pedido;
+    if (incluirComponentes && filtro.equipoId && this.equipos) {
+      filtro.componentes = await this.equipos.ventanasDeComponentes(filtro.equipoId);
+    }
+
     // En paralelo: son dos consultas independientes y una pantalla que espera
     // las dos en fila tarda el doble sin ninguna razón.
     const [datos, total] = await Promise.all([

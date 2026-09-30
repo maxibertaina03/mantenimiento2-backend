@@ -350,6 +350,7 @@ model Usuario {
   comprobantesSubidos    ComprobanteOrden[]   @relation("ComprobantesSubidos")
   vistasDeCredencial     VistaCredencial[]    @relation("VistasDeCredencial")
   manualesSubidos        ManualEquipo[]       @relation("ManualesSubidos")
+  montajesRegistrados    MontajeEquipo[]      @relation("MontajesRegistrados")
 
   @@map("usuarios")
 }
@@ -886,6 +887,11 @@ model Equipo {
   /// remito y su precio.
   renglonOrdenCompraId String?
 
+  /// En qué equipo está montado HOY, o null si va suelto. El historial de
+  /// dónde estuvo antes vive en `MontajeEquipo`; esto es el tramo abierto,
+  /// guardado aparte para listar y filtrar sin recorrer el historial.
+  equipoPadreId String?
+
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
@@ -902,12 +908,45 @@ model Equipo {
   rutinas        RutinaTarea[]
   manuales       ManualEquipo[]
 
+  equipoPadre         Equipo?         @relation("ComponentesDeEquipo", fields: [equipoPadreId], references: [id], onDelete: SetNull)
+  componentes         Equipo[]        @relation("ComponentesDeEquipo")
+  montajesComoPieza   MontajeEquipo[] @relation("MontajesComoPieza")
+  montajesComoMaquina MontajeEquipo[] @relation("MontajesComoMaquina")
+
   @@index([ubicacionId])
+  @@index([equipoPadreId])
   @@index([tipoId])
   @@index([marcaId])
   @@index([modeloId])
   @@index([estado])
   @@map("equipos")
+}
+
+/// Un tramo en que un equipo estuvo montado dentro de otro.
+///
+/// La electrobomba va en la desnatadora: eso es un tramo abierto (`hasta`
+/// null). Si se la saca y se la pone en otra máquina, el tramo se cierra y se
+/// abre otro. Así queda por dónde pasó cada componente, igual que Equipos IT
+/// registra quién tuvo cada equipo.
+model MontajeEquipo {
+  id            String @id @default(uuid())
+  componenteId  String
+  equipoPadreId String
+
+  desde  DateTime  @default(now())
+  hasta  DateTime?
+  motivo String?
+
+  registradoPorId String?
+  creadoEn        DateTime @default(now())
+
+  componente    Equipo   @relation("MontajesComoPieza", fields: [componenteId], references: [id], onDelete: Cascade)
+  equipoPadre   Equipo   @relation("MontajesComoMaquina", fields: [equipoPadreId], references: [id], onDelete: Cascade)
+  registradoPor Usuario? @relation("MontajesRegistrados", fields: [registradoPorId], references: [id], onDelete: SetNull)
+
+  @@index([componenteId])
+  @@index([equipoPadreId])
+  @@map("montajes_equipo")
 }
 
 /// El manual de un equipo o una herramienta, en PDF.

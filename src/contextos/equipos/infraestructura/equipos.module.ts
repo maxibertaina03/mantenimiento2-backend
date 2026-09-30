@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ALMACEN_IMAGENES } from '../puertos/almacen-imagenes';
 import { ALMACEN_MANUALES, REPOSITORIO_MANUALES } from '../puertos/manuales';
+import { REPOSITORIO_MONTAJES } from '../puertos/montajes';
 import { DESTINATARIOS_AVISOS } from '../puertos/destinatarios-avisos';
 import { ENVIADOR_AVISOS } from '../puertos/enviador-avisos';
 import { REPOSITORIO_AVISOS } from '../puertos/repositorio-avisos';
@@ -28,6 +29,8 @@ import { PrismaRepositorioPlanes } from './prisma-repositorio-planes';
 import { PrismaRepositorioUbicaciones } from './prisma-repositorio-ubicaciones';
 import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
 import { ManualesController } from './manuales.controller';
+import { MontajesController } from './montajes.controller';
+import { PrismaRepositorioMontajes } from './prisma-repositorio-montajes';
 import { PrismaRepositorioManuales } from './prisma-repositorio-manuales';
 import { SupabaseAlmacenManuales } from './supabase-almacen-manuales';
 
@@ -43,6 +46,7 @@ import { SupabaseAlmacenManuales } from './supabase-almacen-manuales';
   controllers: [
     EquiposController,
     ManualesController,
+    MontajesController,
     AvisosController,
     UbicacionesEquipoController,
     TiposEquipoPlantaController,
@@ -58,6 +62,7 @@ import { SupabaseAlmacenManuales } from './supabase-almacen-manuales';
     { provide: ALMACEN_IMAGENES, useClass: SupabaseAlmacenImagenes },
     { provide: REPOSITORIO_MANUALES, useClass: PrismaRepositorioManuales },
     { provide: ALMACEN_MANUALES, useClass: SupabaseAlmacenManuales },
+    { provide: REPOSITORIO_MONTAJES, useClass: PrismaRepositorioMontajes },
     { provide: REPOSITORIO_AVISOS, useClass: PrismaRepositorioAvisos },
     { provide: DESTINATARIOS_AVISOS, useClass: PrismaDestinatariosAvisos },
     { provide: ENVIADOR_AVISOS, useClass: CorreoEnviadorAvisos },

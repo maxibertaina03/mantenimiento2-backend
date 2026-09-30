@@ -2,6 +2,8 @@ import { Equipo, normalizarCodigoInterno, normalizarTexto } from '../dominio/equ
 import { ErrorConflicto, ErrorDatosInvalidos, ErrorNoEncontrado } from '../dominio/errores';
 import { EstadoEquipo, transicionar } from '../dominio/estado-equipo';
 import { EquipoConRelaciones, RepositorioEquipos } from '../puertos/repositorio-equipos';
+import { RepositorioMontajes } from '../puertos/montajes';
+import { Reloj } from '../puertos/reloj';
 
 export interface CambiosEquipo {
   nombre?: string;
@@ -28,7 +30,16 @@ export interface CambiosEquipo {
  * campo oculto la borraría sin que nadie lo pida.
  */
 export class ActualizarEquipo {
-  constructor(private readonly repo: RepositorioEquipos) {}
+  /**
+   * `montajes` y `reloj` son opcionales para que quien no trabaja con
+   * componentes pueda seguir armándolo con el repositorio solo. Con ellos, dar
+   * de baja un equipo montado lo desmonta.
+   */
+  constructor(
+    private readonly repo: RepositorioEquipos,
+    private readonly montajes?: RepositorioMontajes,
+    private readonly reloj?: Reloj,
+  ) {}
 
   async ejecutar(id: string, cambios: CambiosEquipo): Promise<EquipoConRelaciones> {
     const actual = await this.repo.buscarPorId(id);
@@ -89,6 +100,18 @@ export class ActualizarEquipo {
       if (cambios[campo] !== undefined) parche[campo] = cambios[campo] ?? null;
     }
 
-    return this.repo.actualizar(id, parche);
+    const actualizado = await this.repo.actualizar(id, parche);
+
+    // Un equipo dado de baja no puede seguir figurando adentro de una
+    // máquina: se lo desmonta, y el tramo queda cerrado con el motivo.
+    if (parche.estado === 'DADO_DE_BAJA' && actual.equipoPadreId && this.montajes) {
+      await this.montajes.desmontar({
+        componenteId: id,
+        cuando: this.reloj?.ahora() ?? new Date(),
+        motivo: 'Dado de baja',
+      });
+      return (await this.repo.buscarPorId(id)) ?? actualizado;
+    }
+    return actualizado;
   }
 }

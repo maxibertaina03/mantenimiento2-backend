@@ -37,6 +37,7 @@ import {
   RepositorioUbicaciones,
 } from '../puertos/repositorio-ubicaciones';
 import { RELOJ, Reloj } from '../puertos/reloj';
+import { REPOSITORIO_MONTAJES, RepositorioMontajes } from '../puertos/montajes';
 import {
   ActualizarEquipoDto,
   CambiarFotoDto,
@@ -83,9 +84,11 @@ export class EquiposController {
     @Inject(REPOSITORIO_PLANES) planesRepo: RepositorioPlanes,
     @Inject(ALMACEN_IMAGENES) private readonly almacen: AlmacenImagenes,
     @Inject(RELOJ) private readonly reloj: Reloj,
+    @Inject(REPOSITORIO_MONTAJES) montajes: RepositorioMontajes,
   ) {
     this.crear = new CrearEquipo(repo);
-    this.actualizar = new ActualizarEquipo(repo);
+    // Con los montajes: dar de baja un equipo montado lo desmonta.
+    this.actualizar = new ActualizarEquipo(repo, montajes, reloj);
     this.consultar = new ConsultarEquipos(repo, reloj);
     this.importar = new ImportarEquipos(repo, ubicaciones);
     this.cambiarFoto = new CambiarFotoEquipo(repo, almacen);

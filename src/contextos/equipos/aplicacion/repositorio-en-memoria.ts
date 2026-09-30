@@ -46,6 +46,9 @@ export class RepositorioEquiposEnMemoria implements RepositorioEquipos {
       marcaNombre: fila.marcaNombre ?? null,
       modeloNombre: fila.modeloNombre ?? null,
       proveedorNombre: fila.proveedorNombre ?? null,
+      equipoPadreId: fila.equipoPadreId ?? null,
+      equipoPadreNombre: fila.equipoPadreNombre ?? null,
+      cantidadComponentes: fila.cantidadComponentes ?? 0,
     };
     this.filas.push(completo);
     return completo;

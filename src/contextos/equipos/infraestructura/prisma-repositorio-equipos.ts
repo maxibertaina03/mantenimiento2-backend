@@ -22,6 +22,8 @@ type FilaEquipo = Prisma.EquipoGetPayload<{
     marca: { select: { nombre: true } };
     modelo: { select: { nombre: true } };
     proveedor: { select: { nombre: true } };
+    equipoPadre: { select: { nombre: true } };
+    _count: { select: { componentes: true } };
   };
 }>;
 
@@ -43,6 +45,10 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
     marca: { select: { nombre: true } },
     modelo: { select: { nombre: true } },
     proveedor: { select: { nombre: true } },
+    // Dónde está montado y cuántos tiene montados: la lista y la ficha lo
+    // muestran sin pedir nada más.
+    equipoPadre: { select: { nombre: true } },
+    _count: { select: { componentes: true } },
   } as const;
 
   private aDominio(fila: FilaEquipo): EquipoConRelaciones {
@@ -69,6 +75,9 @@ export class PrismaRepositorioEquipos implements RepositorioEquipos {
       marcaNombre: fila.marca?.nombre ?? null,
       modeloNombre: fila.modelo?.nombre ?? null,
       proveedorNombre: fila.proveedor?.nombre ?? null,
+      equipoPadreId: fila.equipoPadreId,
+      equipoPadreNombre: fila.equipoPadre?.nombre ?? null,
+      cantidadComponentes: fila._count?.componentes ?? 0,
     };
   }
 
