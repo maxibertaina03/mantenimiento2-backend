@@ -39,6 +39,8 @@ export function crearPrismaEnMemoria() {
     renglones: [] as any[],
     // Por dónde salió cada orden. Sin esto, registrar un WhatsApp daba 500.
     enviosOrden: [] as any[],
+    // Los manuales en PDF de los equipos (el archivo va al almacén, no acá).
+    manuales: [] as any[],
     contadores: [] as any[],
     permisosRol: [] as any[],
     // Marca, modelo y ubicacion dejaron de ser texto libre y pasaron a ser
@@ -366,6 +368,10 @@ export function crearPrismaEnMemoria() {
       const u = db.usuarios.find((x) => x.id === fila.recibidaPorId);
       salida.recibidaPor = u ? { nombre: u.nombre } : null;
     }
+    if (include.subidoPor) {
+      const u = db.usuarios.find((x) => x.id === fila.subidoPorId);
+      salida.subidoPor = u ? { nombre: u.nombre } : null;
+    }
     if (include.registradoPor) {
       const u = db.usuarios.find((x) => x.id === fila.registradoPorId);
       salida.registradoPor = u ? { nombre: u.nombre } : null;
@@ -669,6 +675,10 @@ export function crearPrismaEnMemoria() {
       precioUnitario: null,
       notas: null,
       movimientoId: null,
+    })),
+    manualEquipo: delegate(db.manuales, () => ({
+      subidoPorId: null,
+      subidoEn: new Date(),
     })),
     envioOrden: delegate(db.enviosOrden, () => ({
       usuarioId: null,

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ALMACEN_IMAGENES } from '../puertos/almacen-imagenes';
+import { ALMACEN_MANUALES, REPOSITORIO_MANUALES } from '../puertos/manuales';
 import { DESTINATARIOS_AVISOS } from '../puertos/destinatarios-avisos';
 import { ENVIADOR_AVISOS } from '../puertos/enviador-avisos';
 import { REPOSITORIO_AVISOS } from '../puertos/repositorio-avisos';
@@ -26,6 +27,9 @@ import { PrismaRepositorioIntervenciones } from './prisma-repositorio-intervenci
 import { PrismaRepositorioPlanes } from './prisma-repositorio-planes';
 import { PrismaRepositorioUbicaciones } from './prisma-repositorio-ubicaciones';
 import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
+import { ManualesController } from './manuales.controller';
+import { PrismaRepositorioManuales } from './prisma-repositorio-manuales';
+import { SupabaseAlmacenManuales } from './supabase-almacen-manuales';
 
 /**
  * El cableado del contexto: acá se decide qué implementación concreta entra por
@@ -38,6 +42,7 @@ import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
 @Module({
   controllers: [
     EquiposController,
+    ManualesController,
     AvisosController,
     UbicacionesEquipoController,
     TiposEquipoPlantaController,
@@ -51,6 +56,8 @@ import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
     { provide: REPOSITORIO_INTERVENCIONES, useClass: PrismaRepositorioIntervenciones },
     { provide: REPOSITORIO_PLANES, useClass: PrismaRepositorioPlanes },
     { provide: ALMACEN_IMAGENES, useClass: SupabaseAlmacenImagenes },
+    { provide: REPOSITORIO_MANUALES, useClass: PrismaRepositorioManuales },
+    { provide: ALMACEN_MANUALES, useClass: SupabaseAlmacenManuales },
     { provide: REPOSITORIO_AVISOS, useClass: PrismaRepositorioAvisos },
     { provide: DESTINATARIOS_AVISOS, useClass: PrismaDestinatariosAvisos },
     { provide: ENVIADOR_AVISOS, useClass: CorreoEnviadorAvisos },

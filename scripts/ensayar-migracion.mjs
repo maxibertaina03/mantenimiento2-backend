@@ -35,15 +35,14 @@ const host = (() => {
 })();
 
 /** Las sentencias, sin los comentarios y sin las vacías. */
+// Primero se sacan los comentarios y después se corta en `;`. Al revés, un `;`
+// escrito dentro de un comentario partía la sentencia al medio.
 const sentencias = sql
+  .split('\n')
+  .filter((l) => !l.trim().startsWith('--'))
+  .join('\n')
   .split(';')
-  .map((s) =>
-    s
-      .split('\n')
-      .filter((l) => !l.trim().startsWith('--'))
-      .join('\n')
-      .trim(),
-  )
+  .map((s) => s.trim())
   .filter((s) => s.length > 0);
 
 console.log(`\nBase:      ${host}`);
@@ -101,7 +100,13 @@ try {
   );
 } catch (error) {
   if (!(error instanceof Deshacer)) {
-    console.error(`\n❌ EL ENSAYO FALLO: ${String(error.message).split('\n')[0]}`);
+    // La primera línea CON TEXTO: los errores de Prisma empiezan con un salto
+    // de línea, y tomar la primera a secas dejaba el motivo en blanco.
+    const motivo = String(error?.message ?? error)
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    console.error(`\n❌ EL ENSAYO FALLO: ${motivo.slice(0, 6).join('\n   ')}`);
     console.error('   La base quedó intacta: la transacción se revirtió.\n');
     await prisma.$disconnect();
     process.exit(1);

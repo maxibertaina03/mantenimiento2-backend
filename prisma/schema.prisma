@@ -349,6 +349,7 @@ model Usuario {
   rotacionesDeCredencial RotacionCredencial[] @relation("RotacionesDeCredencial")
   comprobantesSubidos    ComprobanteOrden[]   @relation("ComprobantesSubidos")
   vistasDeCredencial     VistaCredencial[]    @relation("VistasDeCredencial")
+  manualesSubidos        ManualEquipo[]       @relation("ManualesSubidos")
 
   @@map("usuarios")
 }
@@ -899,6 +900,7 @@ model Equipo {
   ordenesTrabajo OrdenTrabajo[]
   tareas         TareaProgramada[]
   rutinas        RutinaTarea[]
+  manuales       ManualEquipo[]
 
   @@index([ubicacionId])
   @@index([tipoId])
@@ -906,6 +908,31 @@ model Equipo {
   @@index([modeloId])
   @@index([estado])
   @@map("equipos")
+}
+
+/// El manual de un equipo o una herramienta, en PDF.
+///
+/// El archivo vive en el almacén (Supabase, bucket privado) y acá queda lo
+/// necesario para mostrarlo, abrirlo y borrarlo. Un equipo puede tener varios:
+/// el de uso, el de servicio, el despiece.
+model ManualEquipo {
+  id       String @id @default(uuid())
+  equipoId String
+
+  /// Como se llamaba el archivo que subieron, para mostrarlo.
+  nombre      String
+  /// Donde quedo en el almacen. Es lo que hace falta para verlo y para borrarlo.
+  ruta        String
+  tamanoBytes Int
+
+  subidoEn    DateTime @default(now())
+  subidoPorId String?
+
+  equipo    Equipo   @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  subidoPor Usuario? @relation("ManualesSubidos", fields: [subidoPorId], references: [id], onDelete: SetNull)
+
+  @@index([equipoId])
+  @@map("manuales_equipo")
 }
 
 /// Un trabajo hecho sobre un equipo: el service, la reparación, la mejora.
