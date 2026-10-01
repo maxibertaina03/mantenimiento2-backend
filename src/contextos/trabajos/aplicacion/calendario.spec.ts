@@ -203,6 +203,47 @@ describe('dar una tarea por hecha', () => {
     expect(orden).toMatchObject({ estado: 'CERRADA', equipoId: 'eq-7' });
   });
 
+  it('si lo hizo un servicio externo, la orden dice cual', async () => {
+    const { gestionar, ordenes } = armar();
+    const tarea = await gestionar.crear({
+      titulo: 'Rebobinado del motor',
+      fecha: dia('2026-09-21'),
+      asignadoAId: 'u1',
+    });
+
+    const hecha = await gestionar.completar(
+      tarea.id,
+      {
+        resolucion: 'Lo rebobinaron afuera',
+        ejecutor: 'EXTERNO',
+        proveedorId: 'prov-1',
+        costoManoObra: 85000,
+      },
+      'u1',
+    );
+    const orden = await ordenes.buscarPorId(hecha.ordenTrabajoId as string);
+
+    expect(orden).toMatchObject({
+      ejecutor: 'EXTERNO',
+      proveedorId: 'prov-1',
+      costoManoObra: 85000,
+    });
+  });
+
+  it('REGRESION: externo sin decir que proveedor no se acepta, y la tarea sigue pendiente', async () => {
+    const { gestionar, tareas } = armar();
+    const tarea = await gestionar.crear({
+      titulo: 'Algo',
+      fecha: dia('2026-09-21'),
+      asignadoAId: 'u1',
+    });
+
+    await expect(
+      gestionar.completar(tarea.id, { resolucion: 'Listo', ejecutor: 'EXTERNO' }, 'u1'),
+    ).rejects.toThrow(/qué proveedor/);
+    expect((await tareas.buscarPorId(tarea.id))?.estado).toBe('PENDIENTE');
+  });
+
   it('la orden se fecha el dia de la tarea, no el de hoy', async () => {
     // Una tarea de ayer que se cierra hoy se hizo ayer.
     const { gestionar, ordenes } = armar();

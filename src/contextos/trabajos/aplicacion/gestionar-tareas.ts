@@ -1,4 +1,5 @@
 import { ErrorDatosInvalidos, ErrorNoEncontrado } from '../dominio/errores';
+import type { Ejecutor } from '../dominio/orden-trabajo';
 import {
   asignarTarea,
   cancelarTarea,
@@ -29,6 +30,9 @@ export interface DatosTareaHecha {
   materiales?: DatosMaterialUsado[];
   costoManoObra?: number | null;
   horasParada?: number | null;
+  /** Quién lo hizo: la planta, o un servicio externo (y cuál). */
+  ejecutor?: Ejecutor;
+  proveedorId?: string | null;
 }
 
 /**
@@ -142,6 +146,8 @@ export class GestionarTareas {
         resolucion: datos.resolucion,
         costoManoObra: datos.costoManoObra,
         horasParada: datos.horasParada,
+        ejecutor: datos.ejecutor,
+        proveedorId: datos.proveedorId,
         materiales: datos.materiales,
       },
       usuarioId,

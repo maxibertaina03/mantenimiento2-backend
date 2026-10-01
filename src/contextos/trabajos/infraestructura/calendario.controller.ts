@@ -156,6 +156,8 @@ export class CalendarioController {
         materiales: dto.materiales,
         costoManoObra: dto.costoManoObra,
         horasParada: dto.horasParada,
+        ejecutor: dto.ejecutor,
+        proveedorId: dto.proveedorId,
       },
       usuario?.id ?? null,
     );

@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -15,6 +16,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { UsarMaterialDto } from './ordenes-trabajo.dto';
+import { EJECUTORES, Ejecutor } from '../dominio/orden-trabajo';
 
 /**
  * Los DTO validan la FORMA. Las reglas —que una tarea la cierra quien la tiene
@@ -89,6 +91,16 @@ export class CompletarTareaDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   horasParada?: number | null;
+
+  @ApiPropertyOptional({ enum: EJECUTORES, default: 'INTERNO' })
+  @IsOptional()
+  @IsIn(EJECUTORES)
+  ejecutor?: Ejecutor;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Obligatorio si lo hizo un externo' })
+  @IsOptional()
+  @IsUUID()
+  proveedorId?: string | null;
 }
 
 export class VerCalendarioDto {
