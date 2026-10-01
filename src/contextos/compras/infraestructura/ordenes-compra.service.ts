@@ -16,6 +16,7 @@ import {
   ProveedoresDelCatalogo,
 } from './adaptadores';
 import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
+import { CorregirPreciosDto } from './dto/corregir-precios.dto';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { EnviarOrdenDto, ResultadoEnvioDto } from './dto/enviar-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
@@ -132,6 +133,12 @@ export class OrdenesCompraService {
   actualizar(id: string, dto: ActualizarOrdenDto): Promise<OrdenRespuestaDto> {
     return traducirErrores(async () =>
       OrdenRespuestaDto.desde(await this.gestionar.actualizar(id, dto)),
+    );
+  }
+
+  corregirPrecios(id: string, dto: CorregirPreciosDto): Promise<OrdenRespuestaDto> {
+    return traducirErrores(async () =>
+      OrdenRespuestaDto.desde(await this.gestionar.corregirPrecios(id, dto.precios)),
     );
   }
 

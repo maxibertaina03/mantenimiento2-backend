@@ -131,5 +131,10 @@ export interface RepositorioOrdenesCompra {
    * de equipo, y la orden RECIBIDA. Todo o nada.
    */
   recibir(datos: DatosRecepcion): Promise<OrdenConRelaciones>;
+  /** Cambia solo el precio de esos renglones. Todo o nada. */
+  actualizarPrecios(
+    id: string,
+    precios: { renglonId: string; precioUnitario: number }[],
+  ): Promise<OrdenConRelaciones>;
   eliminar(id: string): Promise<unknown>;
 }

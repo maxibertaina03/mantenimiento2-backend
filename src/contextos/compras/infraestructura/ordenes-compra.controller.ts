@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Usuario } from '@prisma/client';
 import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.decorator';
 import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
+import { CorregirPreciosDto } from './dto/corregir-precios.dto';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
@@ -125,6 +126,15 @@ export class OrdenesCompraController {
   @ApiOperation({ summary: 'Editar una orden (solo en BORRADOR)' })
   actualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ActualizarOrdenDto) {
     return this.service.actualizar(id, dto);
+  }
+
+  @Permisos(PERMISOS.ORDENES_EDITAR)
+  @Patch(':id/precios')
+  @ApiOperation({
+    summary: 'Cargar o corregir precios en una orden ya emitida o recibida (solo precios)',
+  })
+  corregirPrecios(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CorregirPreciosDto) {
+    return this.service.corregirPrecios(id, dto);
   }
 
   @Permisos(PERMISOS.ORDENES_EDITAR)

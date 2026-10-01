@@ -4,6 +4,9 @@ import { ErrorNoEncontrado } from '../dominio/errores';
 import {
   comprobanteDeRecepcion,
   materialesDeLosRenglones,
+  PrecioCorregido,
+  validarPreciosCorregibles,
+  validarPreciosCorregidos,
   validarEditable,
   validarEliminable,
   validarQueQuedanRenglones,
@@ -187,6 +190,17 @@ export class GestionarOrdenesCompra {
       factura: comprobante.factura,
       notas: datos.notas ?? null,
     });
+  }
+
+  /**
+   * Carga o corrige precios en una orden ya emitida o recibida, para volver a
+   * mandársela al proveedor con todo. Solo precios: ver el dominio.
+   */
+  async corregirPrecios(id: string, precios: PrecioCorregido[]): Promise<OrdenConRelaciones> {
+    const orden = await this.traer(id);
+    validarPreciosCorregibles(orden);
+    validarPreciosCorregidos(orden.renglones ?? [], precios);
+    return this.repo.actualizarPrecios(id, precios);
   }
 
   async anular(id: string): Promise<OrdenConRelaciones> {

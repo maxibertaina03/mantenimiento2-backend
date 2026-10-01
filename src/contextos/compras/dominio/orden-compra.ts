@@ -143,3 +143,51 @@ export function comprobanteDeRecepcion(
     .join(' · ');
   return { remito, factura, referencia: `${numero} · ${papel}` };
 }
+
+/** El precio de un renglón, corregido después de emitir o de recibir. */
+export interface PrecioCorregido {
+  renglonId: string;
+  precioUnitario: number;
+}
+
+/**
+ * Los precios son lo único que se corrige en una orden que ya salió.
+ *
+ * Pasa que se emite o se recibe una orden con un renglón sin precio, y el
+ * proveedor la pide de nuevo con todo. Cantidades y materiales no se tocan:
+ * en una orden recibida ya son stock. El precio no: vive solo en el renglón,
+ * el movimiento de stock no lo copia, así que corregirlo no mueve nada.
+ *
+ * Una anulada no: no va a salir más a ningún lado.
+ */
+export function validarPreciosCorregibles(orden: OrdenEnEstado): void {
+  if (orden.estado === 'ANULADA') {
+    throw new ErrorEstadoDeLaOrden(
+      `La orden ${orden.numero} está ANULADA: no se le corrigen precios.`,
+    );
+  }
+}
+
+/** Cada precio tiene que ser de un renglón de esta orden, una sola vez, y mayor que cero. */
+export function validarPreciosCorregidos(
+  renglonesDeLaOrden: { id: string }[],
+  precios: PrecioCorregido[],
+): void {
+  if (precios.length === 0) {
+    throw new ErrorDatosInvalidos('No llegó ningún precio para corregir.');
+  }
+  const deLaOrden = new Set(renglonesDeLaOrden.map((r) => r.id));
+  const vistos = new Set<string>();
+  for (const p of precios) {
+    if (!deLaOrden.has(p.renglonId)) {
+      throw new ErrorDatosInvalidos('Uno de los renglones no es de esta orden.');
+    }
+    if (vistos.has(p.renglonId)) {
+      throw new ErrorDatosInvalidos('El mismo renglón vino dos veces.');
+    }
+    vistos.add(p.renglonId);
+    if (!(p.precioUnitario > 0)) {
+      throw new ErrorDatosInvalidos('El precio tiene que ser mayor que cero.');
+    }
+  }
+}

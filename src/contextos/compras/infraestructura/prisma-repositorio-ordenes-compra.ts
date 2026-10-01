@@ -187,6 +187,24 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
     });
   }
 
+  async actualizarPrecios(
+    id: string,
+    precios: { renglonId: string; precioUnitario: number }[],
+  ): Promise<OrdenConRelaciones> {
+    return this.prisma.$transaction(async (tx) => {
+      for (const p of precios) {
+        // Con la orden en el filtro: un renglón de otra orden no se toca
+        // aunque alguien mande su id.
+        const { count } = await tx.renglonOrdenCompra.updateMany({
+          where: { id: p.renglonId, ordenId: id },
+          data: { precioUnitario: new Prisma.Decimal(p.precioUnitario.toFixed(2)) },
+        });
+        if (count !== 1) throw new Error(`El renglón ${p.renglonId} no es de la orden ${id}.`);
+      }
+      return tx.ordenCompra.findUniqueOrThrow({ where: { id }, include: this.relaciones });
+    });
+  }
+
   /**
    * Deja constancia de un envío y, si la orden estaba en BORRADOR, la emite.
    *

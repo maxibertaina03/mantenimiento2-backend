@@ -165,6 +165,58 @@ describe('Compras (e2e)', () => {
     });
   });
 
+  describe('corregir precios despues de emitir o recibir', () => {
+    it('una orden recibida con un renglon sin precio se completa, y el stock no se mueve', async () => {
+      const conPrecio = await material();
+      const sinPrecio = await material();
+      const o = await emitida([
+        { materialId: conPrecio, cantidad: 3, precioUnitario: 48226.69 },
+        { materialId: sinPrecio, cantidad: 1 },
+      ]);
+      await http.patch(`/api/ordenes-compra/${o.id}/recibir`).send({ remito: 'R-1' }).expect(200);
+      const stockAntes = [await stockDe(conPrecio), await stockDe(sinPrecio)];
+
+      const leida = await http.get(`/api/ordenes-compra/${o.id}`).expect(200);
+      expect(leida.body.total).toBeNull();
+      const renglon = leida.body.renglones.find(
+        (r: { materialId: string }) => r.materialId === sinPrecio,
+      );
+
+      const r = await http
+        .patch(`/api/ordenes-compra/${o.id}/precios`)
+        .send({ precios: [{ renglonId: renglon.id, precioUnitario: 125000 }] })
+        .expect(200);
+
+      expect(r.body.estado).toBe('RECIBIDA');
+      expect(r.body.total).toBeCloseTo(3 * 48226.69 + 125000, 2);
+      expect([await stockDe(conPrecio), await stockDe(sinPrecio)]).toEqual(stockAntes);
+    });
+
+    it('REGRESION: un renglon de otra orden no se toca', async () => {
+      const a = await emitida([{ materialId: await material(), cantidad: 1 }]);
+      const b = await emitida([{ materialId: await material(), cantidad: 1 }]);
+      const renglonDeB = (await http.get(`/api/ordenes-compra/${b.id}`).expect(200)).body
+        .renglones[0];
+
+      await http
+        .patch(`/api/ordenes-compra/${a.id}/precios`)
+        .send({ precios: [{ renglonId: renglonDeB.id, precioUnitario: 99 }] })
+        .expect(400);
+      const bDespues = (await http.get(`/api/ordenes-compra/${b.id}`).expect(200)).body;
+      expect(bDespues.renglones[0].precioUnitario).toBeNull();
+    });
+
+    it('en una anulada no se corrigen precios', async () => {
+      const o = await orden([{ materialId: await material(), cantidad: 1 }]);
+      await http.patch(`/api/ordenes-compra/${o.id}/anular`).expect(200);
+      const renglon = (await http.get(`/api/ordenes-compra/${o.id}`).expect(200)).body.renglones[0];
+      await http
+        .patch(`/api/ordenes-compra/${o.id}/precios`)
+        .send({ precios: [{ renglonId: renglon.id, precioUnitario: 10 }] })
+        .expect(400);
+    });
+  });
+
   describe('lo que se puede cargar', () => {
     it('REGRESION: no se compra un material desactivado', async () => {
       const m = await material();

@@ -69,6 +69,7 @@ function armar(orden: any = ordenBase) {
       estado: EstadoOrdenCompra.EMITIDA,
     })),
     listarEnvios: jest.fn<Promise<any>, any[]>(async () => []),
+    actualizarPrecios: jest.fn<Promise<any>, any[]>(async () => orden),
   };
   const proveedores = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'prov-1' })) };
   const materiales = {

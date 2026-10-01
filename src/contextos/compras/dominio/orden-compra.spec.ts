@@ -8,6 +8,8 @@ import {
   validarEliminable,
   validarQueQuedanRenglones,
   validarQueSePuedeEmitir,
+  validarPreciosCorregibles,
+  validarPreciosCorregidos,
   validarTransicion,
 } from './orden-compra';
 
@@ -19,6 +21,40 @@ import {
  */
 describe('Compras - dominio', () => {
   const orden = (estado: EstadoOrdenCompra) => ({ numero: 'OC-2026-0001', estado });
+
+  describe('corregir precios de una orden que ya salio', () => {
+    it.each(['BORRADOR', 'EMITIDA', 'RECIBIDA'] as const)('en %s se puede', (estado) => {
+      expect(() => validarPreciosCorregibles(orden(estado))).not.toThrow();
+    });
+
+    it('en una ANULADA no', () => {
+      expect(() => validarPreciosCorregibles(orden('ANULADA'))).toThrow(ErrorEstadoDeLaOrden);
+    });
+
+    const renglones = [{ id: 'r1' }, { id: 'r2' }];
+
+    it('acepta precios de renglones de la orden', () => {
+      expect(() =>
+        validarPreciosCorregidos(renglones, [{ renglonId: 'r2', precioUnitario: 1500 }]),
+      ).not.toThrow();
+    });
+
+    it.each([
+      ['sin precios', []],
+      ['un renglon de otra orden', [{ renglonId: 'otro', precioUnitario: 10 }]],
+      [
+        'el mismo renglon dos veces',
+        [
+          { renglonId: 'r1', precioUnitario: 10 },
+          { renglonId: 'r1', precioUnitario: 20 },
+        ],
+      ],
+      ['precio cero', [{ renglonId: 'r1', precioUnitario: 0 }]],
+      ['precio negativo', [{ renglonId: 'r1', precioUnitario: -5 }]],
+    ])('rechaza %s', (_caso, precios) => {
+      expect(() => validarPreciosCorregidos(renglones, precios)).toThrow(ErrorDatosInvalidos);
+    });
+  });
 
   describe('el ciclo de vida', () => {
     it.each([
