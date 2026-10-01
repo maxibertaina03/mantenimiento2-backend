@@ -5,9 +5,11 @@ import {
   CierreDeTrabajo,
   crearOrdenTrabajo,
   DatosNuevaOrdenTrabajo,
+  Ejecutor,
   OrdenTrabajo,
   reabrirOrdenTrabajo,
   reasignarOrdenTrabajo,
+  validarEjecutor,
   validarElEquipo,
   validarQueEsSuyo,
   TipoTrabajo,
@@ -30,6 +32,12 @@ export interface CambiosOrdenTrabajo {
   tipo?: TipoTrabajo;
   equipoId?: string | null;
   equipoItId?: string | null;
+  /**
+   * Quién lo hace. Se puede decir antes de cerrar: el motor sale para el
+   * taller con la orden impresa, y el papel tiene que decir a qué taller va.
+   */
+  ejecutor?: Ejecutor;
+  proveedorId?: string | null;
 }
 
 /**
@@ -197,6 +205,16 @@ export class GestionarOrdenesTrabajo {
     if (cambios.tipo !== undefined) aGuardar.tipo = cambios.tipo;
     if (cambios.equipoId !== undefined) aGuardar.equipoId = cambios.equipoId;
     if (cambios.equipoItId !== undefined) aGuardar.equipoItId = cambios.equipoItId;
+
+    if (cambios.ejecutor !== undefined || cambios.proveedorId !== undefined) {
+      const ejecutor = cambios.ejecutor ?? orden.ejecutor;
+      const proveedorId =
+        cambios.proveedorId === undefined ? orden.proveedorId : cambios.proveedorId;
+      validarEjecutor(ejecutor, proveedorId);
+      aGuardar.ejecutor = ejecutor;
+      // Vuelve a fábrica: el proveedor de antes ya no corresponde.
+      aGuardar.proveedorId = ejecutor === 'EXTERNO' ? proveedorId : null;
+    }
 
     return this.repo.actualizar(id, aGuardar);
   }

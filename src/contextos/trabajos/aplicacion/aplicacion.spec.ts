@@ -200,6 +200,43 @@ describe('quitar un material', () => {
   });
 });
 
+describe('mandar el trabajo a un taller antes de cerrarlo', () => {
+  it('una orden abierta guarda a que proveedor se manda, y el cierre lo conserva', async () => {
+    const { gestionar } = armar();
+    const orden = await gestionar.crear(NUEVA);
+
+    const enviada = await gestionar.editar(
+      orden.id,
+      { ejecutor: 'EXTERNO', proveedorId: 'prov-1' },
+      'u1',
+    );
+    expect(enviada.ejecutor).toBe('EXTERNO');
+    expect(enviada.proveedorId).toBe('prov-1');
+
+    const cerrada = await gestionar.cerrar(orden.id, 'Rebobinado', 'u1');
+    expect(cerrada.ejecutor).toBe('EXTERNO');
+    expect(cerrada.proveedorId).toBe('prov-1');
+  });
+
+  it('REGRESION: externo sin proveedor se rechaza tambien al editar', async () => {
+    const { gestionar } = armar();
+    const orden = await gestionar.crear(NUEVA);
+    await expect(gestionar.editar(orden.id, { ejecutor: 'EXTERNO' }, 'u1')).rejects.toThrow(
+      /qué proveedor/,
+    );
+  });
+
+  it('si vuelve a hacerse en fabrica, se olvida el proveedor', async () => {
+    const { gestionar } = armar();
+    const orden = await gestionar.crear(NUEVA);
+    await gestionar.editar(orden.id, { ejecutor: 'EXTERNO', proveedorId: 'prov-1' }, 'u1');
+
+    const vuelta = await gestionar.editar(orden.id, { ejecutor: 'INTERNO' }, 'u1');
+    expect(vuelta.ejecutor).toBe('INTERNO');
+    expect(vuelta.proveedorId).toBeNull();
+  });
+});
+
 describe('cerrar, reabrir y anular', () => {
   it('cerrar guarda que se hizo y quien la cerro', async () => {
     const { gestionar } = armar();

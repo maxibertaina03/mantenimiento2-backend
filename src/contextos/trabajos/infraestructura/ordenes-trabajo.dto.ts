@@ -191,6 +191,19 @@ export class EditarOrdenTrabajoDto {
   @IsOptional()
   @IsUUID()
   equipoItId?: string | null;
+
+  @ApiPropertyOptional({
+    enum: EJECUTORES,
+    description: 'Quién lo hace. Se puede decir antes de cerrar, al mandarlo a un taller.',
+  })
+  @IsOptional()
+  @IsIn(EJECUTORES)
+  ejecutor?: Ejecutor;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'A qué proveedor se manda, si es externo.' })
+  @IsOptional()
+  @IsUUID()
+  proveedorId?: string | null;
 }
 
 export class CerrarOrdenTrabajoDto {
