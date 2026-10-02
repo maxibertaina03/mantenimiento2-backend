@@ -337,11 +337,73 @@ describe('lo que hay que hacer hoy', () => {
     expect(mias.map((t) => t.titulo).sort()).toEqual(['De hoy', 'Quedo pendiente']);
   });
 
+  it('tambien trae las que no son de nadie, que las puede hacer cualquiera; las de otro no', async () => {
+    const { gestionar, calendario } = armar();
+    await gestionar.crear({ titulo: 'Mia', fecha: HOY, asignadoAId: 'u1' });
+    await gestionar.crear({ titulo: 'Sin responsable', fecha: dia('2026-09-20') });
+    await gestionar.crear({ titulo: 'De otro', fecha: HOY, asignadoAId: 'u2' });
+
+    const deHoy = await calendario.deHoy('u1');
+
+    expect(deHoy.map((t) => t.titulo).sort()).toEqual(['Mia', 'Sin responsable']);
+  });
+
   it('las hechas no vuelven a aparecer', async () => {
     const { gestionar, calendario } = armar();
     const tarea = await gestionar.crear({ titulo: 'De hoy', fecha: HOY, asignadoAId: 'u1' });
     await gestionar.completar(tarea.id, { resolucion: 'Listo' }, 'u1');
 
     expect(await calendario.deHoy('u1')).toHaveLength(0);
+  });
+});
+
+describe('dar por hecho un service desde la pantalla de servicios', () => {
+  const PURGA = {
+    planId: 'plan-1',
+    equipoId: 'eq-7',
+    nombre: 'Purga de agua',
+    // Vencida hace mas de 30 dias: el calendario ya no la genera solo.
+    fecha: dia('2026-08-01'),
+  };
+
+  it('trae la tarea del vencimiento actual, creandola si el calendario no la habia generado', async () => {
+    const { calendario } = armar([PURGA]);
+
+    const tarea = await calendario.tareaDelPlan('plan-1');
+
+    expect(tarea.planId).toBe('plan-1');
+    expect(tarea.fecha).toEqual(dia('2026-08-01'));
+    expect(tarea.estado).toBe('PENDIENTE');
+    expect(tarea.asignadoAId).toBeNull();
+  });
+
+  it('REGRESION: pedirla dos veces no la duplica: es la misma del calendario', async () => {
+    const { calendario, tareas } = armar([{ ...PURGA, fecha: HOY }]);
+    // La que ya genero el calendario al abrirse.
+    const delCalendario = (await calendario.entre(HOY, HOY)).tareas[0];
+
+    const primera = await calendario.tareaDelPlan('plan-1');
+    const segunda = await calendario.tareaDelPlan('plan-1');
+
+    expect(primera.id).toBe(delCalendario.id);
+    expect(segunda.id).toBe(delCalendario.id);
+    expect(await tareas.listarEntre(HOY, HOY, { planId: 'plan-1' })).toHaveLength(1);
+  });
+
+  it('completarla es lo mismo que desde el calendario: queda hecha, con su orden, y el plan corre', async () => {
+    const { calendario, gestionar, planes } = armar([PURGA]);
+    const tarea = await calendario.tareaDelPlan('plan-1');
+
+    const hecha = await gestionar.completar(tarea.id, { resolucion: 'Purgado' }, 'u2');
+
+    expect(hecha.estado).toBe('HECHA');
+    expect(hecha.asignadoAId).toBe('u2');
+    expect(hecha.ordenTrabajoId).not.toBeNull();
+    expect(planes.avisos).toEqual([{ planId: 'plan-1', fecha: dia('2026-08-01') }]);
+  });
+
+  it('un plan que ya no esta vigente no inventa una tarea', async () => {
+    const { calendario } = armar([]);
+    await expect(calendario.tareaDelPlan('plan-1')).rejects.toThrow(/ya no está vigente/);
   });
 });

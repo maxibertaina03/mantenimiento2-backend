@@ -57,7 +57,13 @@ export class RepositorioTareasEnMemoria implements RepositorioTareas {
   async listarEntre(desde: Date, hasta: Date, filtro: FiltroTareas): Promise<TareaConRelaciones[]> {
     return this.tareas
       .filter((t) => t.fecha >= desde && t.fecha <= hasta)
-      .filter((t) => !filtro.asignadoAId || t.asignadoAId === filtro.asignadoAId)
+      .filter(
+        (t) =>
+          !filtro.asignadoAId ||
+          t.asignadoAId === filtro.asignadoAId ||
+          (filtro.oSinAsignar === true && t.asignadoAId === null),
+      )
+      .filter((t) => !filtro.planId || t.planId === filtro.planId)
       .filter((t) => !filtro.equipoId || t.equipoId === filtro.equipoId)
       .filter((t) => !filtro.soloPendientes || t.estado === 'PENDIENTE')
       .sort((a, b) => a.fecha.getTime() - b.fecha.getTime());

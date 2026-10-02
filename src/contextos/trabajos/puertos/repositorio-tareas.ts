@@ -18,6 +18,12 @@ export interface RutinaConRelaciones extends Rutina {
 
 export interface FiltroTareas {
   asignadoAId?: string;
+  /**
+   * Con `asignadoAId`: también las que no son de nadie. Una sin responsable la
+   * puede hacer cualquiera de mantenimiento, así que es de todos.
+   */
+  oSinAsignar?: boolean;
+  planId?: string;
   equipoId?: string;
   equipoItId?: string;
   /** Por defecto vienen todas; sirve para ver solo lo que falta hacer. */

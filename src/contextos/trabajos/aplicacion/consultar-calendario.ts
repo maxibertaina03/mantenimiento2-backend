@@ -1,3 +1,4 @@
+import { ErrorNoEncontrado } from '../dominio/errores';
 import { crearTarea, ocurrenciasDeRutina, soloElDia } from '../dominio/tarea';
 import { PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import { FiltroTareas, RepositorioTareas, TareaConRelaciones } from '../puertos/repositorio-tareas';
@@ -48,7 +49,10 @@ export class ConsultarCalendario {
     return { desde: inicio, hasta: fin, tareas: await this.repo.listarEntre(inicio, fin, filtro) };
   }
 
-  /** Lo que tiene que hacer una persona hoy, para la pantalla de inicio. */
+  /**
+   * Lo que tiene que hacer una persona hoy, para la pantalla de inicio: lo
+   * suyo y lo que no es de nadie, que lo puede hacer cualquiera.
+   */
   async deHoy(asignadoAId: string): Promise<TareaConRelaciones[]> {
     const hoy = soloElDia(this.reloj.ahora());
     // Se mira desde bastante atrás: lo que venció y no se hizo sigue habiendo
@@ -56,7 +60,50 @@ export class ConsultarCalendario {
     const desde = new Date(hoy.getTime() - 30 * UN_DIA_MS);
     await this.generar(desde, hoy);
 
-    return this.repo.listarEntre(desde, hoy, { asignadoAId, soloPendientes: true });
+    return this.repo.listarEntre(desde, hoy, {
+      asignadoAId,
+      oSinAsignar: true,
+      soloPendientes: true,
+    });
+  }
+
+  /**
+   * La tarea del calendario que corresponde al vencimiento actual de un plan.
+   *
+   * Es lo que permite dar un service por hecho desde la pantalla de servicios
+   * sin un camino aparte: se completa esta tarea, igual que desde el
+   * calendario, y el calendario, la orden de trabajo y la próxima fecha del
+   * plan quedan contando lo mismo.
+   *
+   * Si la tarea todavía no existe —el calendario solo genera un tramo, y un
+   * service muy vencido o muy lejano puede quedar afuera— se crea acá, para esa
+   * misma fecha.
+   */
+  async tareaDelPlan(planId: string): Promise<TareaConRelaciones> {
+    const hoy = soloElDia(this.reloj.ahora());
+    const vencimiento = (
+      await this.planes.vencimientosEntre(new Date(0), new Date(hoy.getTime() + 400 * UN_DIA_MS))
+    ).find((v) => v.planId === planId);
+    if (!vencimiento) {
+      throw new ErrorNoEncontrado(
+        'Ese service ya no está vigente: el plan se desactivó o el equipo está fuera de servicio.',
+      );
+    }
+
+    const dia = soloElDia(vencimiento.fecha);
+    await this.repo.crearSiNoExiste(
+      crearTarea({
+        titulo: vencimiento.nombre,
+        descripcion: vencimiento.tareas,
+        fecha: dia,
+        equipoId: vencimiento.equipoId,
+        planId,
+      }),
+    );
+
+    const [tarea] = await this.repo.listarEntre(dia, dia, { planId });
+    if (!tarea) throw new ErrorNoEncontrado('No se encontró la tarea de ese service.');
+    return tarea;
   }
 
   /**

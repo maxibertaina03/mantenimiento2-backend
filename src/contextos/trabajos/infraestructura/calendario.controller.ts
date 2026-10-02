@@ -107,6 +107,19 @@ export class CalendarioController {
     return this.consultar.deHoy(usuario.id);
   }
 
+  /**
+   * La tarea del calendario del vencimiento actual de un plan, creándola si
+   * hace falta. Es un POST porque puede crearla.
+   */
+  @Permisos(PERMISOS.TAREAS_VER)
+  @Post('planes/:planId/tarea')
+  @ApiOperation({
+    summary: 'La tarea del calendario que corresponde al service vigente de un plan',
+  })
+  tareaDelPlan(@Param('planId', ParseUUIDPipe) planId: string) {
+    return this.consultar.tareaDelPlan(planId);
+  }
+
   @Permisos(PERMISOS.TAREAS_VER)
   @Get('rutinas')
   @ApiOperation({ summary: 'Las tareas que se repiten' })

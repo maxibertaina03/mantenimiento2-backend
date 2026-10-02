@@ -136,7 +136,12 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
     const filas = await this.prisma.tareaProgramada.findMany({
       where: {
         fecha: { gte: desde, lte: hasta },
-        ...(filtro.asignadoAId ? { asignadoAId: filtro.asignadoAId } : {}),
+        ...(filtro.asignadoAId && filtro.oSinAsignar
+          ? { OR: [{ asignadoAId: filtro.asignadoAId }, { asignadoAId: null }] }
+          : filtro.asignadoAId
+            ? { asignadoAId: filtro.asignadoAId }
+            : {}),
+        ...(filtro.planId ? { planId: filtro.planId } : {}),
         ...(filtro.equipoId ? { equipoId: filtro.equipoId } : {}),
         ...(filtro.equipoItId ? { equipoItId: filtro.equipoItId } : {}),
         ...(filtro.soloPendientes ? { estado: 'PENDIENTE' } : {}),
