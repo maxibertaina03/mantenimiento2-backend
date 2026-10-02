@@ -43,6 +43,8 @@ export function crearPrismaEnMemoria() {
     manuales: [] as any[],
     // Tramos de equipos montados dentro de otros (la bomba en la desnatadora).
     montajes: [] as any[],
+    // Los materiales del pañol que lleva cada equipo (sus repuestos).
+    repuestos: [] as any[],
     // Las ordenes de trabajo y lo que se uso en cada una. Hasta que hizo falta
     // probar el historial de una maquina con sus componentes, ningun e2e las
     // creaba.
@@ -748,6 +750,90 @@ export function crearPrismaEnMemoria() {
       registradoPorId: null,
       creadoEn: new Date(),
     })),
+    // Propio y no el genérico: la lista lee del material y del equipo con
+    // select anidado, ordena por el nombre de la relación y usa la clave única
+    // compuesta (equipo, material). El genérico no hace ninguna de las tres.
+    repuestoEquipo: (() => {
+      const conRelaciones = (r: any, include: any) => {
+        const salida: any = { ...r };
+        if (include?.material) {
+          const m = db.materiales.find((x) => x.id === r.materialId);
+          const u = m ? db.unidadesMedida.find((x) => x.id === m.unidadId) : null;
+          salida.material = {
+            nombre: m?.nombre,
+            stockActual: m?.stockActual ?? 0,
+            stockMinimo: m?.stockMinimo ?? 0,
+            activo: m?.activo ?? true,
+            fila: m?.fila ?? null,
+            unidad: u ? { simbolo: u.simbolo } : null,
+            estanteria: null,
+          };
+        }
+        if (include?.equipo) {
+          const e = db.equipos.find((x) => x.id === r.equipoId);
+          const ub = e ? db.ubicacionesEquipo.find((x) => x.id === e.ubicacionId) : null;
+          salida.equipo = {
+            id: e?.id,
+            nombre: e?.nombre,
+            estado: e?.estado ?? 'OPERATIVO',
+            fotoUrl: e?.fotoUrl ?? null,
+            ubicacion: ub ? { nombre: ub.nombre } : null,
+          };
+        }
+        return salida;
+      };
+      const buscar = (where: any) =>
+        where.equipoId_materialId
+          ? db.repuestos.find(
+              (r) =>
+                r.equipoId === where.equipoId_materialId.equipoId &&
+                r.materialId === where.equipoId_materialId.materialId,
+            )
+          : db.repuestos.find((r) => r.id === where.id);
+      return {
+        findMany: async ({ where = {}, include, orderBy }: any = {}) => {
+          const filas = db.repuestos
+            .filter((r) => Object.entries(where).every(([k, v]) => r[k] === v))
+            .map((r) => conRelaciones(r, { material: true, equipo: true, ...include }));
+          const porEquipo = orderBy?.equipo;
+          filas.sort((a: any, b: any) =>
+            String(porEquipo ? a.equipo.nombre : a.material.nombre).localeCompare(
+              String(porEquipo ? b.equipo.nombre : b.material.nombre),
+            ),
+          );
+          return filas.map((f: any) => {
+            if (!include?.material) delete f.material;
+            if (!include?.equipo) delete f.equipo;
+            return f;
+          });
+        },
+        findUnique: async ({ where }: any) => buscar(where) ?? null,
+        create: async ({ data }: any) => {
+          if (buscar({ equipoId_materialId: data })) throw new Error('Unique constraint');
+          const fila = {
+            id: nuevoId(),
+            cantidad: null,
+            notas: null,
+            registradoPorId: null,
+            creadoEn: new Date(),
+            ...data,
+          };
+          db.repuestos.push(fila);
+          return fila;
+        },
+        update: async ({ where, data }: any) => {
+          const fila = buscar(where);
+          if (!fila) throw new Error('No encontrado');
+          Object.assign(fila, data);
+          return fila;
+        },
+        delete: async ({ where }: any) => {
+          const i = db.repuestos.findIndex((r) => r.id === where.id);
+          if (i < 0) throw new Error('No encontrado');
+          return db.repuestos.splice(i, 1)[0];
+        },
+      };
+    })(),
     manualEquipo: delegate(db.manuales, () => ({
       subidoPorId: null,
       subidoEn: new Date(),

@@ -242,6 +242,7 @@ model Material {
   usosEnTrabajos   MaterialUsadoTrabajo[]
   movimientos      MovimientoStock[]
   renglonesOrdenes RenglonOrdenCompra[]
+  usadoEnEquipos   RepuestoEquipo[]
 
   @@index([categoriaId])
   @@index([unidadId])
@@ -351,6 +352,7 @@ model Usuario {
   vistasDeCredencial     VistaCredencial[]    @relation("VistasDeCredencial")
   manualesSubidos        ManualEquipo[]       @relation("ManualesSubidos")
   montajesRegistrados    MontajeEquipo[]      @relation("MontajesRegistrados")
+  repuestosRegistrados   RepuestoEquipo[]     @relation("RepuestosRegistrados")
 
   @@map("usuarios")
 }
@@ -816,12 +818,12 @@ model ModeloEquipo {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  marca     MarcaEquipo @relation(fields: [marcaId], references: [id], onDelete: Cascade)
-  equipos   Equipo[]
+  marca   MarcaEquipo @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  equipos Equipo[]
 
   /// Los renglones de compra que piden un equipo de este modelo.
   renglonesCompra RenglonOrdenCompra[]
-  equiposIt EquipoIT[]
+  equiposIt       EquipoIT[]
 
   @@unique([marcaId, nombre])
   @@index([marcaId])
@@ -908,10 +910,11 @@ model Equipo {
   rutinas        RutinaTarea[]
   manuales       ManualEquipo[]
 
-  equipoPadre         Equipo?         @relation("ComponentesDeEquipo", fields: [equipoPadreId], references: [id], onDelete: SetNull)
-  componentes         Equipo[]        @relation("ComponentesDeEquipo")
-  montajesComoPieza   MontajeEquipo[] @relation("MontajesComoPieza")
-  montajesComoMaquina MontajeEquipo[] @relation("MontajesComoMaquina")
+  equipoPadre         Equipo?          @relation("ComponentesDeEquipo", fields: [equipoPadreId], references: [id], onDelete: SetNull)
+  componentes         Equipo[]         @relation("ComponentesDeEquipo")
+  montajesComoPieza   MontajeEquipo[]  @relation("MontajesComoPieza")
+  montajesComoMaquina MontajeEquipo[]  @relation("MontajesComoMaquina")
+  repuestos           RepuestoEquipo[]
 
   @@index([ubicacionId])
   @@index([equipoPadreId])
@@ -947,6 +950,41 @@ model MontajeEquipo {
   @@index([componenteId])
   @@index([equipoPadreId])
   @@map("montajes_equipo")
+}
+
+/// Un material del pañol que lleva un equipo: el retén de la bomba, el
+/// rodamiento del motor, la correa del ventilador.
+///
+/// Es la lista de repuestos de la máquina. Cuando se rompe, se sabe qué ir a
+/// buscar al pañol y si hay, sin revolver el historial. Un equipo lleva muchos
+/// materiales y un material va en muchos equipos: el mismo retén sirve para
+/// tres bombas.
+///
+/// No mueve stock: dice qué lleva la máquina, no qué se usó. Lo que se usó
+/// sigue saliendo por las órdenes de trabajo.
+model RepuestoEquipo {
+  id         String @id @default(uuid())
+  equipoId   String
+  materialId String
+
+  /// Cuántos lleva la máquina (dos rodamientos, un retén). Opcional: a veces
+  /// solo importa saber cuál es.
+  cantidad Decimal? @db.Decimal(14, 3)
+
+  /// Para distinguir dos del mismo tipo: «lado motor», «el de la tapa».
+  notas String?
+
+  registradoPorId String?
+  creadoEn        DateTime @default(now())
+
+  equipo        Equipo   @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  material      Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  registradoPor Usuario? @relation("RepuestosRegistrados", fields: [registradoPorId], references: [id], onDelete: SetNull)
+
+  /// Un material va una sola vez en la lista de un equipo; cuántos, lo dice la cantidad.
+  @@unique([equipoId, materialId])
+  @@index([materialId])
+  @@map("repuestos_equipo")
 }
 
 /// El manual de un equipo o una herramienta, en PDF.
