@@ -165,6 +165,25 @@ export function completarTarea(
   };
 }
 
+/**
+ * La tarea de un plan cuyo trabajo se registró por otro camino (la ficha del
+ * equipo, una orden cerrada a mano). No se mira de quién es: el trabajo ya está
+ * hecho y registrado, y dejarla pendiente sería mentir en el calendario. Si
+ * tenía responsable lo conserva; si no, queda a nombre de quien cerró la orden.
+ */
+export function cerrarPorTrabajoRegistrado(
+  tarea: Tarea,
+  ordenTrabajoId: string,
+  hechaPorId: string | null,
+): Pick<Tarea, 'estado' | 'asignadoAId' | 'ordenTrabajoId'> {
+  validarQueEstaPendiente(tarea, 'darla por hecha');
+  return {
+    estado: 'HECHA',
+    asignadoAId: tarea.asignadoAId ?? hechaPorId,
+    ordenTrabajoId,
+  };
+}
+
 export function cancelarTarea(tarea: Tarea): Pick<Tarea, 'estado'> {
   validarQueEstaPendiente(tarea, 'cancelar');
   return { estado: 'CANCELADA' };

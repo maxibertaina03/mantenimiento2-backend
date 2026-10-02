@@ -64,6 +64,7 @@ export class RepositorioTareasEnMemoria implements RepositorioTareas {
           (filtro.oSinAsignar === true && t.asignadoAId === null),
       )
       .filter((t) => !filtro.planId || t.planId === filtro.planId)
+      .filter((t) => !filtro.ordenTrabajoId || t.ordenTrabajoId === filtro.ordenTrabajoId)
       .filter((t) => !filtro.equipoId || t.equipoId === filtro.equipoId)
       .filter((t) => !filtro.soloPendientes || t.estado === 'PENDIENTE')
       .sort((a, b) => a.fecha.getTime() - b.fecha.getTime());

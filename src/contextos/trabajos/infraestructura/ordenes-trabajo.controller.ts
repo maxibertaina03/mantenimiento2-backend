@@ -21,6 +21,7 @@ import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.de
 import { PERMISOS } from '../../../common/auth/permisos';
 import { PermisosService } from '../../../common/auth/permisos.service';
 import { ConsultarOrdenesTrabajo } from '../aplicacion/consultar-ordenes-trabajo';
+import { CerrarTareaDelPlan } from '../aplicacion/cerrar-tarea-del-plan';
 import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo';
 import { RegistrarTrabajoHecho } from '../aplicacion/registrar-trabajo-hecho';
 import { UsarMateriales } from '../aplicacion/usar-materiales';
@@ -33,6 +34,7 @@ import {
   RepositorioOrdenesTrabajo,
 } from '../puertos/repositorio-ordenes-trabajo';
 import { RELOJ_TRABAJOS, Reloj } from '../puertos/reloj';
+import { REPOSITORIO_TAREAS, RepositorioTareas } from '../puertos/repositorio-tareas';
 import { STOCK, Stock } from '../puertos/stock';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import {
@@ -62,6 +64,7 @@ export class OrdenesTrabajoController {
   private readonly materiales: UsarMateriales;
   private readonly consultar: ConsultarOrdenesTrabajo;
   private readonly registrarHecho: RegistrarTrabajoHecho;
+  private readonly cerrarTareaDelPlan: CerrarTareaDelPlan;
 
   constructor(
     @Inject(REPOSITORIO_ORDENES_TRABAJO) repo: RepositorioOrdenesTrabajo,
@@ -72,11 +75,13 @@ export class OrdenesTrabajoController {
     @Inject(STOCK) stock: Stock,
     @Inject(RELOJ_TRABAJOS) reloj: Reloj,
     private readonly permisos: PermisosService,
+    @Inject(REPOSITORIO_TAREAS) tareas: RepositorioTareas,
   ) {
     this.gestionar = new GestionarOrdenesTrabajo(repo, equipos, equiposIt, usuarios, planes, reloj);
     this.materiales = new UsarMateriales(repo, stock);
     this.consultar = new ConsultarOrdenesTrabajo(repo, equipos);
     this.registrarHecho = new RegistrarTrabajoHecho(this.gestionar, this.materiales);
+    this.cerrarTareaDelPlan = new CerrarTareaDelPlan(tareas);
   }
 
   /**
@@ -180,7 +185,7 @@ export class OrdenesTrabajoController {
     // Un solo endpoint para los dos caminos: abrir una orden, o registrar de
     // una un trabajo que ya se hizo con lo que se usó. Lo que los distingue es
     // si viene la resolución, no una ruta aparte.
-    return this.registrarHecho.ejecutar(
+    const orden = await this.registrarHecho.ejecutar(
       {
         titulo: dto.titulo,
         descripcion: dto.descripcion,
@@ -200,6 +205,10 @@ export class OrdenesTrabajoController {
       },
       usuario?.id ?? null,
     );
+    // Un trabajo de un plan registrado desde la ficha del equipo: la tarea del
+    // calendario de ese service queda hecha, en vez de quedar vencida.
+    await this.cerrarTareaDelPlan.ejecutar(orden);
+    return orden;
   }
 
   @Permisos(PERMISOS.TRABAJOS_EDITAR)
@@ -244,17 +253,20 @@ export class OrdenesTrabajoController {
   @Permisos(PERMISOS.TRABAJOS_EDITAR)
   @Post(':id/cerrar')
   @ApiOperation({ summary: 'Cerrar la orden contando qué se hizo' })
-  cerrar(
+  async cerrar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CerrarOrdenTrabajoDto,
     @UsuarioActual() usuario?: Usuario,
   ) {
-    return this.gestionar.cerrar(id, dto.resolucion, usuario?.id ?? null, {
+    const cerrada = await this.gestionar.cerrar(id, dto.resolucion, usuario?.id ?? null, {
       ejecutor: dto.ejecutor,
       proveedorId: dto.proveedorId,
       costoManoObra: dto.costoManoObra,
       horasParada: dto.horasParada,
     });
+    // Si responde a un plan, la tarea del calendario de ese service queda hecha.
+    await this.cerrarTareaDelPlan.ejecutar(cerrada);
+    return cerrada;
   }
 
   @Permisos(PERMISOS.TRABAJOS_EDITAR)

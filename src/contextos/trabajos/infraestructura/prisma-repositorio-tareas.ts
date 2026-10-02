@@ -142,6 +142,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
             ? { asignadoAId: filtro.asignadoAId }
             : {}),
         ...(filtro.planId ? { planId: filtro.planId } : {}),
+        ...(filtro.ordenTrabajoId ? { ordenTrabajoId: filtro.ordenTrabajoId } : {}),
         ...(filtro.equipoId ? { equipoId: filtro.equipoId } : {}),
         ...(filtro.equipoItId ? { equipoItId: filtro.equipoItId } : {}),
         ...(filtro.soloPendientes ? { estado: 'PENDIENTE' } : {}),

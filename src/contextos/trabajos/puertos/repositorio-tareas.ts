@@ -24,6 +24,8 @@ export interface FiltroTareas {
    */
   oSinAsignar?: boolean;
   planId?: string;
+  /** La tarea que explica esa orden de trabajo, si hay una. */
+  ordenTrabajoId?: string;
   equipoId?: string;
   equipoItId?: string;
   /** Por defecto vienen todas; sirve para ver solo lo que falta hacer. */
