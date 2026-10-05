@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
+import { reportarError } from '../monitoreo/monitoreo';
 
 /**
  * Filtro global de excepciones.
@@ -57,6 +58,8 @@ export class FiltroExcepcionesHttp implements ExceptionFilter {
         `${request.method} ${request.url} -> ${statusCode}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+      // Y aviso a Sentry, si está configurado (SENTRY_DSN en Render).
+      reportarError(exception, { metodo: request.method, ruta: request.url, estado: statusCode });
     }
 
     response.status(statusCode).json({

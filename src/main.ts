@@ -5,6 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { FiltroExcepcionesHttp } from './common/filters/http-exception.filter';
+import { iniciarMonitoreo } from './common/monitoreo/monitoreo';
 import { exigirBaseCorrecta } from './common/prisma/guardia-base';
 
 async function bootstrap() {
@@ -12,6 +13,9 @@ async function bootstrap() {
   // entorno declarado, acá se corta. Después de `NestFactory.create` ya habría
   // una conexión abierta contra la base equivocada.
   exigirBaseCorrecta();
+
+  // Aviso de errores del servidor. Sin SENTRY_DSN no hace nada.
+  iniciarMonitoreo();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
