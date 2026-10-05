@@ -1,0 +1,57 @@
+# Integración continua: antes de que algo llegue a producción, se compila, se
+# revisa y se corren todos los tests.
+#
+# Render despliega solo cuando main recibe un push. Con «Auto-Deploy: After CI
+# Checks Pass» en Render, un push que rompe los tests no se publica.
+#
+# No usa ninguna base ni ningún secreto: los e2e corren contra un Prisma en
+# memoria (test/prisma-en-memoria.ts) y su entorno está en test/setup-e2e.ts.
+# Nunca toca producción.
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar el cliente de Prisma
+        run: npx prisma generate
+
+      - name: Validar el esquema
+        run: npx prisma validate
+        env:
+          DATABASE_URL: postgresql://ci/ci
+          DIRECT_URL: postgresql://ci/ci
+
+      - name: Revisar el código (lint)
+        # Sin --fix: en CI se revisa, no se corrige. Las advertencias no cortan.
+        run: npx eslint "{src,prisma,test}/**/*.ts"
+
+      - name: Compilar
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Tests unitarios
+        run: npx jest --ci
+
+      - name: Tests de punta a punta
+        run: npx jest --ci --config ./test/jest-e2e.js
