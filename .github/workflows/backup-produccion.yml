@@ -1,0 +1,129 @@
+# Backup diario de la base de producción, cifrado, a Google Drive.
+#
+# Ya se perdió la base una vez y los movimientos no se recuperaron
+# (docs/base-de-prueba.md). Este es el respaldo propio, fuera de Supabase.
+#
+# - De producción SOLO LEE: pg_dump abre una transacción de solo lectura.
+# - El archivo se cifra ACÁ, antes de salir de GitHub (gpg AES256 con la frase
+#   del secreto CLAVE_BACKUP): a Drive llega cifrado. Sin la frase no se abre.
+# - No se guarda nada en GitHub. El repo es PÚBLICO: los logs también lo son,
+#   por eso no se imprime ninguna dirección ni dato; GitHub tapa los secretos.
+# - Las credenciales del baúl de contraseñas van cifradas en la base, y su
+#   clave (CLAVE_SECRETOS) vive solo en Render: el backup no la lleva.
+#
+# Retención: los diarios de los últimos 30 días, y uno por mes para siempre
+# (el del día 1).
+#
+# Secretos que tiene que cargar el dueño del repo (Settings → Secrets → Actions):
+#   DIRECT_URL_PRODUCCION  la DIRECT_URL de .env.produccion (puerto 5432)
+#   CLAVE_BACKUP           una frase larga; guardala también en papel
+#   RCLONE_CONFIG          el contenido de rclone.conf con el remoto «drive»
+# Guía paso a paso: docs/backups.md
+name: Backup de producción
+
+on:
+  schedule:
+    # 03:00 en Argentina (UTC-3). GitHub interpreta el cron en UTC.
+    - cron: '0 6 * * *'
+  # Para correrlo a mano desde la pestaña Actions.
+  workflow_dispatch:
+
+concurrency:
+  group: backup-produccion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CARPETA: 'Backups Mantenimiento'
+    steps:
+      - name: Comprobar que estén los secretos
+        env:
+          DIRECT_URL_PRODUCCION: ${{ secrets.DIRECT_URL_PRODUCCION }}
+          CLAVE_BACKUP: ${{ secrets.CLAVE_BACKUP }}
+          RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          faltan=""
+          [ -z "$DIRECT_URL_PRODUCCION" ] && faltan="$faltan DIRECT_URL_PRODUCCION"
+          [ -z "$CLAVE_BACKUP" ] && faltan="$faltan CLAVE_BACKUP"
+          [ -z "$RCLONE_CONFIG" ] && faltan="$faltan RCLONE_CONFIG"
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan secretos del repo:$faltan. Ver docs/backups.md."
+            exit 1
+          fi
+          if [ ${#CLAVE_BACKUP} -lt 16 ]; then
+            echo "::error::CLAVE_BACKUP es muy corta: usá una frase de 16 caracteres o más."
+            exit 1
+          fi
+
+      - name: Instalar pg_dump 17 y rclone
+        # El pg_dump tiene que ser de la misma versión que producción o más
+        # nueva (Supabase: Postgres 17). El de Ubuntu es más viejo.
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17 rclone > /dev/null
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Copiar la base (solo lectura)
+        env:
+          DIRECT_URL_PRODUCCION: ${{ secrets.DIRECT_URL_PRODUCCION }}
+        run: |
+          set -euo pipefail
+          # --schema=public: lo demás son los esquemas internos de Supabase.
+          # --no-owner/--no-privileges: los roles de Supabase no existen al restaurar.
+          /usr/lib/postgresql/17/bin/pg_dump "$DIRECT_URL_PRODUCCION" \
+            --format=custom --no-owner --no-privileges --schema=public \
+            --file=backup.dump
+
+      - name: Revisar que el backup sirva
+        # Un backup que no se puede leer es peor que ninguno: parece que hay.
+        run: |
+          set -euo pipefail
+          tablas=$(/usr/lib/postgresql/17/bin/pg_restore --list backup.dump | grep -c ' TABLE DATA public ' || true)
+          tamano=$(stat -c %s backup.dump)
+          echo "Tablas con datos: $tablas · tamaño: $tamano bytes"
+          if [ "$tablas" -lt 30 ] || [ "$tamano" -lt 100000 ]; then
+            echo "::error::El backup salió demasiado chico ($tablas tablas, $tamano bytes). No se sube."
+            exit 1
+          fi
+
+      - name: Cifrar
+        env:
+          CLAVE_BACKUP: ${{ secrets.CLAVE_BACKUP }}
+        run: |
+          set -euo pipefail
+          nombre="mantenimiento-$(date -u +%Y-%m-%d).dump.gpg"
+          # La frase entra por un descriptor y no por la línea de comandos.
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+            --passphrase-fd 3 --output "$nombre" backup.dump 3<<<"$CLAVE_BACKUP"
+          shred -u backup.dump
+          echo "NOMBRE=$nombre" >> "$GITHUB_ENV"
+
+      - name: Subir a Google Drive
+        env:
+          RCLONE_CONFIG_CONTENIDO: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/rclone
+          printf '%s\n' "$RCLONE_CONFIG_CONTENIDO" > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+
+          rclone copy "$NOMBRE" "drive:$CARPETA/diarios" --quiet
+          # El del día 1 se guarda además como mensual, y ese no se borra nunca.
+          if [ "$(date -u +%d)" = "01" ]; then
+            rclone copy "$NOMBRE" "drive:$CARPETA/mensuales" --quiet
+          fi
+          # Retención de los diarios: 30 días. Solo en la carpeta de diarios.
+          rclone delete "drive:$CARPETA/diarios" --min-age 30d --include '*.dump.gpg' --quiet
+
+          echo "Diarios en Drive:"
+          rclone lsf "drive:$CARPETA/diarios" | sort | tail -n 5
+          shred -u "$NOMBRE" ~/.config/rclone/rclone.conf
