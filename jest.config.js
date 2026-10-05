@@ -12,4 +12,6 @@ module.exports = {
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  // Entorno de juguete: sin esto, el test de arranque dependía del .env local.
+  setupFiles: ['<rootDir>/test/setup-unit.ts'],
 };
