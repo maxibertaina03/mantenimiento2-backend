@@ -34,6 +34,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.js",
+    "test:integracion": "jest --config ./test/integracion/jest-integracion.js",
     "test:all": "jest && jest --config ./test/jest-e2e.js"
   },
   "prisma": {

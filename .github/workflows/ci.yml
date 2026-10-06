@@ -4,8 +4,9 @@
 # Render despliega solo cuando main recibe un push. Con «Auto-Deploy: After CI
 # Checks Pass» en Render, un push que rompe los tests no se publica.
 #
-# No usa ninguna base ni ningún secreto: los e2e corren contra un Prisma en
-# memoria (test/prisma-en-memoria.ts) y su entorno está en test/setup-e2e.ts.
+# No usa ningún secreto ni ninguna base real: los e2e corren contra un Prisma
+# en memoria (test/prisma-en-memoria.ts), y los de integración contra un
+# Postgres vacío que GitHub levanta para esta corrida y después tira.
 # Nunca toca producción.
 name: CI
 
@@ -23,6 +24,22 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Un Postgres vacío solo para los tests de integración. Nace y muere con
+    # esta corrida; no tiene nada que ver con la base de producción.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mantenimiento_integracion
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -55,3 +72,10 @@ jobs:
 
       - name: Tests de punta a punta
         run: npx jest --ci --config ./test/jest-e2e.js
+
+      - name: Tests de integración (Postgres real, vacío)
+        # Aplica las migraciones a la base del servicio de arriba y prueba el
+        # calendario, los planes y los trabajos con consultas de verdad.
+        run: npx jest --ci --config ./test/integracion/jest-integracion.js
+        env:
+          INTEGRACION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mantenimiento_integracion
