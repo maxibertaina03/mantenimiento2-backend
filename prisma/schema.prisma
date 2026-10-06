@@ -1085,6 +1085,12 @@ model PlanMantenimiento {
   /// necesita un horómetro cargado y se deja para cuando haga falta.
   periodicidadDias Int
 
+  /// Los días que trabaja la planta para este plan: 0 domingo … 6 sábado.
+  /// Si la próxima fecha cae fuera de estos días, pasa al siguiente que sí.
+  /// Por defecto lunes a viernes: la planta no trabaja sábados ni domingos, y
+  /// una purga diaria no puede quedar para un sábado.
+  diasSemana Int[] @default([1, 2, 3, 4, 5])
+
   /// Cuándo toca la próxima vez. Se recalcula al registrar un trabajo del plan,
   /// y se puede corregir a mano: en la práctica un service se adelanta o se
   /// corre, y si el sistema no deja moverla la gente deja de usarlo.
@@ -1470,6 +1476,10 @@ model RutinaTarea {
   /// Cada cuántos días se repite. 1 es todos los días. Se cuenta en días
   /// enteros y no en meses, para que "cada 15" signifique siempre lo mismo.
   cadaDias Int
+
+  /// Los días en que sale la repetición: 0 domingo … 6 sábado. Por defecto
+  /// lunes a viernes, lo mismo que los planes.
+  diasSemana Int[] @default([1, 2, 3, 4, 5])
 
   desde DateTime
   /// Hasta cuándo. Sin esto, para siempre.

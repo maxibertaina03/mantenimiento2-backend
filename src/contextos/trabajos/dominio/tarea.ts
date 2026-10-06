@@ -1,5 +1,6 @@
 import { ErrorDatosInvalidos, ErrorNoEsSuyo, ErrorTransicionInvalida } from './errores';
 import { validarElEquipo } from './orden-trabajo';
+import { esDiaDeTrabajo, validarDiasSemana } from '../../../common/dominio/dias-de-trabajo';
 
 /**
  * Una tarea programada: algo que hay que hacer, con fecha y con dueño.
@@ -204,6 +205,8 @@ export interface Rutina {
   descripcion: string | null;
   /** Cada cuántos días se repite. 1 es todos los días. */
   cadaDias: number;
+  /** Los días en que sale: 0 domingo … 6 sábado. Por defecto, lunes a viernes. */
+  diasSemana: number[];
   desde: Date;
   /** Hasta cuándo. Sin esto, para siempre. */
   hasta: Date | null;
@@ -221,6 +224,8 @@ export interface DatosNuevaRutina {
   titulo: string;
   descripcion?: string | null;
   cadaDias: number;
+  /** Sin esto, lunes a viernes. */
+  diasSemana?: number[] | null;
   desde: Date;
   hasta?: Date | null;
   equipoId?: string | null;
@@ -253,6 +258,7 @@ export function crearRutina(datos: DatosNuevaRutina): Omit<Rutina, 'id' | 'cread
     titulo,
     descripcion: limpiar(datos.descripcion),
     cadaDias: datos.cadaDias,
+    diasSemana: validarDiasSemana(datos.diasSemana),
     desde,
     hasta,
     equipoId: datos.equipoId ?? null,
@@ -292,7 +298,11 @@ export function ocurrenciasDeRutina(rutina: Rutina, desde: Date, hasta: Date): D
     const cuando = base + i * rutina.cadaDias * UN_DIA_MS;
     if (cuando > fin.getTime()) break;
     if (rutina.hasta && cuando > rutina.hasta.getTime()) break;
-    if (cuando >= inicio.getTime()) fechas.push(new Date(cuando));
+    // Los días que la planta no trabaja no sale: la rutina diaria de lunes a
+    // viernes no aparece el sábado ni el domingo.
+    if (cuando >= inicio.getTime() && esDiaDeTrabajo(new Date(cuando), rutina.diasSemana)) {
+      fechas.push(new Date(cuando));
+    }
   }
   return fechas;
 }

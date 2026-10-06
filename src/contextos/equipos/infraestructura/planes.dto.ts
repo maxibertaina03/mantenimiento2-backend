@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsInt,
@@ -8,6 +10,7 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  Max,
   Min,
   MinLength,
 } from 'class-validator';
@@ -31,6 +34,18 @@ export class CrearPlanDto {
   @Min(1)
   periodicidadDias!: number;
 
+  @ApiPropertyOptional({
+    example: [1, 2, 3, 4, 5],
+    description: 'Días que se trabaja: 0 domingo … 6 sábado. Por defecto, lunes a viernes.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  diasSemana?: number[];
+
   @ApiProperty({ example: '2026-12-01', description: 'Cuándo toca la próxima vez' })
   @IsDateString()
   proximaFecha!: string;
@@ -46,6 +61,15 @@ export class ActualizarPlanDto {
   @IsInt()
   @Min(1)
   periodicidadDias?: number;
+
+  @ApiPropertyOptional({ example: [1, 2, 3, 4, 5] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  diasSemana?: number[];
 
   @ApiPropertyOptional() @IsOptional() @IsDateString() proximaFecha?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() activo?: boolean;

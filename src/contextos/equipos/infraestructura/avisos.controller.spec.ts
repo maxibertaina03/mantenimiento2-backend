@@ -37,6 +37,7 @@ async function planQueVence(planes: RepositorioPlanesEnMemoria, dias: number) {
     nombre: 'Cambio de aceite',
     tareas: null,
     periodicidadDias: 90,
+    diasSemana: [0, 1, 2, 3, 4, 5, 6],
     proximaFecha,
     activo: true,
   });

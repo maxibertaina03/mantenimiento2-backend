@@ -52,6 +52,7 @@ export class GestionarPlanes {
       nombre?: string;
       tareas?: string | null;
       periodicidadDias?: number;
+      diasSemana?: number[];
       proximaFecha?: Date;
       activo?: boolean;
     },
@@ -66,6 +67,7 @@ export class GestionarPlanes {
       nombre: cambios.nombre ?? actual.nombre,
       tareas: cambios.tareas !== undefined ? cambios.tareas : actual.tareas,
       periodicidadDias: cambios.periodicidadDias ?? actual.periodicidadDias,
+      diasSemana: cambios.diasSemana ?? actual.diasSemana,
       proximaFecha: cambios.proximaFecha ?? actual.proximaFecha,
     });
 
@@ -105,7 +107,7 @@ export class GestionarPlanes {
     if (!plan) return; // el plan pudo borrarse entre medio; no vale romper por eso
 
     await this.planes.actualizar(planId, {
-      proximaFecha: proximaFechaDespuesDe(fechaDelTrabajo, plan.periodicidadDias),
+      proximaFecha: proximaFechaDespuesDe(fechaDelTrabajo, plan.periodicidadDias, plan.diasSemana),
     });
   }
 }

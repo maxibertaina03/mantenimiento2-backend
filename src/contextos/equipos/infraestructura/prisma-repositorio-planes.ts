@@ -50,6 +50,7 @@ export class PrismaRepositorioPlanes implements RepositorioPlanes {
       nombre: f.nombre,
       tareas: f.tareas,
       periodicidadDias: f.periodicidadDias,
+      diasSemana: f.diasSemana,
       proximaFecha: f.proximaFecha,
       activo: f.activo,
       equipoNombre: f.equipo.nombre,

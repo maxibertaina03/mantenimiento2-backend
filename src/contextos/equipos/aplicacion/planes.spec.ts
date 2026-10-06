@@ -221,6 +221,8 @@ describe('el ciclo completo: registrar un trabajo adelanta el plan', () => {
       equipoId: equipo.id,
       nombre: 'Aceite',
       periodicidadDias: 90,
+      // Todos los días: esto prueba otra cosa que el fin de semana.
+      diasSemana: [0, 1, 2, 3, 4, 5, 6],
       proximaFecha: fecha('2026-09-05'),
     });
 
@@ -244,6 +246,7 @@ describe('el ciclo completo: registrar un trabajo adelanta el plan', () => {
       equipoId: equipo.id,
       nombre: 'Aceite',
       periodicidadDias: 90,
+      diasSemana: [0, 1, 2, 3, 4, 5, 6],
       proximaFecha: fecha('2026-08-01'),
     });
     await actualizarEquipo.ejecutar(equipo.id, { estado: 'DADO_DE_BAJA' });
@@ -274,5 +277,80 @@ describe('el ciclo completo: registrar un trabajo adelanta el plan', () => {
         fecha: fecha('2026-09-01'),
       }),
     ).resolves.toBeDefined();
+  });
+});
+
+describe('los días que trabaja la planta', () => {
+  it('REGRESION: la purga diaria del viernes no queda para el sábado: pasa al lunes', async () => {
+    const { crearEquipo, gestionar, registrar } = armar();
+    const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 1' });
+    const plan = await gestionar.crear({
+      equipoId: equipo.id,
+      nombre: 'Purga de agua',
+      periodicidadDias: 1,
+      proximaFecha: fecha('2026-08-28'), // viernes
+    });
+    // Por defecto, lunes a viernes.
+    expect(plan.diasSemana).toEqual([1, 2, 3, 4, 5]);
+
+    await registrar.ejecutar({
+      ...trabajoBase,
+      equipoId: equipo.id,
+      planId: plan.id,
+      fecha: fecha('2026-08-28'),
+    });
+
+    const [actualizado] = await gestionar.listarPorEquipo(equipo.id);
+    expect(actualizado.proximaFecha.toISOString().slice(0, 10)).toBe('2026-08-31'); // lunes
+  });
+
+  it('un plan que también se hace los sábados sí cae el sábado', async () => {
+    const { crearEquipo, gestionar, registrar } = armar();
+    const equipo = await crearEquipo.ejecutar({ nombre: 'Caldera' });
+    const plan = await gestionar.crear({
+      equipoId: equipo.id,
+      nombre: 'Control de presión',
+      periodicidadDias: 1,
+      diasSemana: [1, 2, 3, 4, 5, 6],
+      proximaFecha: fecha('2026-08-28'),
+    });
+
+    await registrar.ejecutar({
+      ...trabajoBase,
+      equipoId: equipo.id,
+      planId: plan.id,
+      fecha: fecha('2026-08-28'),
+    });
+
+    const [actualizado] = await gestionar.listarPorEquipo(equipo.id);
+    expect(actualizado.proximaFecha.toISOString().slice(0, 10)).toBe('2026-08-29');
+  });
+
+  it('una fecha cargada a mano en un domingo pasa al lunes', async () => {
+    const { crearEquipo, gestionar } = armar();
+    const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 2' });
+    const plan = await gestionar.crear({
+      equipoId: equipo.id,
+      nombre: 'Aceite',
+      periodicidadDias: 90,
+      proximaFecha: fecha('2026-10-04'), // domingo
+    });
+    expect(plan.proximaFecha.toISOString().slice(0, 10)).toBe('2026-10-05');
+  });
+
+  it('cambiar los días al editar; sin ningún día se rechaza', async () => {
+    const { crearEquipo, gestionar } = armar();
+    const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 3' });
+    const plan = await gestionar.crear({
+      equipoId: equipo.id,
+      nombre: 'Aceite',
+      periodicidadDias: 7,
+      proximaFecha: fecha('2026-10-05'),
+    });
+    const cambiado = await gestionar.actualizar(plan.id, { diasSemana: [6, 1, 1] });
+    expect(cambiado.diasSemana).toEqual([1, 6]);
+    await expect(gestionar.actualizar(plan.id, { diasSemana: [] })).rejects.toThrow(
+      /al menos un día/,
+    );
   });
 });

@@ -1,3 +1,8 @@
+import {
+  alSiguienteDiaDeTrabajo,
+  TODOS_LOS_DIAS,
+  validarDiasSemana,
+} from '../../../common/dominio/dias-de-trabajo';
 import { ErrorDatosInvalidos } from './errores';
 import { EstadoEquipo, requiereMantenimiento } from './estado-equipo';
 
@@ -12,6 +17,8 @@ export interface PlanMantenimiento {
   nombre: string;
   tareas: string | null;
   periodicidadDias: number;
+  /** Los días que se trabaja: 0 domingo … 6 sábado. Por defecto, lunes a viernes. */
+  diasSemana: number[];
   /** Cuándo toca la próxima vez. Se calcula, pero se puede corregir a mano. */
   proximaFecha: Date;
   activo: boolean;
@@ -22,6 +29,8 @@ export interface DatosNuevoPlan {
   nombre: string;
   tareas?: string | null;
   periodicidadDias: number;
+  /** Sin esto, lunes a viernes. */
+  diasSemana?: number[] | null;
   proximaFecha: Date;
 }
 
@@ -72,10 +81,16 @@ export function estadoPlan(proximaFecha: Date, hoy: Date, diasDeAviso = DIAS_DE_
  * un service que tocaba en marzo se hizo en mayo, el siguiente va a los noventa
  * días de mayo: contarlo desde marzo lo dejaría vencido apenas se registra.
  */
-export function proximaFechaDespuesDe(fechaDelTrabajo: Date, periodicidadDias: number): Date {
+export function proximaFechaDespuesDe(
+  fechaDelTrabajo: Date,
+  periodicidadDias: number,
+  // Si cae un día que no se trabaja (la purga del viernes, diaria, daría
+  // sábado), pasa al siguiente que sí: el lunes.
+  diasSemana: readonly number[] = TODOS_LOS_DIAS,
+): Date {
   const proxima = new Date(fechaDelTrabajo.getTime());
   proxima.setUTCDate(proxima.getUTCDate() + periodicidadDias);
-  return proxima;
+  return alSiguienteDiaDeTrabajo(proxima, diasSemana);
 }
 
 const MAXIMO_DIAS = 3650; // diez años
@@ -98,13 +113,16 @@ export function crearPlan(datos: DatosNuevoPlan): Omit<PlanMantenimiento, 'id'> 
   }
 
   const tareas = (datos.tareas ?? '').trim();
+  const diasSemana = validarDiasSemana(datos.diasSemana);
 
   return {
     equipoId: datos.equipoId,
     nombre,
     tareas: tareas === '' ? null : tareas,
     periodicidadDias: datos.periodicidadDias,
-    proximaFecha: datos.proximaFecha,
+    diasSemana,
+    // Una fecha cargada a mano en un sábado también pasa al lunes.
+    proximaFecha: alSiguienteDiaDeTrabajo(datos.proximaFecha, diasSemana),
     activo: true,
   };
 }

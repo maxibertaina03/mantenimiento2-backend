@@ -50,6 +50,7 @@ async function plan(
     nombre: datos.nombre ?? 'Cambio de aceite',
     tareas: null,
     periodicidadDias: 90,
+    diasSemana: [0, 1, 2, 3, 4, 5, 6],
     proximaFecha: enDias(datos.dias),
     activo: datos.activo ?? true,
   });

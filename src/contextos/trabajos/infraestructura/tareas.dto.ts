@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -10,6 +11,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -152,6 +154,18 @@ export class CrearRutinaDto {
   @Min(1)
   cadaDias!: number;
 
+  @ApiPropertyOptional({
+    example: [1, 2, 3, 4, 5],
+    description: 'Días en que sale: 0 domingo … 6 sábado. Por defecto, lunes a viernes.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  diasSemana?: number[];
+
   @ApiProperty({ example: '2026-09-22' })
   @IsDateString()
   desde!: string;
@@ -200,6 +214,18 @@ export class CambiarRutinaDto {
   @IsInt()
   @Min(1)
   cadaDias?: number;
+
+  @ApiPropertyOptional({
+    example: [1, 2, 3, 4, 5],
+    description: 'Días en que sale: 0 domingo … 6 sábado. Por defecto, lunes a viernes.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  @Max(6, { each: true })
+  diasSemana?: number[];
 
   @ApiPropertyOptional()
   @IsOptional()

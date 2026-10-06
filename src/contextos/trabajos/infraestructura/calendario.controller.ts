@@ -15,6 +15,7 @@ import type { Usuario } from '@prisma/client';
 import { Permisos } from '../../../common/auth/decorators/permisos.decorator';
 import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.decorator';
 import { PERMISOS } from '../../../common/auth/permisos';
+import { validarDiasSemana } from '../../../common/dominio/dias-de-trabajo';
 import { ConsultarCalendario } from '../aplicacion/consultar-calendario';
 import { GestionarTareas } from '../aplicacion/gestionar-tareas';
 import { PLANES_DE_MANTENIMIENTO, PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
@@ -191,6 +192,7 @@ export class CalendarioController {
       titulo: dto.titulo,
       descripcion: dto.descripcion,
       cadaDias: dto.cadaDias,
+      diasSemana: dto.diasSemana,
       desde: new Date(dto.desde),
       hasta: dto.hasta ? new Date(dto.hasta) : null,
       equipoId: dto.equipoId,
@@ -208,6 +210,7 @@ export class CalendarioController {
       ...(dto.titulo === undefined ? {} : { titulo: dto.titulo }),
       ...(dto.descripcion === undefined ? {} : { descripcion: dto.descripcion }),
       ...(dto.cadaDias === undefined ? {} : { cadaDias: dto.cadaDias }),
+      ...(dto.diasSemana === undefined ? {} : { diasSemana: validarDiasSemana(dto.diasSemana) }),
       ...(dto.hasta === undefined ? {} : { hasta: dto.hasta ? new Date(dto.hasta) : null }),
       ...(dto.asignadoAId === undefined ? {} : { asignadoAId: dto.asignadoAId }),
       ...(dto.activa === undefined ? {} : { activa: dto.activa }),

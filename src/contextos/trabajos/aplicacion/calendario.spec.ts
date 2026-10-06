@@ -120,10 +120,17 @@ describe('el calendario genera las tareas de las rutinas', () => {
       desde: dia('2026-09-22'),
     });
 
+    // Del martes 22 al sábado 26: por defecto es de lunes a viernes, así que
+    // el sábado no sale. La planta no trabaja los fines de semana.
     const semana = await calendario.entre(dia('2026-09-22'), dia('2026-09-26'));
 
-    expect(semana.tareas).toHaveLength(5);
-    expect(semana.tareas.map((t) => t.titulo)).toEqual(Array(5).fill('Revisar presion de caldera'));
+    expect(semana.tareas).toHaveLength(4);
+    expect(semana.tareas.map((t) => t.fecha.toISOString().slice(0, 10))).toEqual([
+      '2026-09-22',
+      '2026-09-23',
+      '2026-09-24',
+      '2026-09-25',
+    ]);
   });
 
   it('la rutina con duenio fijo reparte sola', async () => {

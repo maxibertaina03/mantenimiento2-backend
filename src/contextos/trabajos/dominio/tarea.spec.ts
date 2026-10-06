@@ -36,6 +36,8 @@ const rutina = (cambios: Partial<Rutina> = {}): Rutina => ({
   titulo: 'Revisar presion',
   descripcion: null,
   cadaDias: 1,
+  // Todos los días: los tests de abajo prueban el conteo, no el fin de semana.
+  diasSemana: [0, 1, 2, 3, 4, 5, 6],
   desde: dia('2026-09-01'),
   hasta: null,
   equipoId: null,
@@ -237,5 +239,28 @@ describe('ocurrenciasDeRutina', () => {
 describe('soloElDia', () => {
   it('descarta la hora', () => {
     expect(soloElDia(new Date('2026-09-22T23:59:59.000Z'))).toEqual(dia('2026-09-22'));
+  });
+});
+
+describe('las rutinas y los días que trabaja la planta', () => {
+  it('REGRESION: la rutina diaria de lunes a viernes no sale el sábado ni el domingo', () => {
+    // Del jueves 1/10 al martes 6/10.
+    const fechas = ocurrenciasDeRutina(
+      rutina({ diasSemana: [1, 2, 3, 4, 5] }),
+      dia('2026-10-01'),
+      dia('2026-10-06'),
+    );
+    expect(fechas.map((f) => f.toISOString().slice(0, 10))).toEqual([
+      '2026-10-01',
+      '2026-10-02',
+      '2026-10-05',
+      '2026-10-06',
+    ]);
+  });
+
+  it('una rutina nueva sin días dichos es de lunes a viernes; sin ningún día se rechaza', () => {
+    const datos = { titulo: 'Revisar presión', cadaDias: 1, desde: dia('2026-10-01') };
+    expect(crearRutina(datos).diasSemana).toEqual([1, 2, 3, 4, 5]);
+    expect(() => crearRutina({ ...datos, diasSemana: [] })).toThrow(/al menos un día/);
   });
 });
