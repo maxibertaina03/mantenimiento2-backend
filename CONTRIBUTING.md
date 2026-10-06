@@ -100,6 +100,24 @@ un archivo de `dominio/` importa algo de `@nestjs` o `@prisma`, está mal puesto
 Cómo darse cuenta de que se respeta: los tests de `dominio/` corren en
 milisegundos y no levantan nada.
 
+### Dónde se arma cada caso de uso
+
+En `infraestructura/casos-de-uso.providers.ts` de su contexto, con una fábrica
+de parámetros tipados, y nunca con `new` dentro de un controlador:
+
+```ts
+{
+  provide: GestionarFotos,
+  useFactory: (fotos: RepositorioFotos, almacen: AlmacenImagenes, equipos: RepositorioEquipos) =>
+    new GestionarFotos(fotos, almacen, equipos),
+  inject: [REPOSITORIO_FOTOS, ALMACEN_IMAGENES, REPOSITORIO_EQUIPOS],
+},
+```
+
+El controlador lo recibe armado (`constructor(private readonly gestionar:
+GestionarFotos) {}`) y solo traduce HTTP. Los casos de uso siguen sin saber que
+existe Nest: se prueban con `new` y dobles en memoria, como siempre.
+
 ### Los errores
 
 El dominio no sabe que existe HTTP, así que no lanza `BadRequestException`.
@@ -128,6 +146,17 @@ un equipo existe y cómo se llama, así que tiene
 `puertos/consulta-equipos.ts` con tres campos, y no el modelo entero de equipos.
 
 Así el día que el otro contexto cambie por dentro, acá no se entera nadie.
+
+El adaptador usa al otro contexto **solo por su puerta pública**, el `index.ts`
+de su carpeta: `import { MovimientosStockService } from '../../panol'`. Entrar a
+sus carpetas (`../../panol/infraestructura/...`) es un error de lint —la regla
+está en `.eslintrc.cjs`— y el CI no lo deja pasar. Si hace falta algo que la
+puerta no ofrece, se agrega a la puerta, a la vista.
+
+Cuando una regla cruza contextos, tiene **un** caso de uso dueño. El ejemplo es
+`trabajos/aplicacion/registrar-trabajo-de-plan.ts`: hacer el trabajo de un plan
+corre el plan (equipos) y cierra la tarea (calendario), siempre juntas. No se
+reparte entre un caso de uso y un controlador.
 
 ### Antes de mover un módulo a un contexto
 
@@ -172,7 +201,10 @@ producción sin que nadie la revise de nuevo**.
 
 ## Antes de mergear a `main`
 
-- [ ] Los tests pasan (`npm run test:all`)
+- [ ] Los tests pasan (`npm run test:all`) y, si tocaste el calendario, los
+      planes o una consulta, también `npm run test:integracion`
+      ([docs/tests-de-integracion.md](docs/tests-de-integracion.md)). El CI corre
+      los tres.
 - [ ] Compila (`npm run build`)
 - [ ] Sin errores de lint (`npx eslint "src/**/*.ts" "test/**/*.ts"`)
 - [ ] Probado a mano en local contra tu base local

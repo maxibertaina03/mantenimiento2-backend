@@ -1,6 +1,12 @@
 # Plan: llevar el backend a bounded contexts
 
-Estado al 2026-09-24. Este documento decide **qué se migra, qué no, y en qué
+> **Estado al 2026-10-06: terminado.** Las fases 0 a 3 movieron los cinco
+> contextos a `src/contextos/`, y la fase B (al final de este documento)
+> cerró los bordes: composición en los módulos, un dueño para «trabajo de
+> plan», límites que controla el lint y tests contra Postgres real. Lo que
+> sigue es el registro de cómo se decidió.
+
+Escrito el 2026-09-24. Este documento decide **qué se migra, qué no, y en qué
 orden**. La respuesta corta es que sí es viable, que ya estamos a mitad de
 camino, y que migrar *todo* sería un error.
 
@@ -203,3 +209,47 @@ catálogos, y **8-12 sesiones** repartidas en cuatro fases que se pueden frenar
 en cualquier punto: cada fase deja el sistema andando y desplegable.
 
 El orden importa más que la velocidad. Credenciales primero, compras último.
+
+## Fase B — cerrar los bordes (terminada el 2026-10-06)
+
+Con los cinco contextos ya separados, quedaban cuatro cosas flojas en el borde.
+Ninguna cambió una ruta, un DTO ni un código de estado.
+
+**B1. La composición, en los módulos.** Doce controladores (y el service de
+compras) armaban sus casos de uso con `new`. Ahora cada contexto tiene
+`infraestructura/casos-de-uso.providers.ts`, con una fábrica por caso de uso y
+los parámetros tipados: si un caso de uso cambia lo que recibe, no compila. Los
+controladores reciben el caso de uso armado y solo traducen HTTP.
+
+**B2. Un dueño para «se hizo el trabajo de un plan».** Era la regla más
+importante entre contextos y estaba partida: el caso de uso de las órdenes
+corría el plan, y el controlador HTTP cerraba la tarea del calendario. Un
+camino nuevo podía hacer la mitad. Ahora lo hace
+`trabajos/aplicacion/registrar-trabajo-de-plan.ts`, y lo llama la orden al
+cerrarse, venga de donde venga. «Dar por hecha» una tarea lo avisa
+(`cierraSuPropiaTarea`) porque ya cierra la suya.
+
+**B3. Límites que se controlan solos.** Cada contexto tiene su puerta pública,
+`contextos/<ctx>/index.ts`, y una regla de ESLint (`.eslintrc.cjs`) da error
+si un contexto entra a `dominio/`, `aplicacion/`, `puertos/` o
+`infraestructura/` de otro. Compras usaba los servicios internos del pañol: ahora
+los usa por la puerta pública y solo desde sus adaptadores.
+
+**B4. Tests contra Postgres real.** `test/integracion/` levanta la aplicación
+contra un Postgres vacío con todas las migraciones (en el CI, un servicio que
+nace y muere con cada corrida). Cubre lo que el Prisma en memoria no modela: el
+calendario, los planes, «Hoy» y el trabajo de plan. Ver
+[tests-de-integracion.md](tests-de-integracion.md).
+
+**Queda abierto, a propósito:**
+
+- `traducir-errores.ts` de pañol y compras no se unificó con
+  `FiltroErroresDominio`: existe para que las respuestas sean idénticas byte a
+  byte a las de antes del refactor, y unificarlo no le da nada al usuario.
+- El pañol y compras siguen exponiendo un *service* de Nest como fachada de sus
+  casos de uso (`MaterialesService`, `OrdenesCompraService`). Es la forma que
+  tenían antes de migrar y la conservan para no cambiar la API.
+- Un service diario dado por hecho por adelantado deja el plan apuntando a una
+  tarea que ya figura hecha. Resolverlo es una decisión de negocio (¿un service
+  adelantado cuenta desde el día que se hizo o desde el que tocaba?), no de
+  diseño.
