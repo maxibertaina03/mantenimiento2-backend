@@ -172,3 +172,23 @@ export class CambiarFotoDto {
   @MaxLength(200)
   nombreArchivo!: string;
 }
+
+export class SubirFotoDto extends CambiarFotoDto {
+  @ApiPropertyOptional({ example: 'Chapa característica', maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  descripcion?: string;
+}
+
+export class CambiarDescripcionFotoDto {
+  @ApiPropertyOptional({
+    example: 'Chapa característica',
+    nullable: true,
+    description: 'Vacía o null la deja sin descripción.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  descripcion?: string | null;
+}

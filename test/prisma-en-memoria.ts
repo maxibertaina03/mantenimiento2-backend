@@ -41,6 +41,8 @@ export function crearPrismaEnMemoria() {
     enviosOrden: [] as any[],
     // Los manuales en PDF de los equipos (el archivo va al almacén, no acá).
     manuales: [] as any[],
+    // Las otras fotos de los equipos (la imagen va al almacén, no acá).
+    fotos: [] as any[],
     // Tramos de equipos montados dentro de otros (la bomba en la desnatadora).
     montajes: [] as any[],
     // Los materiales del pañol que lleva cada equipo (sus repuestos).
@@ -836,6 +838,11 @@ export function crearPrismaEnMemoria() {
     })(),
     manualEquipo: delegate(db.manuales, () => ({
       subidoPorId: null,
+      subidoEn: new Date(),
+    })),
+    fotoEquipo: delegate(db.fotos, () => ({
+      subidoPorId: null,
+      descripcion: null,
       subidoEn: new Date(),
     })),
     envioOrden: delegate(db.enviosOrden, () => ({

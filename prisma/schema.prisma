@@ -351,6 +351,7 @@ model Usuario {
   comprobantesSubidos    ComprobanteOrden[]   @relation("ComprobantesSubidos")
   vistasDeCredencial     VistaCredencial[]    @relation("VistasDeCredencial")
   manualesSubidos        ManualEquipo[]       @relation("ManualesSubidos")
+  fotosSubidas           FotoEquipo[]         @relation("FotosSubidas")
   montajesRegistrados    MontajeEquipo[]      @relation("MontajesRegistrados")
   repuestosRegistrados   RepuestoEquipo[]     @relation("RepuestosRegistrados")
 
@@ -909,6 +910,7 @@ model Equipo {
   tareas         TareaProgramada[]
   rutinas        RutinaTarea[]
   manuales       ManualEquipo[]
+  fotos          FotoEquipo[]
 
   equipoPadre         Equipo?          @relation("ComponentesDeEquipo", fields: [equipoPadreId], references: [id], onDelete: SetNull)
   componentes         Equipo[]         @relation("ComponentesDeEquipo")
@@ -985,6 +987,31 @@ model RepuestoEquipo {
   @@unique([equipoId, materialId])
   @@index([materialId])
   @@map("repuestos_equipo")
+}
+
+/// Las otras fotos de un equipo: la chapa característica con los datos, el
+/// tablero, una vista de atrás. La principal sigue siendo `Equipo.fotoUrl`,
+/// la que se ve en la lista; estas se ven en la ficha.
+model FotoEquipo {
+  id       String @id @default(uuid())
+  equipoId String
+
+  /// Para mostrarla (el bucket de fotos es público, igual que la principal).
+  url  String
+  /// Donde quedó en el almacén. Es lo que hace falta para borrarla.
+  ruta String
+
+  /// Qué se ve: «Chapa característica», «Tablero». Opcional.
+  descripcion String?
+
+  subidoEn    DateTime @default(now())
+  subidoPorId String?
+
+  equipo    Equipo   @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  subidoPor Usuario? @relation("FotosSubidas", fields: [subidoPorId], references: [id], onDelete: SetNull)
+
+  @@index([equipoId])
+  @@map("fotos_equipo")
 }
 
 /// El manual de un equipo o una herramienta, en PDF.
