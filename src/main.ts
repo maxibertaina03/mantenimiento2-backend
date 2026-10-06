@@ -56,7 +56,9 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('API Mantenimiento')
     .setDescription('Gestión de stock de materiales con trazabilidad de movimientos')
-    .setVersion('0.1.0')
+    // Con el commit que corre (Render lo pone en RENDER_GIT_COMMIT): así se
+    // puede comprobar que un despliegue llegó aunque no cambie ninguna ruta.
+    .setVersion(`0.1.0+${process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? 'local'}`)
     // Permite pegar un JWT de Clerk en Swagger ("Authorize") para probar con auth activa.
     .addBearerAuth()
     .build();
