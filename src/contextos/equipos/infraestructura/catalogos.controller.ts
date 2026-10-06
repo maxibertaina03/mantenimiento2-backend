@@ -182,6 +182,26 @@ export class CatalogosEquipoService {
     ambito?: 'PLANTA' | 'IT',
   ): Promise<ItemCatalogo> {
     const nombre = dto.nombre.trim();
+
+    // Ya existe en el OTRO módulo («Samsung» cargada desde informática y ahora
+    // pedida desde planta): no es un duplicado, es la misma marca que también
+    // se usa acá. Pasa a valer para los dos y se devuelve esa, en vez de un
+    // «ya existe» que desde planta no se puede ver ni elegir.
+    if (ambito) {
+      const todas = await delegado.findMany({ where: {}, orderBy: { nombre: 'asc' } });
+      const delOtro = buscarNombreRepetido(todas, nombre) as
+        | (FilaCatalogo & { ambito?: string })
+        | undefined;
+      if (delOtro && delOtro.ambito && delOtro.ambito !== ambito && delOtro.ambito !== 'AMBAS') {
+        const compartida = await delegado.update({
+          where: { id: delOtro.id },
+          data: { ambito: 'AMBAS' },
+          include: this.conUso,
+        });
+        return this.aItem(compartida);
+      }
+    }
+
     await this.verificarNombreLibre(delegado, nombre, que);
 
     const fila = await delegado.create({

@@ -63,6 +63,27 @@ describe('CatalogosEquipoService', () => {
     expect(d.create.mock.calls[0][0].data.ambito).toBe('IT');
   });
 
+  it('REGRESION: una marca que ya existe en informatica, pedida desde planta, pasa a valer para los dos', async () => {
+    // «Samsung» cargada desde informatica: en el desplegable de planta no se
+    // ve, y crearla de nuevo chocaba con «ya existe». Ahora se comparte.
+    const d = delegadoFalso([{ ...item('m-1', 'Samsung'), ambito: 'IT' } as any]);
+    await servicio().crear(d as any, { nombre: 'samsung' }, 'la marca', 'PLANTA');
+
+    expect(d.create).not.toHaveBeenCalled();
+    expect(d.update.mock.calls[0][0]).toMatchObject({
+      where: { id: 'm-1' },
+      data: { ambito: 'AMBAS' },
+    });
+  });
+
+  it('la que ya es del mismo modulo sigue siendo un repetido', async () => {
+    const d = delegadoFalso([{ ...item('m-1', 'WEG'), ambito: 'PLANTA' } as any]);
+    await expect(
+      servicio().crear(d as any, { nombre: 'WEG' }, 'la marca', 'PLANTA'),
+    ).rejects.toThrow(BadRequestException);
+    expect(d.update).not.toHaveBeenCalled();
+  });
+
   it('REGRESION: no deja crear un item que ya existe', async () => {
     const d = delegadoFalso([item('u-1', 'Sala de máquinas')]);
     await expect(
