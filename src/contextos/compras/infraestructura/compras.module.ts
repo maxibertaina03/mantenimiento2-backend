@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ProveedoresModule } from '../../../modules/proveedores/proveedores.module';
-import { PanolModule } from '../../panol/infraestructura/panol.module';
+import { PanolModule } from '../../panol';
 import { ComprobantesService } from './comprobantes/comprobantes.service';
 import { OrdenesCompraController } from './ordenes-compra.controller';
 import { OrdenesCompraService } from './ordenes-compra.service';
+import { casosDeUsoCompras } from './casos-de-uso.providers';
 import { PrismaRepositorioOrdenesCompra } from './prisma-repositorio-ordenes-compra';
 
 /**
@@ -21,7 +22,12 @@ import { PrismaRepositorioOrdenesCompra } from './prisma-repositorio-ordenes-com
 @Module({
   imports: [ProveedoresModule, PanolModule],
   controllers: [OrdenesCompraController],
-  providers: [ComprobantesService, OrdenesCompraService, PrismaRepositorioOrdenesCompra],
+  providers: [
+    ComprobantesService,
+    OrdenesCompraService,
+    PrismaRepositorioOrdenesCompra,
+    ...casosDeUsoCompras,
+  ],
   exports: [OrdenesCompraService],
 })
 export class ComprasModule {}

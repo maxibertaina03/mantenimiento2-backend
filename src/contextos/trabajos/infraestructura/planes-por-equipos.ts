@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GestionarPlanes } from '../../equipos/aplicacion/gestionar-planes';
+import { GestionarPlanes } from '../../equipos';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { PlanesDeMantenimiento, VencimientoDePlan } from '../puertos/planes-de-mantenimiento';
 

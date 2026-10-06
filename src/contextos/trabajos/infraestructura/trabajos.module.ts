@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../../common/auth/auth.module';
 import { CorreoModule } from '../../../common/correo/correo.module';
-import { EquiposModule } from '../../equipos/infraestructura/equipos.module';
-import { PanolModule } from '../../panol/infraestructura/panol.module';
+import { EquiposModule } from '../../equipos';
+import { PanolModule } from '../../panol';
 import { CONSULTA_EQUIPOS } from '../puertos/consulta-equipos';
 import { CONSULTA_EQUIPOS_IT } from '../puertos/consulta-equipos-it';
 import { CONSULTA_USUARIOS } from '../puertos/consulta-usuarios';

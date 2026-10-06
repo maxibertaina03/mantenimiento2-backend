@@ -1,20 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { Usuario } from '@prisma/client';
-import { CorreoService } from '../../../common/correo/correo.service';
 import { RespuestaPaginada } from '../../../common/dto/paginacion.dto';
 import { finDelDia, inicioDelDia } from '../../../common/dominio/fechas';
-import { ProveedoresService } from '../../../modules/proveedores/proveedores.service';
-import { MaterialesService } from '../../panol/infraestructura/materiales/materiales.service';
-import { MovimientosStockService } from '../../panol/infraestructura/movimientos/movimientos-stock.service';
 import { EnviarOrdenes } from '../aplicacion/enviar-ordenes';
 import { GestionarOrdenesCompra } from '../aplicacion/gestionar-ordenes-compra';
-import {
-  CasillasDeLaConfiguracion,
-  CorreoDelSistema,
-  PanolPorSusServicios,
-  ProveedoresDelCatalogo,
-} from './adaptadores';
 import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
 import { CorregirPreciosDto } from './dto/corregir-precios.dto';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
@@ -22,7 +11,6 @@ import { EnviarOrdenDto, ResultadoEnvioDto } from './dto/enviar-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
 import { OrdenRespuestaDto } from './dto/orden-respuesta.dto';
 import { RecibirOrdenDto } from './dto/recibir-orden.dto';
-import { PrismaRepositorioOrdenesCompra } from './prisma-repositorio-ordenes-compra';
 import { traducirErrores } from './traducir-errores';
 
 /** Las fechas llegan como texto: el caso de uso trabaja con fechas de verdad. */
@@ -33,37 +21,18 @@ function comoFecha(texto: string | undefined): Date | undefined {
 /**
  * La puerta de Nest a las órdenes de compra.
  *
- * No decide nada: arma los casos de uso con sus adaptadores, traduce el pedido
- * HTTP, la respuesta a su DTO, y los errores del dominio a las excepciones de
- * siempre. Conserva el nombre, el constructor y las firmas del service de
- * antes, así la API y sus pruebas no se enteraron de la mudanza.
+ * No decide nada: traduce el pedido HTTP, la respuesta a su DTO, y los errores
+ * del dominio a las excepciones de siempre. Conserva el nombre y las firmas
+ * del service de antes, así la API no se enteró de la mudanza. Los casos de
+ * uso los recibe armados (casos-de-uso.providers.ts).
  */
 @Injectable()
 export class OrdenesCompraService {
-  private readonly gestionar: GestionarOrdenesCompra;
-  private readonly enviar: EnviarOrdenes;
-
+  // Los casos de uso llegan armados: se componen en casos-de-uso.providers.ts.
   constructor(
-    repo: PrismaRepositorioOrdenesCompra,
-    proveedores: ProveedoresService,
-    materiales: MaterialesService,
-    movimientos: MovimientosStockService,
-    correo: CorreoService,
-    config: ConfigService,
-  ) {
-    this.gestionar = new GestionarOrdenesCompra(
-      repo,
-      new ProveedoresDelCatalogo(proveedores),
-      new PanolPorSusServicios(materiales, movimientos),
-    );
-    // El correo describe la orden igual que la pantalla y el PDF adjunto.
-    this.enviar = new EnviarOrdenes(
-      repo,
-      new CorreoDelSistema(correo),
-      new CasillasDeLaConfiguracion(config),
-      OrdenRespuestaDto.desde,
-    );
-  }
+    private readonly gestionar: GestionarOrdenesCompra,
+    private readonly enviar: EnviarOrdenes,
+  ) {}
 
   enviarPorCorreo(id: string, dto: EnviarOrdenDto, usuario?: Usuario): Promise<ResultadoEnvioDto> {
     return traducirErrores(() =>

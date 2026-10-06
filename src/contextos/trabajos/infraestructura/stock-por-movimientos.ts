@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MotivoMovimiento, TipoMovimiento } from '@prisma/client';
-import { MovimientosStockService } from '../../panol/infraestructura/movimientos/movimientos-stock.service';
+import { MovimientosStockService } from '../../panol';
 import { DatosUsoDeMaterial, Stock } from '../puertos/stock';
 
 /**

@@ -2,8 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CorreoService, explicarErrorSmtp } from '../../../common/correo/correo.service';
 import { ProveedoresService } from '../../../modules/proveedores/proveedores.service';
-import { MaterialesService } from '../../panol/infraestructura/materiales/materiales.service';
-import { MovimientosStockService } from '../../panol/infraestructura/movimientos/movimientos-stock.service';
+import { MaterialesService, MovimientosStockService } from '../../panol';
 import { Casillas, Correo, CorreoSaliente } from '../puertos/envio';
 import { ConsultaProveedores, PanolParaCompras } from '../puertos/otros-contextos';
 

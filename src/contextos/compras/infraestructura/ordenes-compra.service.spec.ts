@@ -5,13 +5,13 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { EstadoOrdenCompra, Usuario } from '@prisma/client';
+import { armarEnviarOrdenes, armarGestionarOrdenesCompra } from './casos-de-uso.providers';
 import { OrdenesCompraService } from './ordenes-compra.service';
 import { ConfigService } from '@nestjs/config';
 import { CorreoService } from '../../../common/correo/correo.service';
 import { PrismaRepositorioOrdenesCompra } from './prisma-repositorio-ordenes-compra';
 import { ProveedoresService } from '../../../modules/proveedores/proveedores.service';
-import { MaterialesService } from '../../panol/infraestructura/materiales/materiales.service';
-import { MovimientosStockService } from '../../panol/infraestructura/movimientos/movimientos-stock.service';
+import { MaterialesService, MovimientosStockService } from '../../panol';
 import { aDecimal } from '../../../common/dominio/decimal';
 
 const ordenBase = {
@@ -100,13 +100,19 @@ function armar(orden: any = ordenBase) {
     movimientos,
     correo,
     config,
+    // Armado con las mismas fábricas que usa la aplicación.
     service: new OrdenesCompraService(
-      repo as unknown as PrismaRepositorioOrdenesCompra,
-      proveedores as unknown as ProveedoresService,
-      materiales as unknown as MaterialesService,
-      movimientos as unknown as MovimientosStockService,
-      correo as unknown as CorreoService,
-      config as unknown as ConfigService,
+      armarGestionarOrdenesCompra(
+        repo as unknown as PrismaRepositorioOrdenesCompra,
+        proveedores as unknown as ProveedoresService,
+        materiales as unknown as MaterialesService,
+        movimientos as unknown as MovimientosStockService,
+      ),
+      armarEnviarOrdenes(
+        repo as unknown as PrismaRepositorioOrdenesCompra,
+        correo as unknown as CorreoService,
+        config as unknown as ConfigService,
+      ),
     ),
   };
 }

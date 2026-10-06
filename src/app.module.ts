@@ -7,14 +7,14 @@ import { ResponsablesModule } from './modules/responsables/responsables.module';
 import { ProveedoresModule } from './modules/proveedores/proveedores.module';
 import { CategoriasMaterialModule } from './modules/categorias-material/categorias-material.module';
 import { EstanteriasMaterialModule } from './modules/estanterias-material/estanterias-material.module';
-import { InformaticaModule } from './contextos/informatica/infraestructura/informatica.module';
+import { InformaticaModule } from './contextos/informatica';
 import { CorreoModule } from './common/correo/correo.module';
-import { EquiposModule } from './contextos/equipos/infraestructura/equipos.module';
-import { TrabajosModule } from './contextos/trabajos/infraestructura/trabajos.module';
+import { EquiposModule } from './contextos/equipos';
+import { TrabajosModule } from './contextos/trabajos';
 import { TiposEquipoModule } from './modules/tipos-equipo/tipos-equipo.module';
 import { UnidadesMedidaModule } from './modules/unidades-medida/unidades-medida.module';
-import { PanolModule } from './contextos/panol/infraestructura/panol.module';
-import { ComprasModule } from './contextos/compras/infraestructura/compras.module';
+import { PanolModule } from './contextos/panol';
+import { ComprasModule } from './contextos/compras';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 
 @Module({
