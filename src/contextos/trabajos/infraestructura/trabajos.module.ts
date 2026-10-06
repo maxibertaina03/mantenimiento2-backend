@@ -21,6 +21,7 @@ import { PlanesPorEquipos } from './planes-por-equipos';
 import { PrismaConsultaUsuarios } from './prisma-consulta-usuarios';
 import { PrismaRepositorioOrdenesTrabajo } from './prisma-repositorio-ordenes-trabajo';
 import { StockPorMovimientos } from './stock-por-movimientos';
+import { casosDeUsoTrabajos } from './casos-de-uso.providers';
 
 /**
  * El cableado del contexto: acá se decide qué implementación concreta entra por
@@ -51,6 +52,7 @@ import { StockPorMovimientos } from './stock-por-movimientos';
     AvisadorDeTareas,
     { provide: STOCK, useClass: StockPorMovimientos },
     { provide: RELOJ_TRABAJOS, useClass: RelojDelSistema },
+    ...casosDeUsoTrabajos,
   ],
 })
 export class TrabajosModule {}

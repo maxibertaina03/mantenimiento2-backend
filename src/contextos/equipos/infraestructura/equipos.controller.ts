@@ -26,18 +26,8 @@ import { RegistrarIntervencion } from '../aplicacion/registrar-intervencion';
 import { ImportarEquipos } from '../aplicacion/importar-equipos';
 import { detectarEquipos } from '../dominio/importacion';
 import { ALMACEN_IMAGENES, AlmacenImagenes } from '../puertos/almacen-imagenes';
-import {
-  REPOSITORIO_INTERVENCIONES,
-  RepositorioIntervenciones,
-} from '../puertos/repositorio-intervenciones';
-import { REPOSITORIO_PLANES, RepositorioPlanes } from '../puertos/repositorio-planes';
 import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
-import {
-  REPOSITORIO_UBICACIONES,
-  RepositorioUbicaciones,
-} from '../puertos/repositorio-ubicaciones';
 import { RELOJ, Reloj } from '../puertos/reloj';
-import { REPOSITORIO_MONTAJES, RepositorioMontajes } from '../puertos/montajes';
 import {
   ActualizarEquipoDto,
   CambiarFotoDto,
@@ -68,39 +58,20 @@ import { PERMISOS } from '../../../common/auth/permisos';
 // abierto y depender de que alguien se acuerde de agregarle el decorador.
 @Controller('equipos')
 export class EquiposController {
-  private readonly crear: CrearEquipo;
-  private readonly actualizar: ActualizarEquipo;
-  private readonly consultar: ConsultarEquipos;
-  private readonly importar: ImportarEquipos;
-  private readonly cambiarFoto: CambiarFotoEquipo;
-  private readonly registrarIntervencion: RegistrarIntervencion;
-  private readonly historial: ConsultarHistorial;
-  private readonly planes: GestionarPlanes;
-
+  // Los casos de uso llegan armados: se componen en casos-de-uso.providers.ts.
   constructor(
+    private readonly crear: CrearEquipo,
+    private readonly actualizar: ActualizarEquipo,
+    private readonly consultar: ConsultarEquipos,
+    private readonly importar: ImportarEquipos,
+    private readonly cambiarFoto: CambiarFotoEquipo,
+    private readonly registrarIntervencion: RegistrarIntervencion,
+    private readonly historial: ConsultarHistorial,
+    private readonly planes: GestionarPlanes,
     @Inject(REPOSITORIO_EQUIPOS) private readonly repo: RepositorioEquipos,
-    @Inject(REPOSITORIO_UBICACIONES) ubicaciones: RepositorioUbicaciones,
-    @Inject(REPOSITORIO_INTERVENCIONES) intervenciones: RepositorioIntervenciones,
-    @Inject(REPOSITORIO_PLANES) planesRepo: RepositorioPlanes,
     @Inject(ALMACEN_IMAGENES) private readonly almacen: AlmacenImagenes,
     @Inject(RELOJ) private readonly reloj: Reloj,
-    @Inject(REPOSITORIO_MONTAJES) montajes: RepositorioMontajes,
-  ) {
-    this.crear = new CrearEquipo(repo);
-    // Con los montajes: dar de baja un equipo montado lo desmonta.
-    this.actualizar = new ActualizarEquipo(repo, montajes, reloj);
-    this.consultar = new ConsultarEquipos(repo, reloj);
-    this.importar = new ImportarEquipos(repo, ubicaciones);
-    this.cambiarFoto = new CambiarFotoEquipo(repo, almacen);
-    this.planes = new GestionarPlanes(planesRepo, repo, reloj);
-    this.registrarIntervencion = new RegistrarIntervencion(
-      intervenciones,
-      repo,
-      reloj,
-      this.planes,
-    );
-    this.historial = new ConsultarHistorial(intervenciones, repo);
-  }
+  ) {}
 
   /** Las fechas llegan como texto ISO y el dominio trabaja con Date. */
   private aFecha(valor: string | null | undefined): Date | null | undefined {

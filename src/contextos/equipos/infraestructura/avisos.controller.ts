@@ -3,7 +3,6 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
-  Inject,
   Logger,
   Post,
   Query,
@@ -15,11 +14,6 @@ import { ApiExcludeEndpoint, ApiTags } from '@nestjs/swagger';
 import { timingSafeEqual } from 'crypto';
 import { Public } from '../../../common/auth/decorators/public.decorator';
 import { ProcesarAvisos } from '../aplicacion/procesar-avisos';
-import { DESTINATARIOS_AVISOS, DestinatariosAvisos } from '../puertos/destinatarios-avisos';
-import { ENVIADOR_AVISOS, EnviadorDeAvisos } from '../puertos/enviador-avisos';
-import { RELOJ, Reloj } from '../puertos/reloj';
-import { REPOSITORIO_AVISOS, RepositorioAvisos } from '../puertos/repositorio-avisos';
-import { REPOSITORIO_PLANES, RepositorioPlanes } from '../puertos/repositorio-planes';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 
 /** Compara sin filtrar la respuesta por el tiempo que tarda. */
@@ -46,18 +40,11 @@ function iguales(a: string, b: string): boolean {
 @UseFilters(FiltroErroresDominio)
 export class AvisosController {
   private readonly logger = new Logger(AvisosController.name);
-  private readonly caso: ProcesarAvisos;
 
   constructor(
     private readonly config: ConfigService,
-    @Inject(REPOSITORIO_PLANES) planes: RepositorioPlanes,
-    @Inject(REPOSITORIO_AVISOS) avisos: RepositorioAvisos,
-    @Inject(DESTINATARIOS_AVISOS) destinatarios: DestinatariosAvisos,
-    @Inject(ENVIADOR_AVISOS) enviador: EnviadorDeAvisos,
-    @Inject(RELOJ) reloj: Reloj,
-  ) {
-    this.caso = new ProcesarAvisos(planes, avisos, destinatarios, enviador, reloj);
-  }
+    private readonly caso: ProcesarAvisos,
+  ) {}
 
   @Public()
   @Post('procesar')

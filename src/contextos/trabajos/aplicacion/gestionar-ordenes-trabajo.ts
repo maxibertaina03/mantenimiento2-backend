@@ -24,6 +24,7 @@ import {
   RepositorioOrdenesTrabajo,
 } from '../puertos/repositorio-ordenes-trabajo';
 import { Reloj } from '../puertos/reloj';
+import { OpcionesTrabajoDePlan, RegistrarTrabajoDePlan } from './registrar-trabajo-de-plan';
 
 /** Lo que se puede cambiar de una orden mientras está abierta. */
 export interface CambiosOrdenTrabajo {
@@ -53,8 +54,11 @@ export class GestionarOrdenesTrabajo {
     private readonly equipos: ConsultaEquipos,
     private readonly equiposIt: ConsultaEquiposIt,
     private readonly usuarios: ConsultaUsuarios,
+    // Solo para validar que el plan es del equipo. Lo que pasa cuando el
+    // trabajo se hace lo decide `RegistrarTrabajoDePlan`.
     private readonly planes: PlanesDeMantenimiento,
     private readonly reloj: Reloj,
+    private readonly trabajoDePlan: RegistrarTrabajoDePlan,
   ) {}
 
   private async traer(id: string): Promise<OrdenTrabajoConRelaciones> {
@@ -125,7 +129,10 @@ export class GestionarOrdenesTrabajo {
     }
   }
 
-  async crear(datos: DatosNuevaOrdenTrabajo): Promise<OrdenTrabajoConRelaciones> {
+  async crear(
+    datos: DatosNuevaOrdenTrabajo,
+    opciones: OpcionesTrabajoDePlan = {},
+  ): Promise<OrdenTrabajoConRelaciones> {
     await this.validarEquipo(datos.equipoId);
     await this.validarEquipoIt(datos.equipoItId);
     await this.validarPlan(datos.planId, datos.equipoId ?? null);
@@ -139,9 +146,7 @@ export class GestionarOrdenesTrabajo {
     // DESPUÉS de guardar: al revés, un fallo al guardar dejaría el plan corrido
     // sin el trabajo que lo justifica, y el equipo pasaría meses sin service
     // creyendo que está al día.
-    if (guardada.estado === 'CERRADA' && guardada.planId) {
-      await this.planes.registrarTrabajo(guardada.planId, guardada.fecha);
-    }
+    await this.trabajoDePlan.ejecutar(guardada, opciones);
 
     return guardada;
   }
@@ -224,6 +229,7 @@ export class GestionarOrdenesTrabajo {
     resolucion: string,
     usuarioId: string | null,
     cierre: CierreDeTrabajo = {},
+    opciones: OpcionesTrabajoDePlan = {},
   ): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.traer(id);
     validarQueEsSuyo(orden, usuarioId);
@@ -235,7 +241,7 @@ export class GestionarOrdenesTrabajo {
 
     // Cerrar el trabajo es lo que corre el plan, y se cuenta desde la fecha
     // real del trabajo, no desde la que estaba planificada.
-    if (cerrada.planId) await this.planes.registrarTrabajo(cerrada.planId, cerrada.fecha);
+    await this.trabajoDePlan.ejecutar(cerrada, opciones);
 
     return cerrada;
   }

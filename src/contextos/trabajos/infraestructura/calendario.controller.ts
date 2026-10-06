@@ -18,20 +18,7 @@ import { PERMISOS } from '../../../common/auth/permisos';
 import { validarDiasSemana } from '../../../common/dominio/dias-de-trabajo';
 import { ConsultarCalendario } from '../aplicacion/consultar-calendario';
 import { GestionarTareas } from '../aplicacion/gestionar-tareas';
-import { PLANES_DE_MANTENIMIENTO, PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
-import { REPOSITORIO_TAREAS, RepositorioTareas } from '../puertos/repositorio-tareas';
-import { CONSULTA_EQUIPOS, ConsultaEquipos } from '../puertos/consulta-equipos';
-import { CONSULTA_EQUIPOS_IT, ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { CONSULTA_USUARIOS, ConsultaUsuarios } from '../puertos/consulta-usuarios';
-import { RELOJ_TRABAJOS, Reloj } from '../puertos/reloj';
-import { STOCK, Stock } from '../puertos/stock';
-import {
-  REPOSITORIO_ORDENES_TRABAJO,
-  RepositorioOrdenesTrabajo,
-} from '../puertos/repositorio-ordenes-trabajo';
-import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo';
-import { RegistrarTrabajoHecho } from '../aplicacion/registrar-trabajo-hecho';
-import { UsarMateriales } from '../aplicacion/usar-materiales';
 import { AvisadorDeTareas } from './avisador-de-tareas';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import {
@@ -56,33 +43,13 @@ import {
 @UseFilters(FiltroErroresDominio)
 @Controller('calendario')
 export class CalendarioController {
-  private readonly consultar: ConsultarCalendario;
-  private readonly gestionar: GestionarTareas;
-
+  // Los casos de uso llegan armados: se componen en casos-de-uso.providers.ts.
   constructor(
-    @Inject(REPOSITORIO_TAREAS) tareas: RepositorioTareas,
-    @Inject(REPOSITORIO_ORDENES_TRABAJO) ordenes: RepositorioOrdenesTrabajo,
-    @Inject(CONSULTA_EQUIPOS) equipos: ConsultaEquipos,
-    @Inject(CONSULTA_EQUIPOS_IT) equiposIt: ConsultaEquiposIt,
+    private readonly consultar: ConsultarCalendario,
+    private readonly gestionar: GestionarTareas,
     @Inject(CONSULTA_USUARIOS) private readonly usuarios: ConsultaUsuarios,
-    @Inject(PLANES_DE_MANTENIMIENTO) planes: PlanesDeMantenimiento,
-    @Inject(STOCK) stock: Stock,
-    @Inject(RELOJ_TRABAJOS) reloj: Reloj,
     private readonly avisador: AvisadorDeTareas,
-  ) {
-    this.consultar = new ConsultarCalendario(tareas, planes, reloj);
-    this.gestionar = new GestionarTareas(
-      tareas,
-      equipos,
-      equiposIt,
-      usuarios,
-      new RegistrarTrabajoHecho(
-        new GestionarOrdenesTrabajo(ordenes, equipos, equiposIt, usuarios, planes, reloj),
-        new UsarMateriales(ordenes, stock),
-      ),
-      reloj,
-    );
-  }
+  ) {}
 
   @Permisos(PERMISOS.TAREAS_VER)
   @Get()

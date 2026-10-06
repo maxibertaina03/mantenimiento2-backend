@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
   Param,
   ParseUUIDPipe,
   Post,
@@ -24,9 +23,6 @@ import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.de
 import { PERMISOS } from '../../../common/auth/permisos';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { GestionarMontajes } from '../aplicacion/gestionar-montajes';
-import { REPOSITORIO_MONTAJES, RepositorioMontajes } from '../puertos/montajes';
-import { RELOJ, Reloj } from '../puertos/reloj';
-import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
 
 export class MontarEquipoDto {
   @ApiProperty({ format: 'uuid', description: 'La máquina donde se monta' })
@@ -58,15 +54,7 @@ export class DesmontarEquipoDto {
 @UseFilters(FiltroErroresDominio)
 @Controller('equipos/:id')
 export class MontajesController {
-  private readonly gestionar: GestionarMontajes;
-
-  constructor(
-    @Inject(REPOSITORIO_MONTAJES) montajes: RepositorioMontajes,
-    @Inject(REPOSITORIO_EQUIPOS) equipos: RepositorioEquipos,
-    @Inject(RELOJ) reloj: Reloj,
-  ) {
-    this.gestionar = new GestionarMontajes(montajes, equipos, reloj);
-  }
+  constructor(private readonly gestionar: GestionarMontajes) {}
 
   @Permisos(PERMISOS.EQUIPOS_VER)
   @Get('componentes')

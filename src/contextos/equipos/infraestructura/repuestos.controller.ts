@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Inject,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -26,8 +25,6 @@ import { PERMISOS } from '../../../common/auth/permisos';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { GestionarRepuestos } from '../aplicacion/gestionar-repuestos';
 import { MAX_NOTAS_REPUESTO } from '../dominio/repuesto';
-import { REPOSITORIO_REPUESTOS, RepositorioRepuestos } from '../puertos/repuestos';
-import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
 
 export class CambiarRepuestoDto {
   @ApiPropertyOptional({ example: 2, description: 'Cuántos lleva la máquina. null = no se dice.' })
@@ -61,14 +58,7 @@ export class AgregarRepuestoDto extends CambiarRepuestoDto {
 @UseFilters(FiltroErroresDominio)
 @Controller('equipos')
 export class RepuestosController {
-  private readonly gestionar: GestionarRepuestos;
-
-  constructor(
-    @Inject(REPOSITORIO_REPUESTOS) repuestos: RepositorioRepuestos,
-    @Inject(REPOSITORIO_EQUIPOS) equipos: RepositorioEquipos,
-  ) {
-    this.gestionar = new GestionarRepuestos(repuestos, equipos);
-  }
+  constructor(private readonly gestionar: GestionarRepuestos) {}
 
   @Permisos(PERMISOS.EQUIPOS_VER)
   @Get('de-material/:materialId')

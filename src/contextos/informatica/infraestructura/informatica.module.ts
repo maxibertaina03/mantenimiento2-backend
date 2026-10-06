@@ -15,6 +15,7 @@ import { CofreService } from './cofre.service';
 import { CredencialesController } from './credenciales.controller';
 import { PrismaConsultaEquiposIt } from './prisma-consulta-equipos-it';
 import { PrismaRepositorioCredenciales } from './prisma-repositorio-credenciales';
+import { casosDeUsoInformatica } from './casos-de-uso.providers';
 
 /**
  * El contexto de informática: el inventario de equipos y el baúl de credenciales.
@@ -48,6 +49,7 @@ import { PrismaRepositorioCredenciales } from './prisma-repositorio-credenciales
       provide: RELOJ_INFORMATICA,
       useValue: { ahora: () => new Date() },
     },
+    ...casosDeUsoInformatica,
   ],
   exports: [CofreService],
 })

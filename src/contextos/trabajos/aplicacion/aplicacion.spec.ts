@@ -4,12 +4,15 @@ import {
   ErrorNoEsSuyo,
   ErrorTransicionInvalida,
 } from '../dominio/errores';
+import { crearTarea } from '../dominio/tarea';
 import { Reloj } from '../puertos/reloj';
 import { ConsultaEquiposEnMemoria } from './consulta-equipos-en-memoria';
 import { ConsultaEquiposItEnMemoria } from './consulta-equipos-it-en-memoria';
 import { ConsultaUsuariosEnMemoria } from './consulta-usuarios-en-memoria';
 import { PlanesEnMemoria } from './planes-en-memoria';
 import { RegistrarTrabajoHecho } from './registrar-trabajo-hecho';
+import { RegistrarTrabajoDePlan } from './registrar-trabajo-de-plan';
+import { RepositorioTareasEnMemoria } from './repositorio-tareas-en-memoria';
 import { ConsultarOrdenesTrabajo } from './consultar-ordenes-trabajo';
 import { GestionarOrdenesTrabajo } from './gestionar-ordenes-trabajo';
 import { RepositorioOrdenesEnMemoria } from './repositorio-en-memoria';
@@ -38,19 +41,28 @@ function armar() {
   ]);
 
   const planes = new PlanesEnMemoria([{ id: 'plan-1', equipoId: 'eq-7' }]);
+  const tareas = new RepositorioTareasEnMemoria();
+  const ordenes = () =>
+    new GestionarOrdenesTrabajo(
+      repo,
+      equipos,
+      equiposIt,
+      usuarios,
+      planes,
+      reloj,
+      new RegistrarTrabajoDePlan(planes, tareas),
+    );
 
   return {
     repo,
     equiposIt,
     stock,
     planes,
-    gestionar: new GestionarOrdenesTrabajo(repo, equipos, equiposIt, usuarios, planes, reloj),
+    tareas,
+    gestionar: ordenes(),
     materiales: new UsarMateriales(repo, stock),
     consultar: new ConsultarOrdenesTrabajo(repo),
-    registrarHecho: new RegistrarTrabajoHecho(
-      new GestionarOrdenesTrabajo(repo, equipos, equiposIt, usuarios, planes, reloj),
-      new UsarMateriales(repo, stock),
-    ),
+    registrarHecho: new RegistrarTrabajoHecho(ordenes(), new UsarMateriales(repo, stock)),
   };
 }
 
@@ -434,6 +446,27 @@ describe('el plan de mantenimiento corre con el trabajo', () => {
     await gestionar.cerrar(orden.id, 'Se cambio el aceite', 'u1');
 
     expect(planes.avisos).toEqual([{ planId: 'plan-1', fecha: orden.fecha }]);
+  });
+
+  it('cerrar la orden de un plan deja hecha la tarea del calendario, sin pasar por el controlador', async () => {
+    // Antes esto lo hacía el controlador HTTP: un camino nuevo que cerrara
+    // órdenes se olvidaba de la tarea. Ahora es parte de cerrar la orden.
+    const { gestionar, tareas } = armar();
+    const tarea = await tareas.crear(
+      crearTarea({
+        titulo: 'Service de los 90 dias',
+        fecha: new Date('2026-09-21T00:00:00.000Z'),
+        equipoId: 'eq-7',
+        planId: 'plan-1',
+      }),
+    );
+    const orden = await gestionar.crear(CON_PLAN);
+
+    await gestionar.cerrar(orden.id, 'Se cambio el aceite', 'u1');
+
+    const despues = await tareas.buscarPorId(tarea.id);
+    expect(despues?.estado).toBe('HECHA');
+    expect(despues?.ordenTrabajoId).toBe(orden.id);
   });
 
   it('REGRESION: no se acepta un plan de otra maquina', async () => {

@@ -7,6 +7,7 @@ import { ConsultaUsuariosEnMemoria } from './consulta-usuarios-en-memoria';
 import { GestionarOrdenesTrabajo } from './gestionar-ordenes-trabajo';
 import { GestionarTareas } from './gestionar-tareas';
 import { PlanesEnMemoria } from './planes-en-memoria';
+import { RegistrarTrabajoDePlan } from './registrar-trabajo-de-plan';
 import { RegistrarTrabajoHecho } from './registrar-trabajo-hecho';
 import { RepositorioOrdenesEnMemoria } from './repositorio-en-memoria';
 import { RepositorioTareasEnMemoria } from './repositorio-tareas-en-memoria';
@@ -48,6 +49,7 @@ function armar(
     usuarios,
     planes,
     reloj,
+    new RegistrarTrabajoDePlan(planes, tareas),
   );
   const registrarHecho = new RegistrarTrabajoHecho(
     gestionarOrdenes,

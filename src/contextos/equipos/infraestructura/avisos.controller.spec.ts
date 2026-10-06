@@ -1,6 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CLAVE_PUBLICO } from '../../../common/auth/decorators/public.decorator';
+import { ProcesarAvisos } from '../aplicacion/procesar-avisos';
 import { DestinatariosEnMemoria } from '../aplicacion/destinatarios-en-memoria';
 import { EnviadorAvisosEnMemoria } from '../aplicacion/enviador-avisos-en-memoria';
 import { RepositorioAvisosEnMemoria } from '../aplicacion/repositorio-avisos-en-memoria';
@@ -19,11 +20,13 @@ function armar(tokenConfigurado: string | undefined = TOKEN) {
   const enviador = new EnviadorAvisosEnMemoria();
   const controlador = new AvisosController(
     config as unknown as ConfigService,
-    planes,
-    new RepositorioAvisosEnMemoria(),
-    new DestinatariosEnMemoria(['mantenimiento@lacteoslastres.com.ar']),
-    enviador,
-    new RelojFijo(HOY),
+    new ProcesarAvisos(
+      planes,
+      new RepositorioAvisosEnMemoria(),
+      new DestinatariosEnMemoria(['mantenimiento@lacteoslastres.com.ar']),
+      enviador,
+      new RelojFijo(HOY),
+    ),
   );
   return { controlador, planes, enviador };
 }

@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
   Param,
   ParseUUIDPipe,
   Post,
@@ -23,15 +22,7 @@ import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dom
 import { GestionarManuales } from '../aplicacion/gestionar-manuales';
 import { ErrorDatosInvalidos } from '../dominio/errores';
 import { MAXIMO_BYTES_MANUAL } from '../dominio/manual';
-import {
-  ALMACEN_MANUALES,
-  AlmacenManuales,
-  Manual,
-  REPOSITORIO_MANUALES,
-  RepositorioManuales,
-} from '../puertos/manuales';
-import { RELOJ, Reloj } from '../puertos/reloj';
-import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
+import { Manual } from '../puertos/manuales';
 
 /** Lo que multer entrega de un archivo subido. Solo lo que se usa. */
 interface ArchivoRecibido {
@@ -56,16 +47,7 @@ function aRespuesta(m: Manual) {
 @UseFilters(FiltroErroresDominio)
 @Controller('equipos/:id/manuales')
 export class ManualesController {
-  private readonly gestionar: GestionarManuales;
-
-  constructor(
-    @Inject(REPOSITORIO_MANUALES) manuales: RepositorioManuales,
-    @Inject(ALMACEN_MANUALES) almacen: AlmacenManuales,
-    @Inject(REPOSITORIO_EQUIPOS) equipos: RepositorioEquipos,
-    @Inject(RELOJ) reloj: Reloj,
-  ) {
-    this.gestionar = new GestionarManuales(manuales, almacen, equipos, reloj);
-  }
+  constructor(private readonly gestionar: GestionarManuales) {}
 
   @Permisos(PERMISOS.EQUIPOS_VER)
   @Get()

@@ -151,6 +151,8 @@ export class GestionarTareas {
         materiales: datos.materiales,
       },
       usuarioId,
+      // La tarea que se cierra es esta, y se cierra acá abajo.
+      { cierraSuPropiaTarea: true },
     );
 
     // `usuarioId` ya no puede ser null: lo acaba de comprobar el dominio.

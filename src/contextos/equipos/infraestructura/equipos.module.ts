@@ -8,10 +8,10 @@ import { DESTINATARIOS_AVISOS } from '../puertos/destinatarios-avisos';
 import { ENVIADOR_AVISOS } from '../puertos/enviador-avisos';
 import { REPOSITORIO_AVISOS } from '../puertos/repositorio-avisos';
 import { REPOSITORIO_INTERVENCIONES } from '../puertos/repositorio-intervenciones';
-import { REPOSITORIO_PLANES, RepositorioPlanes } from '../puertos/repositorio-planes';
-import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
+import { REPOSITORIO_PLANES } from '../puertos/repositorio-planes';
+import { REPOSITORIO_EQUIPOS } from '../puertos/repositorio-equipos';
 import { REPOSITORIO_UBICACIONES } from '../puertos/repositorio-ubicaciones';
-import { RELOJ, Reloj, RelojDelSistema } from '../puertos/reloj';
+import { RELOJ, RelojDelSistema } from '../puertos/reloj';
 import {
   CatalogosEquipoService,
   MarcasEquipoController,
@@ -32,6 +32,7 @@ import { PrismaRepositorioUbicaciones } from './prisma-repositorio-ubicaciones';
 import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
 import { ManualesController } from './manuales.controller';
 import { FotosController } from './fotos.controller';
+import { casosDeUsoEquipos } from './casos-de-uso.providers';
 import { PrismaRepositorioFotos } from './prisma-repositorio-fotos';
 import { MontajesController } from './montajes.controller';
 import { PrismaRepositorioMontajes } from './prisma-repositorio-montajes';
@@ -77,14 +78,7 @@ import { SupabaseAlmacenManuales } from './supabase-almacen-manuales';
     { provide: DESTINATARIOS_AVISOS, useClass: PrismaDestinatariosAvisos },
     { provide: ENVIADOR_AVISOS, useClass: CorreoEnviadorAvisos },
     { provide: RELOJ, useClass: RelojDelSistema },
-    // Se ofrece armado para que el contexto de trabajos pueda avisarle que un
-    // service se hizo, sin copiar la cuenta de cuándo toca el próximo.
-    {
-      provide: GestionarPlanes,
-      useFactory: (planes: RepositorioPlanes, equipos: RepositorioEquipos, reloj: Reloj) =>
-        new GestionarPlanes(planes, equipos, reloj),
-      inject: [REPOSITORIO_PLANES, REPOSITORIO_EQUIPOS, RELOJ],
-    },
+    ...casosDeUsoEquipos,
   ],
   exports: [REPOSITORIO_EQUIPOS, RELOJ, GestionarPlanes],
 })

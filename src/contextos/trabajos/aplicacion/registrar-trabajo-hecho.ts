@@ -1,6 +1,7 @@
 import { DatosNuevaOrdenTrabajo } from '../dominio/orden-trabajo';
 import { OrdenTrabajoConRelaciones } from '../puertos/repositorio-ordenes-trabajo';
 import { GestionarOrdenesTrabajo } from './gestionar-ordenes-trabajo';
+import { OpcionesTrabajoDePlan } from './registrar-trabajo-de-plan';
 import { DatosMaterialUsado, UsarMateriales } from './usar-materiales';
 
 export interface DatosTrabajoHecho extends DatosNuevaOrdenTrabajo {
@@ -29,12 +30,13 @@ export class RegistrarTrabajoHecho {
   async ejecutar(
     datos: DatosTrabajoHecho,
     usuarioId: string | null,
+    opciones: OpcionesTrabajoDePlan = {},
   ): Promise<OrdenTrabajoConRelaciones> {
     const { materiales = [], resolucion, ...resto } = datos;
 
     // Sin materiales, el dominio la crea cerrada de una: un paso, una escritura.
     if (materiales.length === 0) {
-      return this.gestionar.crear({ ...resto, resolucion });
+      return this.gestionar.crear({ ...resto, resolucion }, opciones);
     }
 
     // Con materiales hay que pasar por abierta, porque una orden cerrada no
@@ -50,6 +52,6 @@ export class RegistrarTrabajoHecho {
     }
 
     if (!resolucion) return this.gestionar.editar(orden.id, {}, usuarioId);
-    return this.gestionar.cerrar(orden.id, resolucion, usuarioId);
+    return this.gestionar.cerrar(orden.id, resolucion, usuarioId, {}, opciones);
   }
 }

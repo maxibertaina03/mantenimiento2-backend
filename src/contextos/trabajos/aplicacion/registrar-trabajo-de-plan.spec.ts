@@ -1,5 +1,6 @@
 import { crearTarea } from '../dominio/tarea';
-import { CerrarTareaDelPlan, OrdenCerrada } from './cerrar-tarea-del-plan';
+import { PlanesEnMemoria } from './planes-en-memoria';
+import { OrdenCerrada, RegistrarTrabajoDePlan } from './registrar-trabajo-de-plan';
 import { RepositorioTareasEnMemoria } from './repositorio-tareas-en-memoria';
 
 /**
@@ -13,6 +14,7 @@ const ORDEN: OrdenCerrada = {
   id: 'ot-1',
   estado: 'CERRADA',
   planId: 'plan-purga',
+  fecha: dia('2026-09-30'),
   cerradaPorId: 'u2',
   asignadoAId: 'u2',
 };
@@ -28,10 +30,28 @@ async function armar(asignadoAId: string | null = null) {
       asignadoAId,
     }),
   );
-  return { tareas, pendiente, cerrar: new CerrarTareaDelPlan(tareas) };
+  const planes = new PlanesEnMemoria();
+  return { tareas, pendiente, planes, cerrar: new RegistrarTrabajoDePlan(planes, tareas) };
 }
 
-describe('registrar un service desde el equipo deja hecha la tarea del calendario', () => {
+describe('se hizo el trabajo de un plan: el plan corre y la tarea del calendario queda hecha', () => {
+  it('avisa al plan con la fecha real del trabajo', async () => {
+    const { cerrar, planes } = await armar();
+
+    await cerrar.ejecutar(ORDEN);
+
+    expect(planes.avisos).toEqual([{ planId: 'plan-purga', fecha: dia('2026-09-30') }]);
+  });
+
+  it('desde «dar por hecha» corre el plan pero no busca otra tarea: esa la cierra quien llama', async () => {
+    const { cerrar, planes, tareas, pendiente } = await armar();
+
+    expect(await cerrar.ejecutar(ORDEN, { cierraSuPropiaTarea: true })).toBeNull();
+
+    expect(planes.avisos).toHaveLength(1);
+    expect((await tareas.buscarPorId(pendiente.id))?.estado).toBe('PENDIENTE');
+  });
+
   it('cierra la tarea pendiente del plan, atada a la orden y a nombre de quien la cerro', async () => {
     const { cerrar, tareas, pendiente } = await armar();
 
@@ -51,12 +71,13 @@ describe('registrar un service desde el equipo deja hecha la tarea del calendari
     expect((await tareas.buscarPorId(pendiente.id))?.asignadoAId).toBe('u1');
   });
 
-  it('una orden sin plan, o todavia abierta, no toca el calendario', async () => {
-    const { cerrar, tareas, pendiente } = await armar();
+  it('una orden sin plan, o todavia abierta, no toca ni el plan ni el calendario', async () => {
+    const { cerrar, tareas, pendiente, planes } = await armar();
 
     expect(await cerrar.ejecutar({ ...ORDEN, planId: null })).toBeNull();
     expect(await cerrar.ejecutar({ ...ORDEN, estado: 'ABIERTA' })).toBeNull();
     expect((await tareas.buscarPorId(pendiente.id))?.estado).toBe('PENDIENTE');
+    expect(planes.avisos).toEqual([]);
   });
 
   it('REGRESION: una orden que ya explica una tarea no cierra otra (reabrir y volver a cerrar)', async () => {

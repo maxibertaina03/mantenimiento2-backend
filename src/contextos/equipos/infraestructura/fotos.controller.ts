@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -19,9 +18,7 @@ import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.de
 import { PERMISOS } from '../../../common/auth/permisos';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { GestionarFotos } from '../aplicacion/gestionar-fotos';
-import { ALMACEN_IMAGENES, AlmacenImagenes } from '../puertos/almacen-imagenes';
-import { Foto, REPOSITORIO_FOTOS, RepositorioFotos } from '../puertos/fotos';
-import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
+import { Foto } from '../puertos/fotos';
 import { CambiarDescripcionFotoDto, SubirFotoDto } from './equipos.dto';
 
 /** Lo que ve la pantalla de una foto: nunca la ruta interna del almacén. */
@@ -40,15 +37,7 @@ function aRespuesta(f: Foto) {
 @UseFilters(FiltroErroresDominio)
 @Controller('equipos/:id/fotos')
 export class FotosController {
-  private readonly gestionar: GestionarFotos;
-
-  constructor(
-    @Inject(REPOSITORIO_FOTOS) fotos: RepositorioFotos,
-    @Inject(ALMACEN_IMAGENES) almacen: AlmacenImagenes,
-    @Inject(REPOSITORIO_EQUIPOS) equipos: RepositorioEquipos,
-  ) {
-    this.gestionar = new GestionarFotos(fotos, almacen, equipos);
-  }
+  constructor(private readonly gestionar: GestionarFotos) {}
 
   @Permisos(PERMISOS.EQUIPOS_VER)
   @Get()

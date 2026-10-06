@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Inject,
   UseFilters,
   Delete,
   Get,
@@ -20,9 +19,6 @@ import { Permisos } from '../../../common/auth/decorators/permisos.decorator';
 import { PERMISOS } from '../../../common/auth/permisos';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { GestionarEquiposIt } from '../aplicacion/gestionar-equipos-it';
-import { CONSULTA_RESPONSABLES, ConsultaResponsables } from '../puertos/consulta-responsables';
-import { RELOJ_INFORMATICA, Reloj } from '../puertos/reloj';
-import { REPOSITORIO_EQUIPOS_IT, RepositorioEquiposIt } from '../puertos/repositorio-equipos-it';
 import { ActualizarEquipoDto } from './equipos-it/actualizar-equipo.dto';
 import { AsignarEquipoDto } from './equipos-it/asignar-equipo.dto';
 import { CrearEquipoDto } from './equipos-it/crear-equipo.dto';
@@ -43,16 +39,10 @@ function comoFecha(texto: string | undefined): Date | undefined {
 @UseFilters(FiltroErroresDominio)
 @Controller('equipos-it')
 export class EquiposItController {
-  private readonly gestionar: GestionarEquiposIt;
-
   constructor(
-    @Inject(REPOSITORIO_EQUIPOS_IT) repo: RepositorioEquiposIt,
-    @Inject(CONSULTA_RESPONSABLES) responsables: ConsultaResponsables,
-    @Inject(RELOJ_INFORMATICA) reloj: Reloj,
+    private readonly gestionar: GestionarEquiposIt,
     private readonly importacion: ImportarEquiposItService,
-  ) {
-    this.gestionar = new GestionarEquiposIt(repo, responsables, reloj);
-  }
+  ) {}
 
   @Permisos(PERMISOS.IT_EDITAR)
   @Post()

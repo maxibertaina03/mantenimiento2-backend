@@ -17,12 +17,6 @@ import { UseFilters } from '@nestjs/common';
 import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.decorator';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { GestionarCredenciales } from '../aplicacion/gestionar-credenciales';
-import {
-  REPOSITORIO_CREDENCIALES,
-  RepositorioCredenciales,
-} from '../puertos/repositorio-credenciales';
-import { COFRE, Cofre } from '../puertos/cofre';
-import { CONSULTA_EQUIPOS_IT_BAUL, ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { RELOJ_INFORMATICA, Reloj } from '../puertos/reloj';
 import {
   ActualizarCredencialDto,
@@ -45,16 +39,10 @@ import { PERMISOS } from '../../../common/auth/permisos';
 @UseFilters(FiltroErroresDominio)
 @Controller('credenciales')
 export class CredencialesController {
-  private readonly gestionar: GestionarCredenciales;
-
   constructor(
-    @Inject(REPOSITORIO_CREDENCIALES) repo: RepositorioCredenciales,
-    @Inject(COFRE) cofre: Cofre,
-    @Inject(CONSULTA_EQUIPOS_IT_BAUL) equipos: ConsultaEquiposIt,
+    private readonly gestionar: GestionarCredenciales,
     @Inject(RELOJ_INFORMATICA) private readonly reloj: Reloj,
-  ) {
-    this.gestionar = new GestionarCredenciales(repo, cofre, equipos, reloj);
-  }
+  ) {}
 
   /** La respuesta que sale por la API, con el estado de rotacion calculado a hoy. */
   private responder(c: Parameters<typeof CredencialRespuestaDto.desde>[0]) {
