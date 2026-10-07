@@ -5,7 +5,7 @@ import {
   conEstado,
   crearPlan,
   ordenarPorUrgencia,
-  proximaFechaDespuesDe,
+  proximaFechaTrasTrabajo,
 } from '../dominio/plan-mantenimiento';
 import { RepositorioEquipos } from '../puertos/repositorio-equipos';
 import { PlanConEquipo, RepositorioPlanes } from '../puertos/repositorio-planes';
@@ -102,12 +102,22 @@ export class GestionarPlanes {
    * planificada: un service que tocaba en marzo y se hizo en mayo tiene el
    * siguiente a los noventa días de mayo.
    */
-  async adelantarDespuesDeTrabajo(planId: string, fechaDelTrabajo: Date): Promise<void> {
+  async adelantarDespuesDeTrabajo(
+    planId: string,
+    fechaDelTrabajo: Date,
+    /** La fecha de la tarea que cerró el trabajo: el plan no vuelve a caer ahí. */
+    yaHechoHasta?: Date | null,
+  ): Promise<void> {
     const plan = await this.planes.buscarPorId(planId);
     if (!plan) return; // el plan pudo borrarse entre medio; no vale romper por eso
 
     await this.planes.actualizar(planId, {
-      proximaFecha: proximaFechaDespuesDe(fechaDelTrabajo, plan.periodicidadDias, plan.diasSemana),
+      proximaFecha: proximaFechaTrasTrabajo(
+        fechaDelTrabajo,
+        plan.periodicidadDias,
+        plan.diasSemana,
+        yaHechoHasta,
+      ),
     });
   }
 }

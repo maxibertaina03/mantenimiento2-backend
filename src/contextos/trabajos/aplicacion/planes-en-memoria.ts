@@ -3,7 +3,7 @@ import { PlanesDeMantenimiento, VencimientoDePlan } from '../puertos/planes-de-m
 /** Los planes de los tests: cuáles existen y qué se les avisó. */
 export class PlanesEnMemoria implements PlanesDeMantenimiento {
   /** Lo que se fue avisando, para revisarlo en el test. */
-  readonly avisos: { planId: string; fecha: Date }[] = [];
+  readonly avisos: { planId: string; fecha: Date; yaHechoHasta?: Date }[] = [];
 
   constructor(
     private readonly planes: { id: string; equipoId: string }[] = [],
@@ -19,7 +19,15 @@ export class PlanesEnMemoria implements PlanesDeMantenimiento {
     return this.planes.some((p) => p.id === planId && p.equipoId === equipoId);
   }
 
-  async registrarTrabajo(planId: string, fechaDelTrabajo: Date): Promise<void> {
-    this.avisos.push({ planId, fecha: fechaDelTrabajo });
+  async registrarTrabajo(
+    planId: string,
+    fechaDelTrabajo: Date,
+    yaHechoHasta?: Date,
+  ): Promise<void> {
+    this.avisos.push(
+      yaHechoHasta
+        ? { planId, fecha: fechaDelTrabajo, yaHechoHasta }
+        : { planId, fecha: fechaDelTrabajo },
+    );
   }
 }

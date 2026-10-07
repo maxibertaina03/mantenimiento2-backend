@@ -182,6 +182,34 @@ describe('Calendario y planes (integración, Postgres real)', () => {
     expect(textoDia(fila.proximaFecha)).toBe('2026-09-07');
   });
 
+  it('REGRESION: la purga diaria de mañana dada por hecha hoy no deja el plan trabado en un día ya hecho', async () => {
+    // Lo que pasó el 5/10/2026: se dio por hecha la purga del 6 el día 5. El
+    // plan contaba desde el 5 y quedaba en el 6, ya hecha: Servicios la
+    // mostraba vencida y «Dar por hecho» decía que ya estaba hecha.
+    const hoy = new Date(`${textoDia(new Date())}T00:00:00.000Z`);
+    const maniana = sumarDias(hoy, 1);
+    const plan = await crearPlan({
+      periodicidadDias: 1,
+      proximaFecha: textoDia(maniana),
+      diasSemana: [0, 1, 2, 3, 4, 5, 6],
+    });
+    const deManiana = await t.http.post(`/api/calendario/planes/${plan.body.id}/tarea`).expect(201);
+    expect(textoDia(deManiana.body.fecha)).toBe(textoDia(maniana));
+
+    await t.http
+      .post(`/api/calendario/${deManiana.body.id}/completar`)
+      .send({ resolucion: 'Purgado' })
+      .expect(201);
+
+    const fila = await t.prisma.planMantenimiento.findUniqueOrThrow({
+      where: { id: plan.body.id },
+    });
+    expect(textoDia(fila.proximaFecha)).toBe(textoDia(sumarDias(maniana, 1)));
+    // Y la tarea que ofrece Servicios ahora es una pendiente, no la ya hecha.
+    const siguiente = await t.http.post(`/api/calendario/planes/${plan.body.id}/tarea`).expect(201);
+    expect(siguiente.body.estado).toBe('PENDIENTE');
+  });
+
   it('«Hoy» muestra lo mío y lo que no es de nadie, pero no lo de otro', async () => {
     const otro = await t.prisma.usuario.create({
       data: { nombre: 'Leandro', email: 'leandro@test.local', rol: 'MANTENIMIENTO' },

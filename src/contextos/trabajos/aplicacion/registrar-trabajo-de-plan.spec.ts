@@ -40,7 +40,10 @@ describe('se hizo el trabajo de un plan: el plan corre y la tarea del calendario
 
     await cerrar.ejecutar(ORDEN);
 
-    expect(planes.avisos).toEqual([{ planId: 'plan-purga', fecha: dia('2026-09-30') }]);
+    // Con la fecha de la tarea que cierra, para que el plan no vuelva a caer ahí.
+    expect(planes.avisos).toEqual([
+      { planId: 'plan-purga', fecha: dia('2026-09-30'), yaHechoHasta: dia('2026-09-30') },
+    ]);
   });
 
   it('desde «dar por hecha» corre el plan pero no busca otra tarea: esa la cierra quien llama', async () => {
@@ -69,6 +72,17 @@ describe('se hizo el trabajo de un plan: el plan corre y la tarea del calendario
     await cerrar.ejecutar(ORDEN);
 
     expect((await tareas.buscarPorId(pendiente.id))?.asignadoAId).toBe('u1');
+  });
+
+  it('REGRESION: un trabajo adelantado le dice al plan qué día ya quedó hecho', async () => {
+    // La purga del 30/9 hecha el 29/9: el plan no puede volver a quedar en el 30.
+    const { cerrar, planes } = await armar();
+
+    await cerrar.ejecutar({ ...ORDEN, fecha: dia('2026-09-29') });
+
+    expect(planes.avisos).toEqual([
+      { planId: 'plan-purga', fecha: dia('2026-09-29'), yaHechoHasta: dia('2026-09-30') },
+    ]);
   });
 
   it('una orden sin plan, o todavia abierta, no toca ni el plan ni el calendario', async () => {

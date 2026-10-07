@@ -282,8 +282,11 @@ describe('dar una tarea por hecha', () => {
 
     expect(hecha.estado).toBe('HECHA');
     // El service tocaba el 25 y se hizo hoy, el 22: el plan corre desde el 22,
-    // que es cuando se hizo de verdad.
-    expect(planes.avisos).toEqual([{ planId: 'plan-1', fecha: HOY }]);
+    // que es cuando se hizo de verdad. Se le dice también que el 25 ya está
+    // hecho, para que no vuelva a caer ahí.
+    expect(planes.avisos).toEqual([
+      { planId: 'plan-1', fecha: HOY, yaHechoHasta: dia('2026-09-25') },
+    ]);
   });
 
   it('REGRESION: la tarea de otro no se puede dar por hecha, y no toca el stock', async () => {
@@ -408,7 +411,9 @@ describe('dar por hecho un service desde la pantalla de servicios', () => {
     expect(hecha.estado).toBe('HECHA');
     expect(hecha.asignadoAId).toBe('u2');
     expect(hecha.ordenTrabajoId).not.toBeNull();
-    expect(planes.avisos).toEqual([{ planId: 'plan-1', fecha: dia('2026-08-01') }]);
+    expect(planes.avisos).toEqual([
+      { planId: 'plan-1', fecha: dia('2026-08-01'), yaHechoHasta: dia('2026-08-01') },
+    ]);
   });
 
   it('un plan que ya no esta vigente no inventa una tarea', async () => {

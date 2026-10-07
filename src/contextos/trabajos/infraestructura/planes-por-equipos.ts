@@ -55,7 +55,11 @@ export class PlanesPorEquipos implements PlanesDeMantenimiento {
     return fila !== null;
   }
 
-  async registrarTrabajo(planId: string, fechaDelTrabajo: Date): Promise<void> {
-    await this.planes.adelantarDespuesDeTrabajo(planId, fechaDelTrabajo);
+  async registrarTrabajo(
+    planId: string,
+    fechaDelTrabajo: Date,
+    yaHechoHasta?: Date,
+  ): Promise<void> {
+    await this.planes.adelantarDespuesDeTrabajo(planId, fechaDelTrabajo, yaHechoHasta);
   }
 }

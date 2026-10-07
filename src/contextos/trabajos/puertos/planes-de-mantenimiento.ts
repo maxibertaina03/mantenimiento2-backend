@@ -39,7 +39,15 @@ export interface PlanesDeMantenimiento {
    * service que tocaba en marzo y se hizo en mayo tiene el siguiente a los
    * noventa días de mayo.
    */
-  registrarTrabajo(planId: string, fechaDelTrabajo: Date): Promise<void>;
+  registrarTrabajo(
+    planId: string,
+    fechaDelTrabajo: Date,
+    /**
+     * La fecha de la tarea que cerró el trabajo. Si se adelantó —la purga de
+     * mañana hecha hoy—, el plan no puede volver a caer en ese día ya hecho.
+     */
+    yaHechoHasta?: Date,
+  ): Promise<void>;
 }
 
 export const PLANES_DE_MANTENIMIENTO = Symbol('PlanesDeMantenimiento');

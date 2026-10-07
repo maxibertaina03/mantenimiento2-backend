@@ -20,6 +20,8 @@ export interface OpcionesTrabajoDePlan {
    * Ahí no hay que buscar otra.
    */
   cierraSuPropiaTarea?: boolean;
+  /** La fecha de esa tarea, cuando la cierra quien llama. */
+  fechaDeSuTarea?: Date;
 }
 
 /** Desde siempre y hasta muy lejos: la tarea de un plan puede estar en cualquier fecha. */
@@ -32,6 +34,10 @@ const HASTA_MUY_LEJOS = new Date('2100-01-01T00:00:00.000Z');
  *
  * 1. **El plan corre** a la próxima fecha, contada desde la fecha real del
  *    trabajo. La cuenta es del contexto de equipos; acá solo se le avisa.
+ *    Se le pasa también la fecha de la tarea que explica, para que el plan
+ *    no vuelva a caer en un día ya hecho: la purga diaria de mañana hecha hoy
+ *    dejaba el plan en mañana, apuntando a una tarea cerrada, y Servicios la
+ *    mostraba vencida sin poder darla por hecha (5/10/2026, tres purgas).
  * 2. **La tarea del calendario de ese service queda hecha**, atada a la orden
  *    que la explica. Antes, un service registrado desde la ficha del equipo
  *    corría el plan pero dejaba la tarea pendiente —vencida— por un trabajo que
@@ -59,13 +65,23 @@ export class RegistrarTrabajoDePlan {
   ): Promise<TareaConRelaciones | null> {
     if (orden.estado !== 'CERRADA' || !orden.planId) return null;
 
-    await this.planes.registrarTrabajo(orden.planId, orden.fecha);
+    // Primero cuál tarea explica este trabajo: el plan no puede volver a caer
+    // en su fecha.
+    const aCerrar = opciones.cierraSuPropiaTarea
+      ? null
+      : await this.pendienteQueExplica(orden, orden.planId);
+    const fechaDeLaTarea = opciones.fechaDeSuTarea ?? aCerrar?.fecha;
 
-    if (opciones.cierraSuPropiaTarea) return null;
-    return this.cerrarTareaPendiente(orden, orden.planId);
+    await this.planes.registrarTrabajo(orden.planId, orden.fecha, fechaDeLaTarea);
+
+    if (!aCerrar) return null;
+    return this.tareas.actualizar(
+      aCerrar.id,
+      cerrarPorTrabajoRegistrado(aCerrar, orden.id, orden.cerradaPorId ?? orden.asignadoAId),
+    );
   }
 
-  private async cerrarTareaPendiente(
+  private async pendienteQueExplica(
     orden: OrdenCerrada,
     planId: string,
   ): Promise<TareaConRelaciones | null> {
@@ -78,11 +94,6 @@ export class RegistrarTrabajoDePlan {
       planId,
       soloPendientes: true,
     });
-    if (!pendiente) return null;
-
-    return this.tareas.actualizar(
-      pendiente.id,
-      cerrarPorTrabajoRegistrado(pendiente, orden.id, orden.cerradaPorId ?? orden.asignadoAId),
-    );
+    return pendiente ?? null;
   }
 }

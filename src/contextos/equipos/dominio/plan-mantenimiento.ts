@@ -93,6 +93,34 @@ export function proximaFechaDespuesDe(
   return alSiguienteDiaDeTrabajo(proxima, diasSemana);
 }
 
+/**
+ * La próxima fecha después de un trabajo, sin caer en un día que ya se hizo.
+ *
+ * Se cuenta desde el día real del trabajo: un cambio de aceite cada 90 días
+ * hecho tres días antes tiene el siguiente a los 90 días de cuando se hizo.
+ * Pero si esa cuenta cae en la tarea que el trabajo acaba de cerrar, o antes,
+ * se cuenta desde esa tarea. Pasa con lo diario hecho por adelantado: la purga
+ * de mañana hecha hoy daba «mañana», un día ya hecho, y el plan quedaba
+ * apuntando a una tarea cerrada (el 5/10/2026, con tres purgas).
+ *
+ * @param yaHechoHasta la fecha de la tarea que cerró este trabajo, si hay una
+ */
+export function proximaFechaTrasTrabajo(
+  fechaDelTrabajo: Date,
+  periodicidadDias: number,
+  diasSemana: readonly number[] = TODOS_LOS_DIAS,
+  yaHechoHasta?: Date | null,
+): Date {
+  const proxima = proximaFechaDespuesDe(fechaDelTrabajo, periodicidadDias, diasSemana);
+  // Por día, no por hora: el trabajo adelantado tiene la hora en que se hizo,
+  // y «mañana a las 19:25» no es posterior al día de mañana.
+  const dia = (f: Date) => f.toISOString().slice(0, 10);
+  if (yaHechoHasta && dia(proxima) <= dia(yaHechoHasta)) {
+    return proximaFechaDespuesDe(yaHechoHasta, periodicidadDias, diasSemana);
+  }
+  return proxima;
+}
+
 const MAXIMO_DIAS = 3650; // diez años
 
 export function crearPlan(datos: DatosNuevoPlan): Omit<PlanMantenimiento, 'id'> {

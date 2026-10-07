@@ -9,6 +9,7 @@ import {
   estadoPlan,
   ordenarPorUrgencia,
   proximaFechaDespuesDe,
+  proximaFechaTrasTrabajo,
 } from './plan-mantenimiento';
 
 /**
@@ -80,6 +81,49 @@ describe('proximaFechaDespuesDe', () => {
   it('cruza el cambio de año', () => {
     expect(proximaFechaDespuesDe(fecha('2026-12-15'), 30).toISOString().slice(0, 10)).toBe(
       '2027-01-14',
+    );
+  });
+});
+
+describe('proximaFechaTrasTrabajo', () => {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const TODOS = [0, 1, 2, 3, 4, 5, 6];
+
+  it('cuenta desde el día real del trabajo, aunque se haya adelantado', () => {
+    // Cada 90 días, tocaba el 25/9 y se hizo el 22/9: el siguiente, a los 90 del 22.
+    expect(iso(proximaFechaTrasTrabajo(fecha('2026-09-22'), 90, TODOS, fecha('2026-09-25')))).toBe(
+      '2026-12-21',
+    );
+  });
+
+  it('REGRESION: la purga diaria de mañana hecha hoy no deja el plan en mañana, que ya está hecha', () => {
+    // El 5/10, a las 19:25, se dio por hecha la purga del 6/10. Contando desde
+    // el 5, el plan quedaba en el 6: una tarea cerrada, vencida y sin poder
+    // darse por hecha.
+    expect(
+      iso(proximaFechaTrasTrabajo(fecha('2026-10-05'), 1, [1, 2, 3, 4, 5], fecha('2026-10-06'))),
+    ).toBe('2026-10-07');
+  });
+
+  it('REGRESION: compara por día: el trabajo adelantado trae la hora en que se hizo', () => {
+    // «Dar por hecha» la purga de mañana guarda como fecha del trabajo el
+    // momento en que se tocó el botón, con hora.
+    expect(
+      iso(
+        proximaFechaTrasTrabajo(
+          new Date('2026-10-05T19:25:00.000Z'),
+          1,
+          TODOS,
+          fecha('2026-10-06'),
+        ),
+      ),
+    ).toBe('2026-10-07');
+  });
+
+  it('sin tarea, o con una tarea pasada, es la cuenta de siempre', () => {
+    expect(iso(proximaFechaTrasTrabajo(fecha('2026-10-05'), 1, TODOS))).toBe('2026-10-06');
+    expect(iso(proximaFechaTrasTrabajo(fecha('2026-10-05'), 1, TODOS, fecha('2026-10-01')))).toBe(
+      '2026-10-06',
     );
   });
 });
