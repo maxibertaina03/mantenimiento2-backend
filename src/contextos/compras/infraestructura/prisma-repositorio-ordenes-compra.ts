@@ -40,7 +40,9 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
           select: { nombre: true, unidad: { select: { simbolo: true } } },
         },
       },
-      orderBy: { id: 'asc' as const },
+      // En el orden en que se cargaron. El id desempata los renglones viejos
+      // que comparten posición (no debería pasar, pero el orden queda fijo).
+      orderBy: [{ posicion: 'asc' as const }, { id: 'asc' as const }],
     },
   };
 
@@ -103,7 +105,8 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
           observaciones: datos.observaciones,
           creadoPorId: datos.creadoPorId,
           renglones: {
-            create: datos.renglones.map((r) => ({
+            create: datos.renglones.map((r, posicion) => ({
+              posicion,
               materialId: r.materialId,
               cantidad: aDecimal(r.cantidad),
               precioUnitario:
@@ -156,8 +159,9 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
         // diferenciar altas/bajas/modificaciones renglón por renglón.
         await tx.renglonOrdenCompra.deleteMany({ where: { ordenId: id } });
         await tx.renglonOrdenCompra.createMany({
-          data: datos.renglones.map((r) => ({
+          data: datos.renglones.map((r, posicion) => ({
             ordenId: id,
+            posicion,
             materialId: r.materialId,
             cantidad: aDecimal(r.cantidad),
             precioUnitario:

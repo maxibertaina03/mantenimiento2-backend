@@ -666,6 +666,11 @@ model RenglonOrdenCompra {
   id      String @id @default(uuid())
   ordenId String
 
+  /// El lugar del renglón en la orden, como se cargó: 0, 1, 2… Sin esto se
+  /// ordenaban por id, que es un uuid al azar, y la orden se mostraba —y se
+  /// imprimía— en otro orden que el de carga.
+  posicion Int @default(0)
+
   /// Que material se compra. Nulo cuando el renglon es de un equipo.
   ///
   /// Dejo de ser obligatorio cuando se pudo comprar equipos y herramientas: un
