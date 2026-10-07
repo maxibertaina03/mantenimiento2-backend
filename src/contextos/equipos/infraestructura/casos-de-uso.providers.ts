@@ -2,7 +2,6 @@ import { Provider } from '@nestjs/common';
 import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { CambiarFotoEquipo } from '../aplicacion/cambiar-foto-equipo';
 import { ConsultarEquipos } from '../aplicacion/consultar-equipos';
-import { ConsultarHistorial } from '../aplicacion/consultar-historial';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
 import { GestionarFotos } from '../aplicacion/gestionar-fotos';
 import { GestionarManuales } from '../aplicacion/gestionar-manuales';
@@ -11,7 +10,6 @@ import { GestionarPlanes } from '../aplicacion/gestionar-planes';
 import { GestionarRepuestos } from '../aplicacion/gestionar-repuestos';
 import { ImportarEquipos } from '../aplicacion/importar-equipos';
 import { ProcesarAvisos } from '../aplicacion/procesar-avisos';
-import { RegistrarIntervencion } from '../aplicacion/registrar-intervencion';
 import { ALMACEN_IMAGENES, AlmacenImagenes } from '../puertos/almacen-imagenes';
 import { DESTINATARIOS_AVISOS, DestinatariosAvisos } from '../puertos/destinatarios-avisos';
 import { ENVIADOR_AVISOS, EnviadorDeAvisos } from '../puertos/enviador-avisos';
@@ -26,10 +24,6 @@ import { REPOSITORIO_MONTAJES, RepositorioMontajes } from '../puertos/montajes';
 import { RELOJ, Reloj } from '../puertos/reloj';
 import { REPOSITORIO_AVISOS, RepositorioAvisos } from '../puertos/repositorio-avisos';
 import { REPOSITORIO_EQUIPOS, RepositorioEquipos } from '../puertos/repositorio-equipos';
-import {
-  REPOSITORIO_INTERVENCIONES,
-  RepositorioIntervenciones,
-} from '../puertos/repositorio-intervenciones';
 import { REPOSITORIO_PLANES, RepositorioPlanes } from '../puertos/repositorio-planes';
 import {
   REPOSITORIO_UBICACIONES,
@@ -82,22 +76,6 @@ export const casosDeUsoEquipos: Provider[] = [
     useFactory: (planes: RepositorioPlanes, equipos: RepositorioEquipos, reloj: Reloj) =>
       new GestionarPlanes(planes, equipos, reloj),
     inject: [REPOSITORIO_PLANES, REPOSITORIO_EQUIPOS, RELOJ],
-  },
-  {
-    provide: RegistrarIntervencion,
-    useFactory: (
-      intervenciones: RepositorioIntervenciones,
-      equipos: RepositorioEquipos,
-      reloj: Reloj,
-      planes: GestionarPlanes,
-    ) => new RegistrarIntervencion(intervenciones, equipos, reloj, planes),
-    inject: [REPOSITORIO_INTERVENCIONES, REPOSITORIO_EQUIPOS, RELOJ, GestionarPlanes],
-  },
-  {
-    provide: ConsultarHistorial,
-    useFactory: (intervenciones: RepositorioIntervenciones, equipos: RepositorioEquipos) =>
-      new ConsultarHistorial(intervenciones, equipos),
-    inject: [REPOSITORIO_INTERVENCIONES, REPOSITORIO_EQUIPOS],
   },
   {
     provide: ProcesarAvisos,

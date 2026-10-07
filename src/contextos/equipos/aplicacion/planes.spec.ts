@@ -3,17 +3,16 @@ import { RelojFijo } from '../puertos/reloj';
 import { ActualizarEquipo } from './actualizar-equipo';
 import { CrearEquipo } from './crear-equipo';
 import { GestionarPlanes } from './gestionar-planes';
-import { RegistrarIntervencion } from './registrar-intervencion';
 import { RepositorioEquiposEnMemoria } from './repositorio-en-memoria';
-import { RepositorioIntervencionesEnMemoria } from './repositorio-intervenciones-en-memoria';
 import { RepositorioPlanesEnMemoria } from './repositorio-planes-en-memoria';
 
 /**
- * Planes de mantenimiento y su enganche con el historial.
+ * Planes de mantenimiento.
  *
  * El caso que importa es el ciclo completo: se define cada cuánto va un trabajo,
  * se registra que se hizo, y el plan se adelanta solo. Si ese ciclo se corta, el
- * módulo entero deja de servir para lo que se hizo.
+ * módulo entero deja de servir para lo que se hizo. El trabajo llega desde una
+ * orden de trabajo (contexto trabajos), por `adelantarDespuesDeTrabajo`.
  */
 const HOY = new Date('2026-09-02T12:00:00.000Z');
 const fecha = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
@@ -21,7 +20,6 @@ const fecha = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 function armar() {
   const equipos = new RepositorioEquiposEnMemoria();
   const planes = new RepositorioPlanesEnMemoria();
-  const intervenciones = new RepositorioIntervencionesEnMemoria();
   const reloj = new RelojFijo(HOY);
   const gestionar = new GestionarPlanes(planes, equipos, reloj);
 
@@ -31,16 +29,8 @@ function armar() {
     gestionar,
     crearEquipo: new CrearEquipo(equipos),
     actualizarEquipo: new ActualizarEquipo(equipos),
-    registrar: new RegistrarIntervencion(intervenciones, equipos, reloj, gestionar),
   };
 }
-
-const trabajoBase = {
-  tipo: 'PREVENTIVO' as const,
-  ejecutor: 'INTERNO' as const,
-  usuarioId: 'us-1',
-  descripcion: 'Cambio de aceite hecho',
-};
 
 describe('GestionarPlanes', () => {
   it('crea un plan sobre un equipo', async () => {
@@ -187,12 +177,12 @@ describe('listarQueVencen', () => {
   });
 });
 
-describe('el ciclo completo: registrar un trabajo adelanta el plan', () => {
+describe('el ciclo completo: un trabajo hecho adelanta el plan', () => {
   it('REGRESION: la proxima fecha se cuenta desde el trabajo real', async () => {
     // Un service que tocaba el 1 de agosto y se hizo el 1 de septiembre tiene
     // el siguiente a los 90 dias de septiembre. Contarlo desde agosto lo
     // dejaria casi vencido apenas se registra.
-    const { crearEquipo, gestionar, registrar } = armar();
+    const { crearEquipo, gestionar } = armar();
     const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 1' });
     const plan = await gestionar.crear({
       equipoId: equipo.id,
@@ -201,88 +191,24 @@ describe('el ciclo completo: registrar un trabajo adelanta el plan', () => {
       proximaFecha: fecha('2026-08-01'),
     });
 
-    await registrar.ejecutar({
-      ...trabajoBase,
-      equipoId: equipo.id,
-      planId: plan.id,
-      fecha: fecha('2026-09-01'),
-    });
+    await gestionar.adelantarDespuesDeTrabajo(plan.id, fecha('2026-09-01'));
 
     const [actualizado] = await gestionar.listarPorEquipo(equipo.id);
     expect(actualizado.proximaFecha.toISOString().slice(0, 10)).toBe('2026-11-30');
     expect(actualizado.estado).toBe('AL_DIA');
   });
 
-  it('un trabajo sin plan no adelanta nada', async () => {
-    // Una rotura no responde a ningun plan.
-    const { crearEquipo, gestionar, registrar } = armar();
-    const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 1' });
-    const plan = await gestionar.crear({
-      equipoId: equipo.id,
-      nombre: 'Aceite',
-      periodicidadDias: 90,
-      // Todos los días: esto prueba otra cosa que el fin de semana.
-      diasSemana: [0, 1, 2, 3, 4, 5, 6],
-      proximaFecha: fecha('2026-09-05'),
-    });
-
-    await registrar.ejecutar({
-      ...trabajoBase,
-      tipo: 'CORRECTIVO',
-      equipoId: equipo.id,
-      fecha: fecha('2026-09-01'),
-    });
-
-    const [sinTocar] = await gestionar.listarPorEquipo(equipo.id);
-    expect(sinTocar.proximaFecha.toISOString().slice(0, 10)).toBe('2026-09-05');
-    expect(plan.id).toBe(sinTocar.id);
-  });
-
-  it('REGRESION: si falla el registro, el plan NO se adelanta', async () => {
-    // Al reves, el equipo pasaria meses sin service creyendo que esta al dia.
-    const { crearEquipo, actualizarEquipo, gestionar, registrar } = armar();
-    const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 1' });
-    const plan = await gestionar.crear({
-      equipoId: equipo.id,
-      nombre: 'Aceite',
-      periodicidadDias: 90,
-      diasSemana: [0, 1, 2, 3, 4, 5, 6],
-      proximaFecha: fecha('2026-08-01'),
-    });
-    await actualizarEquipo.ejecutar(equipo.id, { estado: 'DADO_DE_BAJA' });
-
+  it('un plan borrado entre medio no rompe: el trabajo se registró igual', async () => {
+    const { gestionar } = armar();
     await expect(
-      registrar.ejecutar({
-        ...trabajoBase,
-        equipoId: equipo.id,
-        planId: plan.id,
-        fecha: fecha('2026-09-01'),
-      }),
-    ).rejects.toThrow();
-
-    const [sinTocar] = await gestionar.listarPorEquipo(equipo.id);
-    expect(sinTocar.proximaFecha.toISOString().slice(0, 10)).toBe('2026-08-01');
-  });
-
-  it('un plan borrado entre medio no rompe el registro del trabajo', async () => {
-    // El trabajo se hizo igual: perderlo por un plan que ya no está sería peor.
-    const { crearEquipo, registrar } = armar();
-    const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 1' });
-
-    await expect(
-      registrar.ejecutar({
-        ...trabajoBase,
-        equipoId: equipo.id,
-        planId: 'plan-que-no-existe',
-        fecha: fecha('2026-09-01'),
-      }),
-    ).resolves.toBeDefined();
+      gestionar.adelantarDespuesDeTrabajo('plan-que-no-existe', fecha('2026-09-01')),
+    ).resolves.toBeUndefined();
   });
 });
 
 describe('los días que trabaja la planta', () => {
   it('REGRESION: la purga diaria del viernes no queda para el sábado: pasa al lunes', async () => {
-    const { crearEquipo, gestionar, registrar } = armar();
+    const { crearEquipo, gestionar } = armar();
     const equipo = await crearEquipo.ejecutar({ nombre: 'Compresor 1' });
     const plan = await gestionar.crear({
       equipoId: equipo.id,
@@ -293,19 +219,14 @@ describe('los días que trabaja la planta', () => {
     // Por defecto, lunes a viernes.
     expect(plan.diasSemana).toEqual([1, 2, 3, 4, 5]);
 
-    await registrar.ejecutar({
-      ...trabajoBase,
-      equipoId: equipo.id,
-      planId: plan.id,
-      fecha: fecha('2026-08-28'),
-    });
+    await gestionar.adelantarDespuesDeTrabajo(plan.id, fecha('2026-08-28'));
 
     const [actualizado] = await gestionar.listarPorEquipo(equipo.id);
     expect(actualizado.proximaFecha.toISOString().slice(0, 10)).toBe('2026-08-31'); // lunes
   });
 
   it('un plan que también se hace los sábados sí cae el sábado', async () => {
-    const { crearEquipo, gestionar, registrar } = armar();
+    const { crearEquipo, gestionar } = armar();
     const equipo = await crearEquipo.ejecutar({ nombre: 'Caldera' });
     const plan = await gestionar.crear({
       equipoId: equipo.id,
@@ -315,12 +236,7 @@ describe('los días que trabaja la planta', () => {
       proximaFecha: fecha('2026-08-28'),
     });
 
-    await registrar.ejecutar({
-      ...trabajoBase,
-      equipoId: equipo.id,
-      planId: plan.id,
-      fecha: fecha('2026-08-28'),
-    });
+    await gestionar.adelantarDespuesDeTrabajo(plan.id, fecha('2026-08-28'));
 
     const [actualizado] = await gestionar.listarPorEquipo(equipo.id);
     expect(actualizado.proximaFecha.toISOString().slice(0, 10)).toBe('2026-08-29');

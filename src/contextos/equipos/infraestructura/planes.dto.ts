@@ -8,7 +8,6 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   Max,
   Min,
@@ -73,12 +72,4 @@ export class ActualizarPlanDto {
 
   @ApiPropertyOptional() @IsOptional() @IsDateString() proximaFecha?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() activo?: boolean;
-}
-
-/** El plan al que responde un trabajo, si responde a alguno. */
-export class PlanDeIntervencionDto {
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  planId?: string | null;
 }

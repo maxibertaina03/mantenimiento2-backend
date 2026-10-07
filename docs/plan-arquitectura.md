@@ -67,7 +67,7 @@ pañol está repartido en cinco módulos que solo tienen sentido juntos.
 
 | Contexto | Qué se lleva | Estado |
 |---|---|---|
-| `equipos` | máquinas de planta, planes, intervenciones, avisos | **hecho** |
+| `equipos` | máquinas de planta, planes, avisos (las intervenciones se reemplazaron por órdenes de trabajo) | **hecho** |
 | `trabajos` | órdenes de trabajo, tareas, rutinas, calendario | **hecho** |
 | `panol` | materiales y movimientos de stock (los catálogos quedan como módulos) | **hecho** (en develop) |
 | `compras` | órdenes de compra, comprobantes y envío (proveedores queda como módulo) | **hecho** (en develop) |

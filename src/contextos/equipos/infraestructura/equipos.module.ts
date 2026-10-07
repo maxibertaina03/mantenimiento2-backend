@@ -7,7 +7,6 @@ import { REPOSITORIO_REPUESTOS } from '../puertos/repuestos';
 import { DESTINATARIOS_AVISOS } from '../puertos/destinatarios-avisos';
 import { ENVIADOR_AVISOS } from '../puertos/enviador-avisos';
 import { REPOSITORIO_AVISOS } from '../puertos/repositorio-avisos';
-import { REPOSITORIO_INTERVENCIONES } from '../puertos/repositorio-intervenciones';
 import { REPOSITORIO_PLANES } from '../puertos/repositorio-planes';
 import { REPOSITORIO_EQUIPOS } from '../puertos/repositorio-equipos';
 import { REPOSITORIO_UBICACIONES } from '../puertos/repositorio-ubicaciones';
@@ -26,7 +25,6 @@ import { EquiposController } from './equipos.controller';
 import { PrismaDestinatariosAvisos } from './prisma-destinatarios-avisos';
 import { PrismaRepositorioAvisos } from './prisma-repositorio-avisos';
 import { PrismaRepositorioEquipos } from './prisma-repositorio-equipos';
-import { PrismaRepositorioIntervenciones } from './prisma-repositorio-intervenciones';
 import { PrismaRepositorioPlanes } from './prisma-repositorio-planes';
 import { PrismaRepositorioUbicaciones } from './prisma-repositorio-ubicaciones';
 import { SupabaseAlmacenImagenes } from './supabase-almacen-imagenes';
@@ -66,7 +64,6 @@ import { SupabaseAlmacenManuales } from './supabase-almacen-manuales';
     CatalogosEquipoService,
     { provide: REPOSITORIO_EQUIPOS, useClass: PrismaRepositorioEquipos },
     { provide: REPOSITORIO_UBICACIONES, useClass: PrismaRepositorioUbicaciones },
-    { provide: REPOSITORIO_INTERVENCIONES, useClass: PrismaRepositorioIntervenciones },
     { provide: REPOSITORIO_PLANES, useClass: PrismaRepositorioPlanes },
     { provide: ALMACEN_IMAGENES, useClass: SupabaseAlmacenImagenes },
     { provide: REPOSITORIO_MANUALES, useClass: PrismaRepositorioManuales },

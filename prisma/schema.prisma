@@ -1049,6 +1049,11 @@ model ManualEquipo {
 /// Es el corazón de la trazabilidad. No se edita: una intervención cargada es
 /// el registro de algo que pasó, y reescribirla lo volvería inservible como
 /// respaldo. Si hay un error, se corrige con otra intervención que lo aclare.
+///
+/// SIN USO desde el 2026-10-07: los trabajos sobre un equipo son órdenes de
+/// trabajo, y el código que escribía y leía esta tabla se sacó. La tabla queda
+/// (vacía en producción) porque borrarla es una migración destructiva y no hace
+/// falta; si algún día se quiere quitar, va en una migración propia y ensayada.
 model Intervencion {
   id       String @id @default(uuid())
   equipoId String

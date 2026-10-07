@@ -14,15 +14,11 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { Usuario } from '@prisma/client';
-import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.decorator';
 import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { ConsultarEquipos, aEquipoParaMostrar } from '../aplicacion/consultar-equipos';
 import { CambiarFotoEquipo } from '../aplicacion/cambiar-foto-equipo';
-import { ConsultarHistorial } from '../aplicacion/consultar-historial';
 import { GestionarPlanes } from '../aplicacion/gestionar-planes';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
-import { RegistrarIntervencion } from '../aplicacion/registrar-intervencion';
 import { ImportarEquipos } from '../aplicacion/importar-equipos';
 import { detectarEquipos } from '../dominio/importacion';
 import { ALMACEN_IMAGENES, AlmacenImagenes } from '../puertos/almacen-imagenes';
@@ -36,7 +32,6 @@ import {
 } from './equipos.dto';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { DetectarImportacionDto, ImportarEquiposDto } from './importacion.dto';
-import { RegistrarIntervencionDto } from './intervenciones.dto';
 import { ActualizarPlanDto, CrearPlanDto } from './planes.dto';
 import { MarcarQrDto } from './qr.dto';
 import { Permisos } from '../../../common/auth/decorators/permisos.decorator';
@@ -65,8 +60,6 @@ export class EquiposController {
     private readonly consultar: ConsultarEquipos,
     private readonly importar: ImportarEquipos,
     private readonly cambiarFoto: CambiarFotoEquipo,
-    private readonly registrarIntervencion: RegistrarIntervencion,
-    private readonly historial: ConsultarHistorial,
     private readonly planes: GestionarPlanes,
     @Inject(REPOSITORIO_EQUIPOS) private readonly repo: RepositorioEquipos,
     @Inject(ALMACEN_IMAGENES) private readonly almacen: AlmacenImagenes,
@@ -257,40 +250,6 @@ export class EquiposController {
   })
   eliminarPlan(@Param('planId', ParseUUIDPipe) planId: string) {
     return this.planes.eliminar(planId);
-  }
-
-  @Permisos(PERMISOS.EQUIPOS_VER)
-  @Get(':id/historial')
-  @ApiOperation({
-    summary: 'Historial de intervenciones de un equipo, con su resumen',
-    description:
-      'El resumen se calcula al leer y no se guarda: un total acumulado en la ficha habría ' +
-      'que recalcularlo con cada alta, y bastaría un error para que quede desfasado.',
-  })
-  verHistorial(@Param('id', ParseUUIDPipe) id: string) {
-    return this.historial.ejecutar(id);
-  }
-
-  @Permisos(PERMISOS.EQUIPOS_EDITAR)
-  @Post(':id/intervenciones')
-  @ApiOperation({
-    summary: 'Registrar un trabajo hecho sobre el equipo',
-    description:
-      'Una intervención no se edita: es el registro de algo que pasó. Si hay un error, se ' +
-      'corrige con otra intervención que lo aclare.',
-  })
-  registrarTrabajo(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: RegistrarIntervencionDto,
-    @UsuarioActual() usuario?: Usuario,
-  ) {
-    return this.registrarIntervencion.ejecutar({
-      ...dto,
-      equipoId: id,
-      planId: dto.planId ?? null,
-      fecha: new Date(dto.fecha),
-      registradoPorId: usuario?.id ?? null,
-    });
   }
 
   @Permisos(PERMISOS.EQUIPOS_EDITAR)
