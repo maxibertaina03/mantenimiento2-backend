@@ -73,6 +73,7 @@ export class OrdenesCompraService {
         via: e.via,
         destinatarios: e.destinatarios,
         automatico: e.automatico,
+        esReclamo: e.esReclamo ?? false,
         enviadoEn: e.enviadoEn,
         usuarioNombre: e.usuario?.nombre ?? null,
       })),
