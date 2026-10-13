@@ -22,13 +22,23 @@ function crearPrismaFalso() {
       findUnique: jest.fn(async () => ({
         id: 'oc-1',
         proveedorId: 'prov-1',
-        renglones: [{ id: 'r1', materialId: 'mat-1', cantidad: aDecimal(5) }],
+        renglones: [
+          {
+            id: 'r1',
+            materialId: 'mat-1',
+            cantidad: aDecimal(5),
+            cantidadRecibida: aDecimal(0),
+            movimientoId: null,
+          },
+        ],
       })),
       update: jest.fn(async () => ({ id: 'oc-1', estado: EstadoOrdenCompra.RECIBIDA })),
     },
     movimientoStock: { create: jest.fn(async () => ({ id: 'mov-1' })) },
     material: { update: jest.fn(async () => material) },
     renglonOrdenCompra: { update: jest.fn(async () => ({})) },
+    recepcionOrden: { create: jest.fn(async () => ({ id: 'ent-1' })) },
+    recepcionRenglon: { create: jest.fn(async () => ({})) },
   };
 
   const prisma = {
@@ -46,6 +56,8 @@ const paramsRecibir = {
   remito: '1234',
   factura: null,
   notas: null,
+  renglones: [{ renglonId: 'r1', cantidad: aDecimal(5) }],
+  estado: 'RECIBIDA' as const,
 };
 
 describe('PrismaRepositorioOrdenesCompra.recibir()', () => {
@@ -100,6 +112,28 @@ describe('PrismaRepositorioOrdenesCompra.recibir()', () => {
 
     const nuevoStock = (tx.material.update as jest.Mock).mock.calls[0][0].data.stockActual;
     expect(nuevoStock.toNumber()).toBe(5); // 0 + 5
+  });
+
+  it('una entrega parcial suma solo lo que llegó y deja la orden RECIBIDA_PARCIAL', async () => {
+    const { prisma, tx } = crearPrismaFalso();
+    const repo = new PrismaRepositorioOrdenesCompra(prisma);
+
+    await repo.recibir({
+      ...paramsRecibir,
+      renglones: [{ renglonId: 'r1', cantidad: aDecimal(2) }],
+      estado: 'RECIBIDA_PARCIAL',
+    });
+
+    expect((tx.material.update as jest.Mock).mock.calls[0][0].data.stockActual.toNumber()).toBe(2);
+    expect(
+      (tx.renglonOrdenCompra.update as jest.Mock).mock.calls[0][0].data.cantidadRecibida.toNumber(),
+    ).toBe(2);
+    expect(tx.recepcionRenglon.create).toHaveBeenCalledWith({
+      data: { recepcionId: 'ent-1', renglonId: 'r1', cantidad: aDecimal(2), movimientoId: 'mov-1' },
+    });
+    expect((tx.ordenCompra.update as jest.Mock).mock.calls[0][0].data.estado).toBe(
+      EstadoOrdenCompra.RECIBIDA_PARCIAL,
+    );
   });
 
   it('deja la orden en RECIBIDA', async () => {

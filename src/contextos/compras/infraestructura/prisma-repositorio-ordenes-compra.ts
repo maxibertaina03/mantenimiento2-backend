@@ -44,6 +44,14 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
       // que comparten posición (no debería pasar, pero el orden queda fijo).
       orderBy: [{ posicion: 'asc' as const }, { id: 'asc' as const }],
     },
+    // Las entregas, de la primera a la última, con lo que trajo cada una.
+    recepciones: {
+      include: {
+        recibidaPor: { select: { nombre: true } },
+        renglones: { select: { renglonId: true, cantidad: true } },
+      },
+      orderBy: { fecha: 'asc' as const },
+    },
   };
 
   private aWhere(filtro: FiltroOrdenes): Prisma.OrdenCompraWhereInput {
@@ -222,6 +230,7 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
     destinatarios: string;
     automatico: boolean;
     usuarioId: string | null;
+    esReclamo?: boolean;
   }): Promise<OrdenConRelaciones> {
     const { ordenId, ...envio } = params;
 
@@ -264,16 +273,7 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
   }
 
   /**
-   * Recibe la orden: por cada renglón crea un movimiento de ENTRADA y suma el
-   * stock del material, todo en UNA transacción.
-   *
-   * Se toma lock de cada material (SELECT ... FOR UPDATE) igual que en el alta
-   * manual de movimientos, para no perder actualizaciones si alguien está
-   * cargando stock del mismo material al mismo tiempo.
-   */
-
-  /**
-   * Da de alta las fichas de los equipos comprados en un renglon.
+   * Da de alta las fichas de los equipos que llegaron de un renglón.
    *
    * Una por unidad: cinco amoladoras son cinco fichas, cada una con su numero
    * de serie y su historial. Nacen con lo que se sabe de la compra —que
@@ -282,31 +282,36 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
    *
    * El nombre lleva un numero cuando son varias, porque si no quedan cinco
    * equipos llamados igual y no hay forma de saber cual es cual en la lista.
+   * Si llegan en dos entregas, la numeración sigue: la segunda arranca donde
+   * terminó la primera («3 de 5»).
    */
   private async altaDeEquipos(
     tx: Prisma.TransactionClient,
     renglon: {
       id: string;
       cantidad: Prisma.Decimal;
+      cantidadRecibida: Prisma.Decimal;
       descripcionEquipo: string | null;
       clasificacion: ClasificacionEquipo | null;
       equipoTipoId: string | null;
       equipoMarcaId: string | null;
       equipoModeloId: string | null;
     },
+    unidadesQueLlegan: number,
     proveedorId: string,
     fechaRecepcion: Date,
   ): Promise<void> {
-    const unidades = unidadesDeEquipo({
+    const total = unidadesDeEquipo({
       descripcionEquipo: renglon.descripcionEquipo,
       cantidad: Number(renglon.cantidad),
     });
+    const yaLlegaron = Number(renglon.cantidadRecibida);
     const nombre = (renglon.descripcionEquipo ?? 'Equipo comprado').trim();
 
-    for (let i = 1; i <= unidades; i++) {
+    for (let i = yaLlegaron + 1; i <= yaLlegaron + unidadesQueLlegan; i++) {
       await tx.equipo.create({
         data: {
-          nombre: unidades === 1 ? nombre : `${nombre} (${i} de ${unidades})`,
+          nombre: total === 1 ? nombre : `${nombre} (${i} de ${total})`,
           clasificacion: renglon.clasificacion ?? 'EQUIPO',
           tipoId: renglon.equipoTipoId,
           marcaId: renglon.equipoMarcaId,
@@ -319,8 +324,18 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
     }
   }
 
+  /**
+   * Registra una entrega: por cada renglón que llegó, una ENTRADA de stock por
+   * lo que llegó (o las fichas de los equipos), y la entrega con su remito.
+   * Todo en UNA transacción.
+   *
+   * Se toma lock de cada material (SELECT ... FOR UPDATE) igual que en el alta
+   * manual de movimientos, para no perder actualizaciones si alguien está
+   * cargando stock del mismo material al mismo tiempo.
+   */
   async recibir(params: DatosRecepcion): Promise<OrdenConRelaciones> {
-    const { id, fechaRecepcion, recibidaPorId, referencia, remito, factura, notas } = params;
+    const { id, fechaRecepcion, recibidaPorId, referencia, remito, factura, notas, estado } =
+      params;
 
     return this.prisma.$transaction(async (tx) => {
       const orden = await tx.ordenCompra.findUnique({
@@ -331,59 +346,89 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
         throw new NotFoundException(`No existe la orden de compra con id ${id}`);
       }
 
-      for (const renglon of orden.renglones) {
-        // Los renglones de equipo no mueven stock: al recibirlos se da de alta
-        // una ficha por unidad, que es otro camino. Se saltean aca para que la
-        // parte de stock siga siendo exactamente la de antes.
+      const entrega = await tx.recepcionOrden.create({
+        data: {
+          ordenId: id,
+          fecha: fechaRecepcion,
+          remito,
+          factura,
+          notas: notas ?? null,
+          recibidaPorId,
+        },
+      });
+
+      for (const llega of params.renglones) {
+        const renglon = orden.renglones.find((x) => x.id === llega.renglonId);
+        if (!renglon) {
+          throw new NotFoundException(`El renglón ${llega.renglonId} no es de esta orden`);
+        }
+        const cantidad = aDecimal(llega.cantidad);
+        let movimientoId: string | null = null;
+
         if (!renglon.materialId) {
-          await this.altaDeEquipos(tx, renglon, orden.proveedorId, fechaRecepcion);
-          continue;
+          // Los renglones de equipo no mueven stock: se da de alta una ficha
+          // por unidad que llegó, que es otro camino.
+          await this.altaDeEquipos(
+            tx,
+            renglon,
+            Number(cantidad),
+            orden.proveedorId,
+            fechaRecepcion,
+          );
+        } else {
+          const materialId = renglon.materialId;
+
+          // Lock de la fila del material antes de leer su stock.
+          const filas = await tx.$queryRaw<{ stockActual: Prisma.Decimal }[]>`
+            SELECT "stockActual" FROM materiales WHERE id = ${materialId} FOR UPDATE
+          `;
+          if (filas.length === 0) {
+            throw new NotFoundException(`No existe el material con id ${materialId}`);
+          }
+          const nuevoStock = aDecimal(filas[0].stockActual).plus(cantidad);
+
+          const movimiento = await tx.movimientoStock.create({
+            data: {
+              materialId,
+              tipo: TipoMovimiento.ENTRADA,
+              motivo: MotivoMovimiento.COMPRA,
+              cantidad,
+              fecha: fechaRecepcion,
+              proveedorId: orden.proveedorId,
+              usuarioId: recibidaPorId,
+              // Trazabilidad: desde el historial de stock se llega a la orden.
+              referenciaTrabajo: referencia,
+              notas: notas ?? null,
+            },
+          });
+          movimientoId = movimiento.id;
+
+          await tx.material.update({
+            where: { id: materialId },
+            data: { stockActual: nuevoStock },
+          });
         }
 
-        const materialId = renglon.materialId;
-
-        // Lock de la fila del material antes de leer su stock.
-        const filas = await tx.$queryRaw<{ stockActual: Prisma.Decimal }[]>`
-          SELECT "stockActual" FROM materiales WHERE id = ${materialId} FOR UPDATE
-        `;
-        if (filas.length === 0) {
-          throw new NotFoundException(`No existe el material con id ${materialId}`);
-        }
-
-        const cantidad = aDecimal(renglon.cantidad);
-        const nuevoStock = aDecimal(filas[0].stockActual).plus(cantidad);
-
-        const movimiento = await tx.movimientoStock.create({
-          data: {
-            materialId,
-            tipo: TipoMovimiento.ENTRADA,
-            motivo: MotivoMovimiento.COMPRA,
-            cantidad,
-            fecha: fechaRecepcion,
-            proveedorId: orden.proveedorId,
-            usuarioId: recibidaPorId,
-            // Trazabilidad: desde el historial de stock se llega a la orden.
-            referenciaTrabajo: referencia,
-            notas: notas ?? null,
-          },
+        await tx.recepcionRenglon.create({
+          data: { recepcionId: entrega.id, renglonId: renglon.id, cantidad, movimientoId },
         });
-
-        await tx.material.update({
-          where: { id: materialId },
-          data: { stockActual: nuevoStock },
-        });
-
-        // Enlace renglón ↔ movimiento generado.
         await tx.renglonOrdenCompra.update({
           where: { id: renglon.id },
-          data: { movimientoId: movimiento.id },
+          data: {
+            cantidadRecibida: aDecimal(renglon.cantidadRecibida).plus(cantidad),
+            // El enlace de siempre renglón ↔ movimiento: la primera entrada.
+            // Las demás quedan en las entregas.
+            ...(renglon.movimientoId || !movimientoId ? {} : { movimientoId }),
+          },
         });
       }
 
+      // La cabecera muestra la última entrega, como antes mostraba la única.
       return tx.ordenCompra.update({
         where: { id },
         data: {
-          estado: EstadoOrdenCompra.RECIBIDA,
+          estado:
+            estado === 'RECIBIDA' ? EstadoOrdenCompra.RECIBIDA : EstadoOrdenCompra.RECIBIDA_PARCIAL,
           recibidaEn: fechaRecepcion,
           recibidaPorId,
           remito,
@@ -391,6 +436,18 @@ export class PrismaRepositorioOrdenesCompra implements RepositorioOrdenesCompra 
         },
         include: this.relaciones,
       });
+    });
+  }
+
+  cerrarConFaltante(id: string, motivo: string): Promise<OrdenConRelaciones> {
+    return this.prisma.ordenCompra.update({
+      where: { id },
+      data: {
+        estado: EstadoOrdenCompra.RECIBIDA,
+        cerradaConFaltante: true,
+        motivoFaltante: motivo,
+      },
+      include: this.relaciones,
     });
   }
 

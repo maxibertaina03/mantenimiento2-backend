@@ -14,6 +14,8 @@ export interface OrdenParaMensaje {
     descripcionEquipo?: string | null;
     unidad: string | null;
     cantidad: number;
+    /** Lo que falta entregar. Sin el dato, todo lo pedido. */
+    pendiente?: number;
   }[];
 }
 
@@ -66,6 +68,39 @@ export function armarMensaje(orden: OrdenParaMensaje): MensajeOrden {
 
   return {
     asunto: `Orden de compra ${orden.numero} - Lácteos Las Tres S.R.L.`,
+    cuerpo: lineas.join('\n'),
+  };
+}
+
+/**
+ * El reclamo de lo que falta entregar de una orden.
+ *
+ * Lista solo lo pendiente, con la cantidad que falta y no la pedida: si de
+ * diez llegaron seis, se reclaman cuatro. Vale para el correo y es el mismo
+ * texto que arma la pantalla para WhatsApp.
+ */
+export function armarReclamo(orden: OrdenParaMensaje): MensajeOrden {
+  const faltan = orden.renglones
+    .map((r) => ({ ...r, falta: r.pendiente ?? r.cantidad }))
+    .filter((r) => r.falta > 0)
+    .map(
+      (r) =>
+        `• ${r.materialNombre ?? r.descripcionEquipo ?? 'Material'} — ${r.falta}${r.unidad ? ` ${r.unidad}` : ''}`,
+    )
+    .join('\n');
+  const lineas = [
+    `Estimados de ${orden.proveedorNombre ?? 'la empresa'}:`,
+    '',
+    `De la orden de compra ${orden.numero} todavía no recibimos:`,
+    faltan,
+    '',
+    '¿Nos pueden confirmar cuándo lo entregan?',
+    '',
+    'Saludos,',
+    'Lácteos Las Tres S.R.L.',
+  ];
+  return {
+    asunto: `Pendiente de la orden de compra ${orden.numero} - Lácteos Las Tres S.R.L.`,
     cuerpo: lineas.join('\n'),
   };
 }

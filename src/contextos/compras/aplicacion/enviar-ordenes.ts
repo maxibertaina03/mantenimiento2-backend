@@ -5,10 +5,11 @@ import {
   ErrorNoEncontrado,
   ErrorSinDestinatario,
 } from '../dominio/errores';
-import type { EstadoOrdenCompra } from '../dominio/orden-compra';
+import { type EstadoOrdenCompra, validarReclamable } from '../dominio/orden-compra';
 import {
   OrdenParaMensaje,
   armarMensaje,
+  armarReclamo,
   destinatarios,
   esEmailValido,
 } from '../dominio/mensaje-orden';
@@ -154,6 +155,84 @@ export class EnviarOrdenes {
       destinatarios: numero,
       automatico: false,
       usuarioId,
+    });
+  }
+
+  /**
+   * Le reclama al proveedor, por correo, lo que falta entregar.
+   *
+   * Sin PDF: el reclamo es la lista de lo pendiente, y la orden ya la tiene.
+   * Mismas reglas que el envío de la orden: el texto y los destinatarios se
+   * arman acá, y se registra recién cuando el correo salió.
+   */
+  async reclamoPorCorreo(id: string, quien?: QuienEnvia): Promise<ResultadoEnvio> {
+    if (!this.correo.estaConfigurado()) {
+      throw new ErrorCorreoNoConfigurado(
+        'El envío automático de correo no está configurado. Reclamale por WhatsApp.',
+      );
+    }
+    const guardada = await this.traer(id);
+    const orden = this.vista(guardada);
+    validarReclamable(
+      guardada,
+      orden.renglones.filter((r) => (r.pendiente ?? r.cantidad) > 0),
+    );
+
+    const { para, copia } = destinatarios(orden, this.casillas.mailAdministracion());
+    if (para.length === 0) {
+      throw new ErrorSinDestinatario(
+        `${orden.proveedorNombre ?? 'El proveedor'} no tiene correo cargado. Cargáselo desde ` +
+          'esta misma pantalla, o reclamale por WhatsApp.',
+      );
+    }
+    const { asunto, cuerpo } = armarReclamo(orden);
+    const responderA = esEmailValido(quien?.email) ? quien!.email! : undefined;
+
+    try {
+      await this.correo.enviar({
+        para,
+        copia,
+        responderA,
+        nombreRemitente: quien?.nombre
+          ? `${quien.nombre} · Lácteos Las Tres S.R.L.`
+          : 'Lácteos Las Tres S.R.L.',
+        asunto,
+        texto: cuerpo,
+        adjuntos: [],
+      });
+    } catch (error) {
+      throw new ErrorEnvioFallido(
+        `No se pudo enviar el reclamo: ${this.correo.explicarError(error)} ` +
+          'Podés reintentar o reclamar por WhatsApp.',
+      );
+    }
+
+    const actualizada = await this.repo.registrarEnvio({
+      ordenId: id,
+      via: 'CORREO',
+      destinatarios: [...para, ...copia].join(', '),
+      automatico: true,
+      usuarioId: quien?.id ?? null,
+      esReclamo: true,
+    });
+    return { para, copia, responderA: responderA ?? null, estado: actualizada.estado };
+  }
+
+  /** Deja constancia del reclamo por WhatsApp (el chat lo abre la persona). */
+  async reclamoPorWhatsapp(id: string, numero: string, usuarioId: string | null) {
+    const guardada = await this.traer(id);
+    const orden = this.vista(guardada);
+    validarReclamable(
+      guardada,
+      orden.renglones.filter((r) => (r.pendiente ?? r.cantidad) > 0),
+    );
+    return this.repo.registrarEnvio({
+      ordenId: id,
+      via: 'WHATSAPP',
+      destinatarios: numero,
+      automatico: false,
+      usuarioId,
+      esReclamo: true,
     });
   }
 

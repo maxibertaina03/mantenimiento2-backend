@@ -55,6 +55,19 @@ export interface RenglonConRelaciones {
   descripcionEquipo?: string | null;
   clasificacion?: ClasificacionEquipo | null;
   material?: { nombre: string; unidad?: { simbolo: string } | null } | null;
+  /** Lo que llegó ya, sumando las entregas. */
+  cantidadRecibida?: Decimal;
+}
+
+/** Una entrega del proveedor, con lo que trajo de cada renglón. */
+export interface RecepcionConRenglones {
+  id: string;
+  fecha: Date;
+  remito: string | null;
+  factura: string | null;
+  notas: string | null;
+  recibidaPor?: { nombre: string } | null;
+  renglones: { renglonId: string; cantidad: Decimal }[];
 }
 
 /** Una orden tal como está guardada, con los nombres de lo que referencia. */
@@ -79,6 +92,9 @@ export interface OrdenConRelaciones {
   creadoPor?: { nombre: string } | null;
   recibidaPor?: { nombre: string } | null;
   renglones?: RenglonConRelaciones[];
+  recepciones?: RecepcionConRenglones[];
+  cerradaConFaltante?: boolean;
+  motivoFaltante?: string | null;
 }
 
 export interface EnvioConUsuario {
@@ -86,6 +102,7 @@ export interface EnvioConUsuario {
   via: ViaEnvioOrden;
   destinatarios: string;
   automatico: boolean;
+  esReclamo?: boolean;
   enviadoEn: Date;
   usuario?: { nombre: string } | null;
 }
@@ -98,6 +115,10 @@ export interface DatosRecepcion {
   remito: string | null;
   factura: string | null;
   notas?: string | null;
+  /** Lo que llega en esta entrega, ya validado por el dominio. */
+  renglones: { renglonId: string; cantidad: Decimal }[];
+  /** El estado en que queda la orden: lo decide el dominio. */
+  estado: 'RECIBIDA' | 'RECIBIDA_PARCIAL';
 }
 
 export interface RepositorioOrdenesCompra {
@@ -119,6 +140,7 @@ export interface RepositorioOrdenesCompra {
     destinatarios: string;
     automatico: boolean;
     usuarioId: string | null;
+    esReclamo?: boolean;
   }): Promise<OrdenConRelaciones>;
   listarEnvios(ordenId: string): Promise<EnvioConUsuario[]>;
   cambiarEstado(
@@ -127,10 +149,13 @@ export interface RepositorioOrdenesCompra {
     extra?: { emitidaEn?: Date },
   ): Promise<OrdenConRelaciones>;
   /**
-   * Cierra la orden: una ENTRADA por renglón de material, una ficha por unidad
-   * de equipo, y la orden RECIBIDA. Todo o nada.
+   * Registra una entrega: una ENTRADA por cada renglón de material que llegó,
+   * una ficha por unidad de equipo que llegó, la entrega con su remito, y la
+   * orden en el estado que decidió el dominio. Todo o nada.
    */
   recibir(datos: DatosRecepcion): Promise<OrdenConRelaciones>;
+  /** Cierra con lo que llegó: queda RECIBIDA, con el motivo del faltante. */
+  cerrarConFaltante(id: string, motivo: string): Promise<OrdenConRelaciones>;
   /** Cambia solo el precio de esos renglones. Todo o nada. */
   actualizarPrecios(
     id: string,

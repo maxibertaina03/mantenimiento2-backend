@@ -281,6 +281,8 @@ model MovimientoStock {
   usuario       Usuario?            @relation(fields: [usuarioId], references: [id])
   ediciones     EdicionMovimiento[]
   renglonOrigen RenglonOrdenCompra?
+  /// La entrega de una orden de compra que generó esta ENTRADA.
+  entregaOrigen RecepcionRenglon?   @relation("EntradaDeRecepcion")
 
   /// Si la salida la generó una orden de trabajo, el renglón que la reclama.
   /// Es lo que permite ir del movimiento al trabajo, además de al revés.
@@ -345,6 +347,7 @@ model Usuario {
   materialesDeTrabajo MaterialUsadoTrabajo[] @relation("MaterialesDeTrabajo")
   ordenesCreadas      OrdenCompra[]          @relation("OrdenesCreadas")
   ordenesRecibidas    OrdenCompra[]          @relation("OrdenesRecibidas")
+  recepcionesDeOrden  RecepcionOrden[]       @relation("RecepcionesDeOrden")
   enviosDeOrden       EnvioOrden[]           @relation("EnviosDeOrden")
 
   rotacionesDeCredencial RotacionCredencial[] @relation("RotacionesDeCredencial")
@@ -576,7 +579,8 @@ enum ClasificacionEquipo {
 enum EstadoOrdenCompra {
   BORRADOR // se puede editar libremente
   EMITIDA // enviada al proveedor, esperando la mercadería
-  RECIBIDA // llegó: generó los movimientos de ENTRADA en stock
+  RECIBIDA_PARCIAL // llegó una parte; el resto se espera, se reclama o se cierra con faltante
+  RECIBIDA // llegó (o se cerró con lo que llegó): generó los movimientos de ENTRADA en stock
   ANULADA
 }
 
@@ -608,6 +612,9 @@ model EnvioOrden {
   /// Que quede escrito evita leer el registro como si fuera una confirmación de
   /// entrega, que no lo es.
   automatico Boolean @default(true)
+
+  /// Un reclamo de lo que falta entregar, y no el envío de la orden.
+  esReclamo Boolean @default(false)
 
   enviadoEn DateTime @default(now())
   usuarioId String?
@@ -655,6 +662,13 @@ model OrdenCompra {
   renglones    RenglonOrdenCompra[]
   envios       EnvioOrden[]
   comprobantes ComprobanteOrden[]
+  /// Cada entrega del proveedor. Una orden puede llegar en varias veces.
+  recepciones  RecepcionOrden[]
+
+  /// El proveedor no entregó todo y se cerró con lo que llegó. Lo que faltó
+  /// queda a la vista en cada renglón (cantidad contra cantidadRecibida).
+  cerradaConFaltante Boolean @default(false)
+  motivoFaltante     String?
 
   @@index([estado])
   @@index([proveedorId])
@@ -697,6 +711,10 @@ model RenglonOrdenCompra {
   equipoMarcaId     String?
   equipoModeloId    String?
 
+  /// Cuánto llegó ya, sumando todas las entregas. Lo que falta es
+  /// cantidad - cantidadRecibida.
+  cantidadRecibida Decimal @default(0) @db.Decimal(14, 3)
+
   orden      OrdenCompra      @relation(fields: [ordenId], references: [id], onDelete: Cascade)
   material   Material?        @relation(fields: [materialId], references: [id])
   movimiento MovimientoStock? @relation(fields: [movimientoId], references: [id])
@@ -711,9 +729,56 @@ model RenglonOrdenCompra {
   /// su numero de serie y su historial.
   equiposGenerados Equipo[]
 
+  /// Lo que llegó de este renglón en cada entrega.
+  recibido RecepcionRenglon[]
+
   @@index([ordenId])
   @@index([materialId])
   @@map("renglones_orden_compra")
+}
+
+/// Una entrega del proveedor: lo que llegó de una orden de compra en un
+/// remito. Una orden que llega en dos veces tiene dos.
+///
+/// El `movimientoId` del renglón queda de antes, cuando una orden se recibía
+/// de una sola vez; desde que existen las entregas, cada movimiento de
+/// ENTRADA cuelga de su `RecepcionRenglon`.
+model RecepcionOrden {
+  id      String @id @default(uuid())
+  ordenId String
+
+  fecha   DateTime
+  remito  String?
+  factura String?
+  notas   String?
+
+  recibidaPorId String?
+  creadoEn      DateTime @default(now())
+
+  orden       OrdenCompra        @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  recibidaPor Usuario?           @relation("RecepcionesDeOrden", fields: [recibidaPorId], references: [id], onDelete: SetNull)
+  renglones   RecepcionRenglon[]
+
+  @@index([ordenId])
+  @@map("recepciones_orden")
+}
+
+/// Cuánto llegó de un renglón en una entrega, y el movimiento de stock que lo
+/// sumó (los renglones de equipo no mueven stock: dan de alta fichas).
+model RecepcionRenglon {
+  id           String  @id @default(uuid())
+  recepcionId  String
+  renglonId    String
+  cantidad     Decimal @db.Decimal(14, 3)
+  movimientoId String? @unique
+
+  recepcion  RecepcionOrden     @relation(fields: [recepcionId], references: [id], onDelete: Cascade)
+  renglon    RenglonOrdenCompra @relation(fields: [renglonId], references: [id], onDelete: Cascade)
+  movimiento MovimientoStock?   @relation("EntradaDeRecepcion", fields: [movimientoId], references: [id])
+
+  @@index([recepcionId])
+  @@index([renglonId])
+  @@map("recepciones_renglon")
 }
 
 // Contadores atómicos para numerar documentos (una fila por serie, ej "OC-2026").

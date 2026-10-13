@@ -1,5 +1,30 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsISO8601,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+
+/** Lo que llegó de un renglón en esta entrega. */
+export class RenglonRecibidoDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  renglonId!: string;
+
+  @ApiProperty({ example: 10, description: '0 = no llegó nada de este renglón' })
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  cantidad!: number;
+}
 
 /**
  * Marca la orden como recibida. Genera un movimiento de ENTRADA por cada
@@ -40,4 +65,26 @@ export class RecibirOrdenDto {
   @IsString()
   @MaxLength(500)
   notas?: string;
+
+  @ApiPropertyOptional({
+    type: [RenglonRecibidoDto],
+    description:
+      'Lo que llegó en esta entrega. Sin esto, llegó todo lo que faltaba (la recepción ' +
+      'de siempre). Con esto, lo que no llega queda pendiente y la orden «Recibida en parte».',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => RenglonRecibidoDto)
+  renglones?: RenglonRecibidoDto[];
+}
+
+/** El proveedor no va a entregar el resto: la orden se cierra con lo que llegó. */
+export class CerrarConFaltanteDto {
+  @ApiProperty({ example: 'El proveedor no tiene stock del acrílico' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(300)
+  motivo!: string;
 }

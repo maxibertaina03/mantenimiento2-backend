@@ -70,6 +70,11 @@ function armar(orden: any = ordenBase) {
     })),
     listarEnvios: jest.fn<Promise<any>, any[]>(async () => []),
     actualizarPrecios: jest.fn<Promise<any>, any[]>(async () => orden),
+    cerrarConFaltante: jest.fn<Promise<any>, any[]>(async () => ({
+      ...orden,
+      estado: EstadoOrdenCompra.RECIBIDA,
+      cerradaConFaltante: true,
+    })),
   };
   const proveedores = { obtener: jest.fn<Promise<any>, any[]>(async () => ({ id: 'prov-1' })) };
   const materiales = {
@@ -785,5 +790,121 @@ describe('OrdenesCompraService - sin copia interna configurada', () => {
   it('la configuracion que ve la pantalla dice que no hay copia interna', () => {
     const { service } = sinCasillaInterna(conProveedor('ventas@ferreteria.com.ar'));
     expect(service.configuracionDeEnvio().mailAdministracion).toBeNull();
+  });
+});
+
+/**
+ * Recibir en varias entregas: la OC-2026-0028 llegó con los artefactos y sin
+ * los acrílicos. Lo que llegó suma al stock; lo que falta queda pendiente, se
+ * reclama, o se cierra con faltante.
+ */
+describe('OrdenesCompraService - recepción en varias entregas', () => {
+  const renglon = (id: string, nombre: string, recibida = 0) => ({
+    id,
+    ordenId: 'oc-28',
+    materialId: `mat-${id}`,
+    cantidad: aDecimal(10),
+    cantidadRecibida: aDecimal(recibida),
+    precioUnitario: null,
+    notas: null,
+    movimientoId: null,
+    material: { nombre: nombre, unidad: { simbolo: 'u' } },
+  });
+  const oc28 = (estado: EstadoOrdenCompra, recibidaArtefacto = 0) => ({
+    ...ordenBase,
+    id: 'oc-28',
+    numero: 'OC-2026-0028',
+    estado,
+    proveedor: { nombre: 'Ferrero', cuit: null, email: 'ventas@ferrero.com.ar', telefono: null },
+    renglones: [
+      renglon('art', 'Artefacto marea', recibidaArtefacto),
+      renglon('acr', 'Repuesto acrilico p/marea 2x36w'),
+    ],
+  });
+
+  it('REGRESION: recibir solo lo que llegó deja la orden RECIBIDA_PARCIAL', async () => {
+    const { service, repo } = armar(oc28(EstadoOrdenCompra.EMITIDA));
+
+    await service.recibir('oc-28', {
+      remito: '0001-123',
+      renglones: [
+        { renglonId: 'art', cantidad: 10 },
+        { renglonId: 'acr', cantidad: 0 },
+      ],
+    } as any);
+
+    const datos = repo.recibir.mock.calls[0][0];
+    expect(datos.estado).toBe('RECIBIDA_PARCIAL');
+    expect(datos.renglones.map((r: any) => [r.renglonId, r.cantidad.toNumber()])).toEqual([
+      ['art', 10],
+    ]);
+  });
+
+  it('sin detalle recibe todo lo pendiente, como siempre', async () => {
+    const { service, repo } = armar(oc28(EstadoOrdenCompra.RECIBIDA_PARCIAL, 10));
+
+    await service.recibir('oc-28', RECEPCION as any);
+
+    const datos = repo.recibir.mock.calls[0][0];
+    expect(datos.estado).toBe('RECIBIDA');
+    expect(datos.renglones.map((r: any) => r.renglonId)).toEqual(['acr']);
+  });
+
+  it('REGRESION: no se recibe más de lo que falta', async () => {
+    const { service, repo } = armar(oc28(EstadoOrdenCompra.RECIBIDA_PARCIAL, 10));
+    await expect(
+      service.recibir('oc-28', {
+        remito: '0001-124',
+        renglones: [{ renglonId: 'art', cantidad: 1 }],
+      } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.recibir).not.toHaveBeenCalled();
+  });
+
+  it('una orden recibida en parte no se puede anular: ya movió stock', async () => {
+    const { service } = armar(oc28(EstadoOrdenCompra.RECIBIDA_PARCIAL, 10));
+    await expect(service.anular('oc-28')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('cerrar con faltante pide el motivo y lo guarda', async () => {
+    const { service, repo } = armar(oc28(EstadoOrdenCompra.RECIBIDA_PARCIAL, 10));
+
+    await service.cerrarConFaltante('oc-28', 'El proveedor no tiene stock');
+
+    expect(repo.cerrarConFaltante).toHaveBeenCalledWith('oc-28', 'El proveedor no tiene stock');
+  });
+
+  it('el reclamo por correo lista solo lo que falta y queda registrado como reclamo', async () => {
+    const { service, repo, correo } = armar(oc28(EstadoOrdenCompra.RECIBIDA_PARCIAL, 10));
+
+    await service.reclamarPorCorreo('oc-28');
+
+    const enviado = (correo.enviar as jest.Mock).mock.calls[0][0];
+    expect(enviado.para).toEqual(['ventas@ferrero.com.ar']);
+    expect(enviado.texto).toContain('• Repuesto acrilico p/marea 2x36w — 10 u');
+    expect(enviado.texto).not.toContain('Artefacto');
+    expect(enviado.adjuntos).toEqual([]);
+    expect(repo.registrarEnvio.mock.calls[0][0]).toMatchObject({ via: 'CORREO', esReclamo: true });
+  });
+
+  it('el reclamo por WhatsApp queda registrado como reclamo', async () => {
+    const { service, repo } = armar(oc28(EstadoOrdenCompra.RECIBIDA_PARCIAL, 10));
+
+    await service.registrarReclamoWhatsapp('oc-28', '+54 9 351 000 0000');
+
+    expect(repo.registrarEnvio.mock.calls[0][0]).toMatchObject({
+      via: 'WHATSAPP',
+      esReclamo: true,
+      automatico: false,
+    });
+  });
+
+  it('no se reclama una orden que ya llegó completa', async () => {
+    const { service, correo } = armar({
+      ...oc28(EstadoOrdenCompra.RECIBIDA, 10),
+      renglones: [renglon('art', 'Artefacto marea', 10), renglon('acr', 'Acrilico', 10)],
+    });
+    await expect(service.reclamarPorCorreo('oc-28')).rejects.toBeInstanceOf(BadRequestException);
+    expect(correo.enviar).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,13 @@
-import { aDecimal } from '../../../common/dominio/decimal';
+import { aDecimal, aNumero } from '../../../common/dominio/decimal';
 import type { ClasificacionEquipo } from '../../../common/dominio/renglon-de-compra';
 import { ErrorNoEncontrado } from '../dominio/errores';
 import {
+  CantidadRecibida,
+  cantidadesARecibir,
   comprobanteDeRecepcion,
+  estadoTrasRecibir,
+  RenglonARecibir,
+  validarCierreConFaltante,
   materialesDeLosRenglones,
   PrecioCorregido,
   validarPreciosCorregibles,
@@ -52,6 +57,8 @@ export interface DatosRecibir {
   remito?: string;
   factura?: string;
   notas?: string;
+  /** Lo que llegó en esta entrega. Sin esto, llegó todo lo que faltaba. */
+  renglones?: CantidadRecibida[];
 }
 
 /**
@@ -155,13 +162,32 @@ export class GestionarOrdenesCompra {
    * Recibe la mercadería: genera un movimiento de ENTRADA por renglón y suma
    * el stock. Es la operación que conecta compras con inventario.
    */
+  /**
+   * Registra una entrega del proveedor: toda la orden, o una parte.
+   *
+   * Sin detalle de renglones llega todo lo que faltaba, que es la recepción de
+   * siempre. Con detalle llega lo indicado, y la orden queda «Recibida en
+   * parte» hasta que llegue el resto o se cierre con lo que llegó.
+   */
   async recibir(
     id: string,
     datos: DatosRecibir,
     recibidaPorId: string | null,
   ): Promise<OrdenConRelaciones> {
     const orden = await this.traer(id);
+    // Primero el estado: una orden en borrador, ya recibida o anulada se
+    // rechaza con el mismo mensaje de siempre, antes de mirar cantidades.
     validarTransicion(orden, 'RECIBIDA');
+    const renglones: RenglonARecibir[] = (orden.renglones ?? []).map((r) => ({
+      id: r.id,
+      cantidad: aNumero(r.cantidad),
+      cantidadRecibida: aNumero(r.cantidadRecibida ?? 0),
+      esEquipo: !r.materialId,
+      nombre: r.material?.nombre ?? r.descripcionEquipo ?? 'Renglón',
+    }));
+    const recibidas = cantidadesARecibir(orden.numero, renglones, datos.renglones);
+    const estado = estadoTrasRecibir(renglones, recibidas);
+    validarTransicion(orden, estado);
     const comprobante = comprobanteDeRecepcion(orden.numero, datos.remito, datos.factura);
 
     const fechaRecepcion = datos.fechaRecepcion ?? this.reloj.ahora();
@@ -169,11 +195,12 @@ export class GestionarOrdenesCompra {
     // Recibir genera un movimiento de ENTRADA por renglón con esta fecha, así
     // que le corresponde la misma regla que a un movimiento cargado a mano: no
     // puede quedar por detrás del último ajuste del material. Se comprueban
-    // TODOS antes de tocar nada, para no dejar media orden recibida.
+    // TODOS los que llegan antes de tocar nada, para no dejar media entrega.
+    const llegan = new Set(recibidas.map((r) => r.renglonId));
     for (const renglon of orden.renglones ?? []) {
       // Los renglones de equipo no mueven stock, asi que no hay ajuste contra
       // el que comparar: esta regla es solo de los materiales.
-      if (!renglon.materialId) continue;
+      if (!renglon.materialId || !llegan.has(renglon.id)) continue;
       await this.panol.verificarFechaContraAjustes(
         renglon.materialId,
         fechaRecepcion,
@@ -189,7 +216,19 @@ export class GestionarOrdenesCompra {
       remito: comprobante.remito,
       factura: comprobante.factura,
       notas: datos.notas ?? null,
+      renglones: recibidas.map((r) => ({ renglonId: r.renglonId, cantidad: aDecimal(r.cantidad) })),
+      estado,
     });
+  }
+
+  /**
+   * El proveedor no va a entregar el resto: la orden se cierra con lo que
+   * llegó. Lo que faltó queda a la vista en cada renglón, con el motivo.
+   */
+  async cerrarConFaltante(id: string, motivo: string): Promise<OrdenConRelaciones> {
+    const orden = await this.traer(id);
+    const limpio = validarCierreConFaltante(orden, motivo);
+    return this.repo.cerrarConFaltante(id, limpio);
   }
 
   /**

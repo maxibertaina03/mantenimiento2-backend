@@ -3,6 +3,7 @@ import { EstadoOrdenCompra } from '@prisma/client';
 import { aNumero } from '../../../../common/dominio/decimal';
 import type {
   OrdenConRelaciones,
+  RecepcionConRenglones,
   RenglonConRelaciones,
 } from '../../puertos/repositorio-ordenes-compra';
 
@@ -30,8 +31,15 @@ export class RenglonRespuestaDto {
   @ApiPropertyOptional({ enum: ['EQUIPO', 'HERRAMIENTA'], nullable: true })
   clasificacion!: 'EQUIPO' | 'HERRAMIENTA' | null;
 
+  @ApiProperty({ description: 'Lo que ya llegó, sumando las entregas', example: 10 })
+  cantidadRecibida!: number;
+
+  @ApiProperty({ description: 'Lo que falta entregar (cantidad - cantidadRecibida)', example: 0 })
+  pendiente!: number;
+
   static desde(r: RenglonConRelaciones): RenglonRespuestaDto {
     const cantidad = aNumero(r.cantidad);
+    const cantidadRecibida = aNumero(r.cantidadRecibida ?? 0);
     const precioUnitario = r.precioUnitario === null ? null : aNumero(r.precioUnitario);
     return {
       id: r.id,
@@ -47,6 +55,34 @@ export class RenglonRespuestaDto {
       // proveedor sin decir qué se compraba.
       descripcionEquipo: r.descripcionEquipo ?? null,
       clasificacion: r.clasificacion ?? null,
+      cantidadRecibida,
+      pendiente: Math.max(0, Number((cantidad - cantidadRecibida).toFixed(3))),
+    };
+  }
+}
+
+export class RecepcionRespuestaDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() fecha!: Date;
+  @ApiPropertyOptional({ nullable: true }) remito!: string | null;
+  @ApiPropertyOptional({ nullable: true }) factura!: string | null;
+  @ApiPropertyOptional({ nullable: true }) notas!: string | null;
+  @ApiPropertyOptional({ nullable: true }) recibidaPorNombre!: string | null;
+  @ApiProperty({ description: 'Lo que llegó de cada renglón en esta entrega' })
+  renglones!: { renglonId: string; cantidad: number }[];
+
+  static desde(r: RecepcionConRenglones): RecepcionRespuestaDto {
+    return {
+      id: r.id,
+      fecha: r.fecha,
+      remito: r.remito,
+      factura: r.factura,
+      notas: r.notas,
+      recibidaPorNombre: r.recibidaPor?.nombre ?? null,
+      renglones: r.renglones.map((x) => ({
+        renglonId: x.renglonId,
+        cantidad: aNumero(x.cantidad),
+      })),
     };
   }
 }
@@ -89,6 +125,18 @@ export class OrdenRespuestaDto {
   @ApiProperty({ description: 'true si todavía se puede editar (está en BORRADOR)' })
   editable!: boolean;
 
+  @ApiProperty({
+    type: [RecepcionRespuestaDto],
+    description: 'Las entregas, de la primera a la última',
+  })
+  recepciones!: RecepcionRespuestaDto[];
+
+  @ApiProperty({ description: 'Se cerró con lo que llegó: el proveedor no entregó todo' })
+  cerradaConFaltante!: boolean;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Por qué se cerró con faltante' })
+  motivoFaltante!: string | null;
+
   @ApiProperty() creadoEn!: Date;
 
   static desde(o: OrdenConRelaciones): OrdenRespuestaDto {
@@ -120,6 +168,9 @@ export class OrdenRespuestaDto {
       renglones,
       total,
       editable: o.estado === EstadoOrdenCompra.BORRADOR,
+      recepciones: (o.recepciones ?? []).map(RecepcionRespuestaDto.desde),
+      cerradaConFaltante: o.cerradaConFaltante ?? false,
+      motivoFaltante: o.motivoFaltante ?? null,
       creadoEn: o.creadoEn,
     };
   }

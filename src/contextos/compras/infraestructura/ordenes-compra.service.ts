@@ -50,6 +50,22 @@ export class OrdenesCompraService {
     );
   }
 
+  reclamarPorCorreo(id: string, usuario?: Usuario): Promise<ResultadoEnvioDto> {
+    return traducirErrores(() => this.enviar.reclamoPorCorreo(id, usuario));
+  }
+
+  registrarReclamoWhatsapp(
+    id: string,
+    numero: string,
+    usuario?: Usuario,
+  ): Promise<OrdenRespuestaDto> {
+    return traducirErrores(async () =>
+      OrdenRespuestaDto.desde(
+        await this.enviar.reclamoPorWhatsapp(id, numero, usuario?.id ?? null),
+      ),
+    );
+  }
+
   listarEnvios(id: string) {
     return traducirErrores(async () =>
       (await this.enviar.envios(id)).map((e) => ({
@@ -124,6 +140,12 @@ export class OrdenesCompraService {
           usuarioActual?.id ?? null,
         ),
       ),
+    );
+  }
+
+  cerrarConFaltante(id: string, motivo: string): Promise<OrdenRespuestaDto> {
+    return traducirErrores(async () =>
+      OrdenRespuestaDto.desde(await this.gestionar.cerrarConFaltante(id, motivo)),
     );
   }
 

@@ -19,7 +19,7 @@ import { ActualizarOrdenDto } from './dto/actualizar-orden.dto';
 import { CorregirPreciosDto } from './dto/corregir-precios.dto';
 import { CrearOrdenDto } from './dto/crear-orden.dto';
 import { ListarOrdenesDto } from './dto/listar-ordenes.dto';
-import { RecibirOrdenDto } from './dto/recibir-orden.dto';
+import { CerrarConFaltanteDto, RecibirOrdenDto } from './dto/recibir-orden.dto';
 import { EnviarOrdenDto, RegistrarWhatsappDto } from './dto/enviar-orden.dto';
 import { AdjuntarComprobanteDto } from './comprobantes/comprobantes.dto';
 import { ComprobantesService } from './comprobantes/comprobantes.service';
@@ -147,7 +147,10 @@ export class OrdenesCompraController {
   @Permisos(PERMISOS.ORDENES_RECIBIR)
   @Patch(':id/recibir')
   @ApiOperation({
-    summary: 'Recibir la mercadería: genera un movimiento de ENTRADA por renglón y suma el stock',
+    summary: 'Recibir la mercadería, toda o una parte: una ENTRADA de stock por lo que llegó',
+    description:
+      'Sin `renglones`, llega todo lo que faltaba. Con `renglones`, llega lo indicado: si queda ' +
+      'algo pendiente, la orden pasa a RECIBIDA_PARCIAL y se puede volver a recibir.',
   })
   recibir(
     @Param('id', ParseUUIDPipe) id: string,
@@ -196,6 +199,45 @@ export class OrdenesCompraController {
     @UsuarioActual() usuario?: Usuario,
   ) {
     return this.service.registrarEnvioWhatsapp(id, dto.numero, usuario);
+  }
+
+  @Permisos(PERMISOS.ORDENES_ENVIAR)
+  @Post(':id/reclamar-correo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Reclamarle al proveedor por correo lo que falta entregar',
+    description:
+      'El texto (solo lo pendiente) y los destinatarios los arma el servidor. Queda ' +
+      'registrado en los envíos de la orden como reclamo.',
+  })
+  reclamarCorreo(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() usuario?: Usuario) {
+    return this.service.reclamarPorCorreo(id, usuario);
+  }
+
+  @Permisos(PERMISOS.ORDENES_ENVIAR)
+  @Post(':id/reclamar-whatsapp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dejar constancia de que se reclamó lo que falta por WhatsApp',
+    description: 'El chat lo abre la persona con el texto escrito; esto lo registra como reclamo.',
+  })
+  reclamarWhatsapp(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RegistrarWhatsappDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.service.registrarReclamoWhatsapp(id, dto.numero, usuario);
+  }
+
+  @Permisos(PERMISOS.ORDENES_RECIBIR)
+  @Post(':id/cerrar-con-faltante')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cerrar con lo que llegó: el proveedor no va a entregar el resto',
+    description: 'Solo una orden «Recibida en parte». Queda RECIBIDA, con el motivo del faltante.',
+  })
+  cerrarConFaltante(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CerrarConFaltanteDto) {
+    return this.service.cerrarConFaltante(id, dto.motivo);
   }
 
   @Permisos(PERMISOS.ORDENES_VER)

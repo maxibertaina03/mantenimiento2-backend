@@ -37,6 +37,9 @@ export function crearPrismaEnMemoria() {
     asignacionesIt: [] as any[],
     ordenes: [] as any[],
     renglones: [] as any[],
+    // Las entregas de las órdenes de compra, y lo que trajo cada una.
+    recepciones: [] as any[],
+    recepcionesRenglon: [] as any[],
     // Por dónde salió cada orden. Sin esto, registrar un WhatsApp daba 500.
     enviosOrden: [] as any[],
     // Los manuales en PDF de los equipos (el archivo va al almacén, no acá).
@@ -424,6 +427,20 @@ export function crearPrismaEnMemoria() {
       const u = db.usuarios.find((x) => x.id === fila.registradoPorId);
       salida.registradoPor = u ? { nombre: u.nombre } : null;
     }
+    if (include.recepciones) {
+      salida.recepciones = db.recepciones
+        .filter((x) => x.ordenId === fila.id)
+        .sort((a, b) => +new Date(a.fecha) - +new Date(b.fecha))
+        .map((x) => ({
+          ...x,
+          recibidaPor: include.recepciones.include?.recibidaPor
+            ? (db.usuarios.find((u) => u.id === x.recibidaPorId) ?? null)
+            : undefined,
+          renglones: db.recepcionesRenglon
+            .filter((rr) => rr.recepcionId === x.id)
+            .map((rr) => ({ renglonId: rr.renglonId, cantidad: rr.cantidad })),
+        }));
+    }
     if (include.renglones) {
       salida.renglones = db.renglones
         .filter((r) => r.ordenId === fila.id)
@@ -524,6 +541,10 @@ export function crearPrismaEnMemoria() {
               id: nuevoId(),
               creadoEn: new Date(),
               [clavePadre(campo)]: fila.id,
+              // Lo que en Postgres pone el default de la columna.
+              ...(campo === 'renglones'
+                ? { movimientoId: null, cantidadRecibida: new Prisma.Decimal(0) }
+                : {}),
               ...hijo,
             });
           }
@@ -718,12 +739,17 @@ export function crearPrismaEnMemoria() {
       emitidaEn: null,
       recibidaEn: null,
       recibidaPorId: null,
+      cerradaConFaltante: false,
+      motivoFaltante: null,
     })),
     renglonOrdenCompra: delegate(db.renglones, () => ({
       precioUnitario: null,
       notas: null,
       movimientoId: null,
+      cantidadRecibida: new Prisma.Decimal(0),
     })),
+    recepcionOrden: delegate(db.recepciones, () => ({ notas: null, recibidaPorId: null })),
+    recepcionRenglon: delegate(db.recepcionesRenglon, () => ({ movimientoId: null })),
     ordenTrabajo: delegate(db.ordenesTrabajo, () => ({
       descripcion: null,
       estado: 'ABIERTA',
