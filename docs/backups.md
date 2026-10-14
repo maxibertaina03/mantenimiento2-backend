@@ -31,6 +31,9 @@ Cerrá y abrí PowerShell (otra vez normal), y después:
 rclone config
 ```
 
+Antes, hace falta **un client_id propio de Google** (ver «El client_id de
+Google» más abajo): el compartido de rclone se retira durante 2026.
+
 Respondé así (lo demás, Enter):
 
 | Pregunta | Respuesta |
@@ -38,7 +41,7 @@ Respondé así (lo demás, Enter):
 | `n) New remote` | `n` |
 | `name` | `drive` (tal cual, en minúscula) |
 | `Storage` | el número de **Google Drive** |
-| `client_id` / `client_secret` | Enter (vacío) |
+| `client_id` / `client_secret` | los del cliente «App de escritorio» de Google Cloud |
 | `scope` | el número de **drive.file** («Access to files created by rclone only»): rclone solo ve lo que él mismo sube, nada más de tu Drive |
 | `Edit advanced config?` | `n` |
 | `Use web browser to automatically authenticate?` | `y` → se abre el navegador, entrás con tu cuenta de Google y aceptás |
@@ -75,6 +78,31 @@ producción** → **Run workflow**. En un par de minutos tiene que quedar en
 verde y aparecer el archivo en `Backups Mantenimiento/diarios/`.
 
 Si una noche falla, GitHub te manda un correo.
+
+## El client_id de Google
+
+rclone se conecta a Drive con una app de OAuth **propia**, en Google Cloud, en
+el proyecto **rclone-backups** (cuenta del Drive). Se armó el 2026-10-14:
+
+1. Proyecto `rclone-backups` → **APIs y servicios → Biblioteca → Google Drive
+   API → Habilitar**.
+2. **Google Auth Platform**: público **Externo**. En «Información de la
+   marca»: nombre `rclone backups`, correo de asistencia, página principal
+   `https://mantenimiento2-frontend.vercel.app`, política de privacidad
+   `https://mantenimiento2-frontend.vercel.app/privacidad.html`, y el dominio
+   autorizado `mantenimiento2-frontend.vercel.app`.
+3. **Público → Publicar app** («En producción»). **Imprescindible:** una app
+   «En prueba» recibe permisos que vencen a los 7 días, y el backup fallaría
+   todas las semanas. Con el permiso drive.file, Google no exige verificarla.
+4. **Clientes → Crear cliente → App de escritorio.** El ID y el secreto van en
+   `rclone config` (nunca en un chat ni en el repo).
+5. Después de cambiar algo en rclone, volver a cargar el secreto
+   `RCLONE_CONFIG` (paso 2.a) y correr el workflow a mano para comprobarlo.
+
+**drive.file es por app:** cada app de OAuth ve solo los archivos que creó
+ella. Si algún día se cambia de client_id, la app nueva no ve los backups
+anteriores: crea su propia carpeta «Backups Mantenimiento», y la vieja queda
+aparte en Drive (ya no la rota nadie; se puede borrar a mano o guardar).
 
 ## Restaurar un backup
 
