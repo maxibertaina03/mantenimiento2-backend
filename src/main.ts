@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -7,6 +9,23 @@ import { AppModule } from './app.module';
 import { FiltroExcepcionesHttp } from './common/filters/http-exception.filter';
 import { iniciarMonitoreo } from './common/monitoreo/monitoreo';
 import { exigirBaseCorrecta } from './common/prisma/guardia-base';
+
+/**
+ * La versión de `package.json`, leída al arrancar.
+ *
+ * Se lee del archivo y no con un `import` del JSON: importarlo haría que el
+ * compilador saque `package.json` de `src/` y cambie la carpeta de salida
+ * (`dist/src/main.js` en vez de `dist/main.js`), que es justo lo que rompe el
+ * arranque en Render.
+ */
+function versionDelPaquete(): string {
+  try {
+    const ruta = join(__dirname, '..', 'package.json');
+    return (JSON.parse(readFileSync(ruta, 'utf8')) as { version?: string }).version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 async function bootstrap() {
   // Lo PRIMERO, antes de crear la aplicación: si la base no corresponde al
@@ -55,10 +74,10 @@ async function bootstrap() {
   // ── Swagger en /docs ──
   const swaggerConfig = new DocumentBuilder()
     .setTitle('API Mantenimiento')
-    .setDescription('Gestión de stock de materiales con trazabilidad de movimientos')
-    // Con el commit que corre (Render lo pone en RENDER_GIT_COMMIT): así se
-    // puede comprobar que un despliegue llegó aunque no cambie ninguna ruta.
-    .setVersion(`0.1.0+${process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? 'local'}`)
+    .setDescription('Mantenimiento de planta: pañol, compras, equipos, trabajos e informática')
+    // La versión y el commit que corre (Render lo pone en RENDER_GIT_COMMIT):
+    // así se puede comprobar que un despliegue llegó aunque no cambie ninguna ruta.
+    .setVersion(`${versionDelPaquete()}+${process.env.RENDER_GIT_COMMIT?.slice(0, 7) ?? 'local'}`)
     // Permite pegar un JWT de Clerk en Swagger ("Authorize") para probar con auth activa.
     .addBearerAuth()
     .build();
