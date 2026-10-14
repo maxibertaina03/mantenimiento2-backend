@@ -1,6 +1,7 @@
 import { Provider } from '@nestjs/common';
 import { ConsultarCalendario } from '../aplicacion/consultar-calendario';
 import { ConsultarOrdenesTrabajo } from '../aplicacion/consultar-ordenes-trabajo';
+import { EnviarOrdenesTrabajo } from '../aplicacion/enviar-ordenes-trabajo';
 import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo';
 import { GestionarTareas } from '../aplicacion/gestionar-tareas';
 import { RegistrarTrabajoDePlan } from '../aplicacion/registrar-trabajo-de-plan';
@@ -9,6 +10,13 @@ import { UsarMateriales } from '../aplicacion/usar-materiales';
 import { CONSULTA_EQUIPOS, ConsultaEquipos } from '../puertos/consulta-equipos';
 import { CONSULTA_EQUIPOS_IT, ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { CONSULTA_USUARIOS, ConsultaUsuarios } from '../puertos/consulta-usuarios';
+import {
+  CONTACTOS_DE_TALLERES,
+  CORREO_TRABAJOS,
+  ContactosDeTalleres,
+  CorreoTrabajos,
+} from '../puertos/envio';
+import { EQUIPOS_EN_TALLER, EquiposEnTaller } from '../puertos/equipos-en-taller';
 import { PLANES_DE_MANTENIMIENTO, PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import { RELOJ_TRABAJOS, Reloj } from '../puertos/reloj';
 import {
@@ -43,6 +51,7 @@ export const casosDeUsoTrabajos: Provider[] = [
       planes: PlanesDeMantenimiento,
       reloj: Reloj,
       trabajoDePlan: RegistrarTrabajoDePlan,
+      taller: EquiposEnTaller,
     ) =>
       new GestionarOrdenesTrabajo(
         ordenes,
@@ -52,6 +61,7 @@ export const casosDeUsoTrabajos: Provider[] = [
         planes,
         reloj,
         trabajoDePlan,
+        taller,
       ),
     inject: [
       REPOSITORIO_ORDENES_TRABAJO,
@@ -61,7 +71,17 @@ export const casosDeUsoTrabajos: Provider[] = [
       PLANES_DE_MANTENIMIENTO,
       RELOJ_TRABAJOS,
       RegistrarTrabajoDePlan,
+      EQUIPOS_EN_TALLER,
     ],
+  },
+  {
+    provide: EnviarOrdenesTrabajo,
+    useFactory: (
+      ordenes: RepositorioOrdenesTrabajo,
+      correo: CorreoTrabajos,
+      talleres: ContactosDeTalleres,
+    ) => new EnviarOrdenesTrabajo(ordenes, correo, talleres),
+    inject: [REPOSITORIO_ORDENES_TRABAJO, CORREO_TRABAJOS, CONTACTOS_DE_TALLERES],
   },
   {
     provide: UsarMateriales,

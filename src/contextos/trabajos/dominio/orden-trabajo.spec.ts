@@ -38,6 +38,7 @@ const orden = (cambios: Partial<OrdenTrabajo> = {}): OrdenTrabajo => ({
   cerradaEn: null,
   cerradaPorId: null,
   motivoAnulacion: null,
+  comprobanteExterno: null,
   creadoEn: AHORA,
   ...cambios,
 });

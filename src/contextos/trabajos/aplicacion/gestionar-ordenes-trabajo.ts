@@ -9,6 +9,7 @@ import {
   OrdenTrabajo,
   reabrirOrdenTrabajo,
   reasignarOrdenTrabajo,
+  tieneEquipoEnTaller,
   validarEjecutor,
   validarElEquipo,
   validarQueEsSuyo,
@@ -18,6 +19,7 @@ import {
 import { ConsultaEquipos } from '../puertos/consulta-equipos';
 import { ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { ConsultaUsuarios } from '../puertos/consulta-usuarios';
+import { EquiposEnTaller } from '../puertos/equipos-en-taller';
 import { PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import {
   OrdenTrabajoConRelaciones,
@@ -59,7 +61,33 @@ export class GestionarOrdenesTrabajo {
     private readonly planes: PlanesDeMantenimiento,
     private readonly reloj: Reloj,
     private readonly trabajoDePlan: RegistrarTrabajoDePlan,
+    // Opcional para que quien no prueba esto no tenga que armarlo.
+    private readonly taller?: EquiposEnTaller,
   ) {}
+
+  /**
+   * Pone a la máquina «En reparación» mientras está en un taller de afuera, y
+   * la vuelve a «Operativo» cuando vuelve.
+   *
+   * Recibe la orden antes y después del cambio, y solo mira las máquinas de
+   * las que tenían o tienen una orden externa abierta: cerrar un trabajo hecho
+   * en fábrica no toca el estado que alguien haya puesto a mano. Y cuenta las
+   * otras órdenes externas abiertas de la misma máquina: si salió a dos
+   * talleres, vuelve recién cuando vuelve de los dos.
+   */
+  private async avisarAlTaller(
+    ...ordenes: (Pick<OrdenTrabajo, 'estado' | 'ejecutor' | 'equipoId'> | null)[]
+  ): Promise<void> {
+    if (!this.taller) return;
+    const maquinas = new Set(
+      ordenes.filter((o) => o !== null && tieneEquipoEnTaller(o)).map((o) => o!.equipoId!),
+    );
+    for (const equipoId of maquinas) {
+      const afuera = await this.repo.contar({ equipoId, estado: 'ABIERTA', ejecutor: 'EXTERNO' });
+      if (afuera > 0) await this.taller.salioAlTaller(equipoId);
+      else await this.taller.volvioDelTaller(equipoId);
+    }
+  }
 
   private async traer(id: string): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.repo.buscarPorId(id);
@@ -147,6 +175,7 @@ export class GestionarOrdenesTrabajo {
     // sin el trabajo que lo justifica, y el equipo pasaría meses sin service
     // creyendo que está al día.
     await this.trabajoDePlan.ejecutar(guardada, opciones);
+    await this.avisarAlTaller(guardada);
 
     return guardada;
   }
@@ -221,7 +250,10 @@ export class GestionarOrdenesTrabajo {
       aGuardar.proveedorId = ejecutor === 'EXTERNO' ? proveedorId : null;
     }
 
-    return this.repo.actualizar(id, aGuardar);
+    const editada = await this.repo.actualizar(id, aGuardar);
+    // Mandarla a un taller, traerla a fábrica o cambiarle la máquina.
+    await this.avisarAlTaller(orden, editada);
+    return editada;
   }
 
   async cerrar(
@@ -242,6 +274,7 @@ export class GestionarOrdenesTrabajo {
     // Cerrar el trabajo es lo que corre el plan, y se cuenta desde la fecha
     // real del trabajo, no desde la que estaba planificada.
     await this.trabajoDePlan.ejecutar(cerrada, opciones);
+    await this.avisarAlTaller(orden, cerrada);
 
     return cerrada;
   }
@@ -249,7 +282,9 @@ export class GestionarOrdenesTrabajo {
   async reabrir(id: string, usuarioId: string | null): Promise<OrdenTrabajoConRelaciones> {
     const orden = await this.traer(id);
     validarQueEsSuyo(orden, usuarioId);
-    return this.repo.actualizar(id, reabrirOrdenTrabajo(orden));
+    const reabierta = await this.repo.actualizar(id, reabrirOrdenTrabajo(orden));
+    await this.avisarAlTaller(reabierta);
+    return reabierta;
   }
 
   async eliminar(id: string): Promise<void> {
@@ -267,6 +302,11 @@ export class GestionarOrdenesTrabajo {
     validarQueEsSuyo(orden, usuarioId);
     // El dominio necesita saber cuántos materiales tiene cargados: una orden
     // que ya movió stock no se anula, se le quitan los materiales primero.
-    return this.repo.actualizar(id, anularOrdenTrabajo(orden, motivo, orden.materiales.length));
+    const anulada = await this.repo.actualizar(
+      id,
+      anularOrdenTrabajo(orden, motivo, orden.materiales.length),
+    );
+    await this.avisarAlTaller(orden, anulada);
+    return anulada;
   }
 }

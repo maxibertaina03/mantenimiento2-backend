@@ -3,6 +3,7 @@ import { ActualizarEquipo } from '../aplicacion/actualizar-equipo';
 import { CambiarFotoEquipo } from '../aplicacion/cambiar-foto-equipo';
 import { ConsultarEquipos } from '../aplicacion/consultar-equipos';
 import { CrearEquipo } from '../aplicacion/crear-equipo';
+import { EstadoPorTaller } from '../aplicacion/estado-por-taller';
 import { GestionarFotos } from '../aplicacion/gestionar-fotos';
 import { GestionarManuales } from '../aplicacion/gestionar-manuales';
 import { GestionarMontajes } from '../aplicacion/gestionar-montajes';
@@ -68,6 +69,13 @@ export const casosDeUsoEquipos: Provider[] = [
     useFactory: (equipos: RepositorioEquipos, almacen: AlmacenImagenes) =>
       new CambiarFotoEquipo(equipos, almacen),
     inject: [REPOSITORIO_EQUIPOS, ALMACEN_IMAGENES],
+  },
+  // Se exporta: trabajos avisa que una máquina salió a un taller o volvió, y
+  // el estado que le toca lo decide equipos.
+  {
+    provide: EstadoPorTaller,
+    useFactory: (equipos: RepositorioEquipos) => new EstadoPorTaller(equipos),
+    inject: [REPOSITORIO_EQUIPOS],
   },
   // Se exporta: el contexto de trabajos le avisa que un service se hizo, sin
   // copiar la cuenta de cuándo toca el próximo.

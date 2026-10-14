@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   Body,
   Controller,
   Delete,
@@ -12,6 +13,7 @@ import {
   Patch,
   Post,
   Query,
+  ServiceUnavailableException,
   UseFilters,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -21,6 +23,8 @@ import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.de
 import { PERMISOS } from '../../../common/auth/permisos';
 import { PermisosService } from '../../../common/auth/permisos.service';
 import { ConsultarOrdenesTrabajo } from '../aplicacion/consultar-ordenes-trabajo';
+import { EnviarOrdenesTrabajo } from '../aplicacion/enviar-ordenes-trabajo';
+import { ErrorCorreoNoConfigurado, ErrorEnvioFallido } from '../dominio/errores';
 import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo';
 import { RegistrarTrabajoHecho } from '../aplicacion/registrar-trabajo-hecho';
 import { UsarMateriales } from '../aplicacion/usar-materiales';
@@ -31,10 +35,29 @@ import {
   CerrarOrdenTrabajoDto,
   CrearOrdenTrabajoDto,
   EditarOrdenTrabajoDto,
+  EnviarOrdenTrabajoDto,
   ListarOrdenesTrabajoDto,
   ReasignarOrdenTrabajoDto,
+  RegistrarWhatsappTrabajoDto,
   UsarMaterialDto,
 } from './ordenes-trabajo.dto';
+
+/**
+ * Los dos errores de correo que no son reglas del negocio: 503 si el correo
+ * no está configurado (la pantalla ofrece WhatsApp), 502 si el servidor de
+ * correo lo rechazó.
+ */
+async function traducirErroresDeCorreo<T>(hacer: () => Promise<T>): Promise<T> {
+  try {
+    return await hacer();
+  } catch (error) {
+    if (error instanceof ErrorCorreoNoConfigurado) {
+      throw new ServiceUnavailableException(error.message);
+    }
+    if (error instanceof ErrorEnvioFallido) throw new BadGatewayException(error.message);
+    throw error;
+  }
+}
 
 /**
  * La entrada HTTP del contexto.
@@ -55,6 +78,7 @@ export class OrdenesTrabajoController {
     private readonly materiales: UsarMateriales,
     private readonly consultar: ConsultarOrdenesTrabajo,
     private readonly registrarHecho: RegistrarTrabajoHecho,
+    private readonly enviar: EnviarOrdenesTrabajo,
     @Inject(CONSULTA_USUARIOS) private readonly usuarios: ConsultaUsuarios,
     private readonly permisos: PermisosService,
   ) {}
@@ -123,6 +147,7 @@ export class OrdenesTrabajoController {
         incluirComponentes: query.incluirComponentes === 'true',
         equipoItId: query.equipoItId,
         asignadoAId: query.asignadoAId,
+        ejecutor: query.ejecutor,
       },
       query.pagina ?? 1,
       query.limite ?? 20,
@@ -177,6 +202,7 @@ export class OrdenesTrabajoController {
         costoManoObra: dto.costoManoObra,
         horasParada: dto.horasParada,
         planId: dto.planId,
+        comprobanteExterno: dto.comprobanteExterno,
         resolucion: dto.resolucion,
         materiales: dto.materiales,
       },
@@ -237,7 +263,46 @@ export class OrdenesTrabajoController {
       proveedorId: dto.proveedorId,
       costoManoObra: dto.costoManoObra,
       horasParada: dto.horasParada,
+      comprobanteExterno: dto.comprobanteExterno,
     });
+  }
+
+  @Permisos(PERMISOS.TRABAJOS_EDITAR)
+  @Post(':id/enviar-correo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Mandarle la orden al taller por correo, con el PDF adjunto',
+    description:
+      'El cuerpo lleva SOLO el PDF. El destinatario (el correo del proveedor) y el texto los ' +
+      'arma el servidor, para que la casilla de la empresa no sirva para escribirle a cualquiera.',
+  })
+  enviarCorreo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: EnviarOrdenTrabajoDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return traducirErroresDeCorreo(() =>
+      this.enviar.porCorreo(id, Buffer.from(dto.pdfBase64, 'base64'), usuario),
+    );
+  }
+
+  @Permisos(PERMISOS.TRABAJOS_EDITAR)
+  @Post(':id/registrar-whatsapp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Dejar constancia de que la orden se le mandó al taller por WhatsApp' })
+  registrarWhatsapp(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RegistrarWhatsappTrabajoDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.enviar.porWhatsapp(id, dto.numero, usuario?.id ?? null);
+  }
+
+  @Permisos(PERMISOS.TRABAJOS_VER)
+  @Get(':id/envios')
+  @ApiOperation({ summary: 'Cuándo y por dónde se le mandó la orden al taller' })
+  envios(@Param('id', ParseUUIDPipe) id: string) {
+    return this.enviar.envios(id);
   }
 
   @Permisos(PERMISOS.TRABAJOS_EDITAR)

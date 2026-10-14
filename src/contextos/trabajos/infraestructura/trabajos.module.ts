@@ -1,17 +1,25 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../../common/auth/auth.module';
 import { CorreoModule } from '../../../common/correo/correo.module';
+import { ProveedoresModule } from '../../../modules/proveedores/proveedores.module';
 import { EquiposModule } from '../../equipos';
 import { PanolModule } from '../../panol';
 import { CONSULTA_EQUIPOS } from '../puertos/consulta-equipos';
 import { CONSULTA_EQUIPOS_IT } from '../puertos/consulta-equipos-it';
 import { CONSULTA_USUARIOS } from '../puertos/consulta-usuarios';
+import { CONTACTOS_DE_TALLERES, CORREO_TRABAJOS } from '../puertos/envio';
+import { EQUIPOS_EN_TALLER } from '../puertos/equipos-en-taller';
 import { REPOSITORIO_TAREAS } from '../puertos/repositorio-tareas';
 import { PLANES_DE_MANTENIMIENTO } from '../puertos/planes-de-mantenimiento';
 import { RELOJ_TRABAJOS, RelojDelSistema } from '../puertos/reloj';
 import { REPOSITORIO_ORDENES_TRABAJO } from '../puertos/repositorio-ordenes-trabajo';
 import { STOCK } from '../puertos/stock';
 import { AvisadorDeTareas } from './avisador-de-tareas';
+import {
+  ContactosPorProveedores,
+  CorreoDeTrabajos,
+  EquiposEnTallerPorEstado,
+} from './adaptadores-taller';
 import { CalendarioController } from './calendario.controller';
 import { OrdenesTrabajoController } from './ordenes-trabajo.controller';
 import { PrismaRepositorioTareas } from './prisma-repositorio-tareas';
@@ -40,7 +48,7 @@ import { casosDeUsoTrabajos } from './casos-de-uso.providers';
  * importa. Olvidarlo no rompe la compilación, rompe el arranque.
  */
 @Module({
-  imports: [PanolModule, AuthModule, EquiposModule, CorreoModule],
+  imports: [PanolModule, AuthModule, EquiposModule, CorreoModule, ProveedoresModule],
   controllers: [OrdenesTrabajoController, CalendarioController],
   providers: [
     { provide: REPOSITORIO_ORDENES_TRABAJO, useClass: PrismaRepositorioOrdenesTrabajo },
@@ -52,6 +60,9 @@ import { casosDeUsoTrabajos } from './casos-de-uso.providers';
     AvisadorDeTareas,
     { provide: STOCK, useClass: StockPorMovimientos },
     { provide: RELOJ_TRABAJOS, useClass: RelojDelSistema },
+    { provide: EQUIPOS_EN_TALLER, useClass: EquiposEnTallerPorEstado },
+    { provide: CORREO_TRABAJOS, useClass: CorreoDeTrabajos },
+    { provide: CONTACTOS_DE_TALLERES, useClass: ContactosPorProveedores },
     ...casosDeUsoTrabajos,
   ],
 })

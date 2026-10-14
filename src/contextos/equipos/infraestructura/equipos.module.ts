@@ -18,6 +18,7 @@ import {
   TiposEquipoPlantaController,
   UbicacionesEquipoController,
 } from './catalogos.controller';
+import { EstadoPorTaller } from '../aplicacion/estado-por-taller';
 import { GestionarPlanes } from '../aplicacion/gestionar-planes';
 import { AvisosController } from './avisos.controller';
 import { CorreoEnviadorAvisos } from './correo-enviador-avisos';
@@ -77,6 +78,6 @@ import { SupabaseAlmacenManuales } from './supabase-almacen-manuales';
     { provide: RELOJ, useClass: RelojDelSistema },
     ...casosDeUsoEquipos,
   ],
-  exports: [REPOSITORIO_EQUIPOS, RELOJ, GestionarPlanes],
+  exports: [REPOSITORIO_EQUIPOS, RELOJ, GestionarPlanes, EstadoPorTaller],
 })
 export class EquiposModule {}

@@ -1,4 +1,5 @@
 import {
+  Ejecutor,
   EstadoOrdenTrabajo,
   MaterialUsado,
   OrdenTrabajo,
@@ -39,8 +40,22 @@ export interface FiltroOrdenesTrabajo {
   buscar?: string;
   /** Solo las de una persona, para el filtro "las mías". */
   asignadoAId?: string;
+  /** EXTERNO: las de talleres de afuera. */
+  ejecutor?: Ejecutor;
   desde?: Date;
   hasta?: Date;
+}
+
+/** Una vez que se le mandó la orden al taller. */
+export interface EnvioDeTrabajo {
+  id: string;
+  ordenTrabajoId: string;
+  via: 'CORREO' | 'WHATSAPP';
+  destinatarios: string;
+  automatico: boolean;
+  enviadoEn: Date;
+  usuarioId: string | null;
+  usuarioNombre: string | null;
 }
 
 export interface RepositorioOrdenesTrabajo {
@@ -68,6 +83,12 @@ export interface RepositorioOrdenesTrabajo {
   ): Promise<MaterialUsadoConRelaciones>;
   buscarMaterialUsado(id: string): Promise<MaterialUsado | null>;
   quitarMaterial(id: string): Promise<void>;
+
+  registrarEnvio(
+    envio: Omit<EnvioDeTrabajo, 'id' | 'enviadoEn' | 'usuarioNombre'>,
+  ): Promise<EnvioDeTrabajo>;
+  /** Los envíos de una orden, el último primero. */
+  listarEnvios(ordenTrabajoId: string): Promise<EnvioDeTrabajo[]>;
 }
 
 export const REPOSITORIO_ORDENES_TRABAJO = Symbol('RepositorioOrdenesTrabajo');

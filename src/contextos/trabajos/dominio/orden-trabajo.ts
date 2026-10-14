@@ -140,6 +140,11 @@ export interface OrdenTrabajo {
   cerradaEn: Date | null;
   cerradaPorId: string | null;
   motivoAnulacion: string | null;
+  /**
+   * El remito o la factura con que un taller de afuera devolvió el equipo.
+   * Solo en los trabajos externos.
+   */
+  comprobanteExterno: string | null;
   creadoEn: Date;
 }
 
@@ -160,6 +165,8 @@ export interface DatosNuevaOrdenTrabajo {
   costoManoObra?: number | null;
   horasParada?: number | null;
   planId?: string | null;
+  /** El remito o la factura del taller, si fue un trabajo externo ya hecho. */
+  comprobanteExterno?: string | null;
 
   /**
    * El trabajo ya está terminado: la orden nace cerrada, con esta resolución.
@@ -254,6 +261,7 @@ export function crearOrdenTrabajo(
     cerradaEn: yaHecha ? ahora : null,
     cerradaPorId: yaHecha ? asignadoAId : null,
     motivoAnulacion: null,
+    comprobanteExterno: ejecutor === 'EXTERNO' ? limpiar(datos.comprobanteExterno) : null,
   };
 }
 
@@ -377,6 +385,8 @@ export interface CierreDeTrabajo {
   proveedorId?: string | null;
   costoManoObra?: number | null;
   horasParada?: number | null;
+  /** El remito o la factura del taller, si el trabajo se hizo afuera. */
+  comprobanteExterno?: string | null;
 }
 
 /** Los cambios que deja cerrar una orden. */
@@ -396,6 +406,7 @@ export function cerrarOrdenTrabajo(
   | 'proveedorId'
   | 'costoManoObra'
   | 'horasParada'
+  | 'comprobanteExterno'
 > {
   if (orden.estado !== 'ABIERTA') {
     throw new ErrorTransicionInvalida(
@@ -428,7 +439,50 @@ export function cerrarOrdenTrabajo(
     proveedorId: ejecutor === 'EXTERNO' ? (cierre.proveedorId ?? orden.proveedorId) : null,
     costoManoObra: cierre.costoManoObra ?? orden.costoManoObra,
     horasParada: cierre.horasParada ?? orden.horasParada,
+    // El papel del taller solo tiene sentido si lo hizo un taller.
+    comprobanteExterno:
+      ejecutor === 'EXTERNO'
+        ? cierre.comprobanteExterno === undefined
+          ? orden.comprobanteExterno
+          : limpiar(cierre.comprobanteExterno)
+        : null,
   };
+}
+
+/**
+ * Si la orden tiene un equipo afuera: abierta, para un taller externo, y
+ * sobre una máquina.
+ *
+ * Es lo que decide que la máquina figure «En reparación» mientras tanto, y lo
+ * que lista la pantalla de lo que está en talleres.
+ */
+export function tieneEquipoEnTaller(
+  orden: Pick<OrdenTrabajo, 'estado' | 'ejecutor' | 'equipoId'>,
+): boolean {
+  return orden.estado === 'ABIERTA' && orden.ejecutor === 'EXTERNO' && orden.equipoId !== null;
+}
+
+/**
+ * Solo se le manda al taller una orden abierta y con taller elegido.
+ *
+ * Mandar una cerrada sería pedirle un trabajo que ya está hecho; una sin
+ * proveedor, no tiene a quién.
+ */
+export function validarEnviableAlTaller(
+  orden: Pick<OrdenTrabajo, 'numero' | 'estado' | 'ejecutor' | 'proveedorId'>,
+): void {
+  if (orden.estado !== 'ABIERTA') {
+    throw new ErrorTransicionInvalida(
+      `La orden ${orden.numero} ya está ${ETIQUETA_ESTADO_TRABAJO[orden.estado].toLowerCase()}: ` +
+        'no hay nada que mandarle al taller.',
+    );
+  }
+  if (orden.ejecutor !== 'EXTERNO' || !orden.proveedorId) {
+    throw new ErrorDatosInvalidos(
+      `La orden ${orden.numero} se hace en fábrica. Para mandarla afuera, elegí primero a qué ` +
+        'taller o proveedor va.',
+    );
+  }
 }
 
 /**

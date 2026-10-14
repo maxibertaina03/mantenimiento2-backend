@@ -38,3 +38,15 @@ export class ErrorNoEncontrado extends comun.ErrorNoEncontrado {}
  * quién es.
  */
 export class ErrorNoEsSuyo extends comun.ErrorNoAutorizado {}
+
+/** El taller no tiene correo cargado: no hay a dónde mandarle la orden. */
+export class ErrorSinDestinatario extends comun.ErrorDatosInvalidos {}
+
+/**
+ * El servidor no tiene el correo configurado. No es un error de quien manda:
+ * la pantalla lo usa para ofrecer WhatsApp en su lugar.
+ */
+export class ErrorCorreoNoConfigurado extends comun.ErrorDominio {}
+
+/** El servidor de correo rechazó el envío; el mensaje dice por qué. */
+export class ErrorEnvioFallido extends comun.ErrorDominio {}

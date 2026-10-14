@@ -349,6 +349,7 @@ model Usuario {
   ordenesRecibidas    OrdenCompra[]          @relation("OrdenesRecibidas")
   recepcionesDeOrden  RecepcionOrden[]       @relation("RecepcionesDeOrden")
   enviosDeOrden       EnvioOrden[]           @relation("EnviosDeOrden")
+  enviosDeTrabajo     EnvioOrdenTrabajo[]    @relation("EnviosDeTrabajo")
 
   rotacionesDeCredencial RotacionCredencial[] @relation("RotacionesDeCredencial")
   comprobantesSubidos    ComprobanteOrden[]   @relation("ComprobantesSubidos")
@@ -1452,6 +1453,10 @@ model OrdenTrabajo {
 
   motivoAnulacion String?
 
+  /// El remito o la factura con que el taller de afuera devolvió el equipo.
+  /// Es lo que después permite cruzar el trabajo con el papel que quedó.
+  comprobanteExterno String?
+
   creadoEn DateTime @default(now())
 
   equipo     Equipo?                @relation(fields: [equipoId], references: [id], onDelete: SetNull)
@@ -1463,6 +1468,7 @@ model OrdenTrabajo {
   cerradaPor Usuario?               @relation("TrabajosCerrados", fields: [cerradaPorId], references: [id])
   materiales MaterialUsadoTrabajo[]
   tarea      TareaProgramada?
+  envios     EnvioOrdenTrabajo[]
 
   @@index([estado])
   @@index([equipoId])
@@ -1474,6 +1480,34 @@ model OrdenTrabajo {
   @@index([abiertaEn])
   @@index([tipo])
   @@map("ordenes_trabajo")
+}
+
+/// Cuándo y por dónde se le mandó una orden de trabajo al taller de afuera.
+///
+/// Igual que los envíos de las órdenes de compra: el correo sale desde el
+/// servidor, y WhatsApp lo manda la persona (por eso `automatico`). Sirve para
+/// contestar «¿ya se lo mandamos al taller?» sin buscar en la casilla de nadie.
+model EnvioOrdenTrabajo {
+  id             String @id @default(uuid())
+  ordenTrabajoId String
+
+  /// CORREO | WHATSAPP. Texto y no enum, como el resto de este contexto.
+  via String
+
+  /// A quiénes se les mandó, separados por coma. En WhatsApp, el número.
+  destinatarios String
+
+  /// false en WhatsApp: el sistema abre el chat, pero quien manda es la persona.
+  automatico Boolean @default(true)
+
+  enviadoEn DateTime @default(now())
+  usuarioId String?
+
+  orden   OrdenTrabajo @relation(fields: [ordenTrabajoId], references: [id], onDelete: Cascade)
+  usuario Usuario?     @relation("EnviosDeTrabajo", fields: [usuarioId], references: [id])
+
+  @@index([ordenTrabajoId])
+  @@map("envios_orden_trabajo")
 }
 
 /// Un material que consumió un trabajo.

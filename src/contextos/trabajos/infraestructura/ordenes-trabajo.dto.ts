@@ -131,6 +131,15 @@ export class CrearOrdenTrabajoDto {
   planId?: string | null;
 
   @ApiPropertyOptional({
+    example: 'R-0001-00004930',
+    description: 'El remito o la factura del taller, si el trabajo se hizo afuera.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  comprobanteExterno?: string | null;
+
+  @ApiPropertyOptional({
     description:
       'Si viene, el trabajo ya está hecho y la orden nace cerrada con esta resolución. ' +
       'Es el camino desde la ficha de una máquina.',
@@ -239,6 +248,15 @@ export class CerrarOrdenTrabajoDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   horasParada?: number | null;
+
+  @ApiPropertyOptional({
+    example: 'R-0001-00004930',
+    description: 'El remito o la factura del taller, si el trabajo se hizo afuera.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  comprobanteExterno?: string | null;
 }
 
 export class AnularOrdenTrabajoDto {
@@ -291,6 +309,14 @@ export class ListarOrdenesTrabajoDto {
   @IsUUID()
   asignadoAId?: string;
 
+  @ApiPropertyOptional({
+    enum: EJECUTORES,
+    description: 'EXTERNO: las de talleres de afuera. Con estado=ABIERTA, lo que está afuera hoy.',
+  })
+  @IsOptional()
+  @IsIn(EJECUTORES)
+  ejecutor?: Ejecutor;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -304,4 +330,23 @@ export class ListarOrdenesTrabajoDto {
   @IsInt()
   @Min(1)
   limite?: number;
+}
+
+/** ~6 MB de base64 ≈ 4,5 MB de PDF. Una orden pesa muy por debajo de eso. */
+const MAX_BASE64 = 6_000_000;
+
+export class EnviarOrdenTrabajoDto {
+  @ApiProperty({ description: 'El PDF de la orden en base64, tal como lo genera el navegador' })
+  @IsString()
+  @MinLength(100)
+  @MaxLength(MAX_BASE64, { message: 'El PDF es demasiado grande para enviarlo por correo.' })
+  pdfBase64!: string;
+}
+
+export class RegistrarWhatsappTrabajoDto {
+  @ApiProperty({ description: 'El número al que se abrió el chat', example: '5493534403519' })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(20)
+  numero!: string;
 }

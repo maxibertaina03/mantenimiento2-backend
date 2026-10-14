@@ -1,5 +1,6 @@
 import { MaterialUsado, OrdenTrabajo } from '../dominio/orden-trabajo';
 import {
+  EnvioDeTrabajo,
   FiltroOrdenesTrabajo,
   MaterialUsadoConRelaciones,
   OrdenTrabajoConRelaciones,
@@ -17,6 +18,7 @@ import {
 export class RepositorioOrdenesEnMemoria implements RepositorioOrdenesTrabajo {
   private ordenes: OrdenTrabajoConRelaciones[] = [];
   private materiales: MaterialUsadoConRelaciones[] = [];
+  private envios: EnvioDeTrabajo[] = [];
   private contador = 0;
 
   /** Nombres de materiales, para que el read model devuelva algo legible. */
@@ -78,6 +80,7 @@ export class RepositorioOrdenesEnMemoria implements RepositorioOrdenesTrabajo {
       if (filtro.tipo && o.tipo !== filtro.tipo) return false;
       if (filtro.equipoId && o.equipoId !== filtro.equipoId) return false;
       if (filtro.asignadoAId && o.asignadoAId !== filtro.asignadoAId) return false;
+      if (filtro.ejecutor && o.ejecutor !== filtro.ejecutor) return false;
       if (filtro.buscar) {
         const texto = `${o.numero} ${o.titulo} ${o.descripcion ?? ''}`.toLowerCase();
         if (!texto.includes(filtro.buscar.toLowerCase())) return false;
@@ -123,5 +126,23 @@ export class RepositorioOrdenesEnMemoria implements RepositorioOrdenesTrabajo {
 
   async quitarMaterial(id: string): Promise<void> {
     this.materiales = this.materiales.filter((m) => m.id !== id);
+  }
+
+  async registrarEnvio(
+    envio: Omit<EnvioDeTrabajo, 'id' | 'enviadoEn' | 'usuarioNombre'>,
+  ): Promise<EnvioDeTrabajo> {
+    this.contador += 1;
+    const guardado: EnvioDeTrabajo = {
+      ...envio,
+      id: `env-${this.contador}`,
+      enviadoEn: new Date(),
+      usuarioNombre: envio.usuarioId ? `Usuario ${envio.usuarioId}` : null,
+    };
+    this.envios.push(guardado);
+    return guardado;
+  }
+
+  async listarEnvios(ordenTrabajoId: string): Promise<EnvioDeTrabajo[]> {
+    return this.envios.filter((e) => e.ordenTrabajoId === ordenTrabajoId).reverse();
   }
 }

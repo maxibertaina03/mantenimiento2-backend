@@ -10,6 +10,7 @@ import {
   TipoTrabajo,
 } from '../dominio/orden-trabajo';
 import {
+  EnvioDeTrabajo,
   FiltroOrdenesTrabajo,
   MaterialUsadoConRelaciones,
   OrdenTrabajoConRelaciones,
@@ -83,6 +84,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       cerradaEn: fila.cerradaEn,
       cerradaPorId: fila.cerradaPorId,
       motivoAnulacion: fila.motivoAnulacion,
+      comprobanteExterno: fila.comprobanteExterno,
       creadoEn: fila.creadoEn,
       equipoNombre: fila.equipo?.nombre ?? null,
       equipoCodigo: fila.equipo?.codigoInterno ?? null,
@@ -124,6 +126,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
       ...(filtro.tipo ? { tipo: filtro.tipo } : {}),
       ...(filtro.equipoItId ? { equipoItId: filtro.equipoItId } : {}),
       ...(filtro.asignadoAId ? { asignadoAId: filtro.asignadoAId } : {}),
+      ...(filtro.ejecutor ? { ejecutor: filtro.ejecutor } : {}),
       ...(filtro.desde || filtro.hasta
         ? {
             abiertaEn: {
@@ -193,6 +196,7 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
           cerradaEn: orden.cerradaEn,
           cerradaPorId: orden.cerradaPorId,
           motivoAnulacion: orden.motivoAnulacion,
+          comprobanteExterno: orden.comprobanteExterno,
         },
         include: RELACIONES,
       });
@@ -253,6 +257,9 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
         ...(cambios.motivoAnulacion === undefined
           ? {}
           : { motivoAnulacion: cambios.motivoAnulacion }),
+        ...(cambios.comprobanteExterno === undefined
+          ? {}
+          : { comprobanteExterno: cambios.comprobanteExterno }),
       },
       include: RELACIONES,
     });
@@ -297,5 +304,46 @@ export class PrismaRepositorioOrdenesTrabajo implements RepositorioOrdenesTrabaj
     // Solo se borra el renglón. El movimiento de stock queda: la salida ocurrió
     // de verdad, y la devolución se asienta aparte.
     await this.prisma.materialUsadoTrabajo.delete({ where: { id } });
+  }
+
+  private envioADominio(fila: {
+    id: string;
+    ordenTrabajoId: string;
+    via: string;
+    destinatarios: string;
+    automatico: boolean;
+    enviadoEn: Date;
+    usuarioId: string | null;
+    usuario: { nombre: string } | null;
+  }): EnvioDeTrabajo {
+    return {
+      id: fila.id,
+      ordenTrabajoId: fila.ordenTrabajoId,
+      via: fila.via as EnvioDeTrabajo['via'],
+      destinatarios: fila.destinatarios,
+      automatico: fila.automatico,
+      enviadoEn: fila.enviadoEn,
+      usuarioId: fila.usuarioId,
+      usuarioNombre: fila.usuario?.nombre ?? null,
+    };
+  }
+
+  async registrarEnvio(
+    envio: Omit<EnvioDeTrabajo, 'id' | 'enviadoEn' | 'usuarioNombre'>,
+  ): Promise<EnvioDeTrabajo> {
+    const fila = await this.prisma.envioOrdenTrabajo.create({
+      data: envio,
+      include: { usuario: { select: { nombre: true } } },
+    });
+    return this.envioADominio(fila);
+  }
+
+  async listarEnvios(ordenTrabajoId: string): Promise<EnvioDeTrabajo[]> {
+    const filas = await this.prisma.envioOrdenTrabajo.findMany({
+      where: { ordenTrabajoId },
+      orderBy: { enviadoEn: 'desc' },
+      include: { usuario: { select: { nombre: true } } },
+    });
+    return filas.map((f) => this.envioADominio(f));
   }
 }
