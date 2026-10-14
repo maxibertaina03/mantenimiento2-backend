@@ -42,6 +42,21 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # El historial completo: hace falta para revisar los commits nuevos.
+          fetch-depth: 0
+
+      - name: Formato de los commits
+        # Solo los commits nuevos (los del pull request, o los del push), con el
+        # formato de CONTRIBUTING.md. El historial viejo no se revisa.
+        env:
+          DESDE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HASTA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -z "$DESDE" ] || [ "$DESDE" = "0000000000000000000000000000000000000000" ]; then
+            DESDE="$HASTA~1"
+          fi
+          node scripts/verificar-commits.mjs "$DESDE..$HASTA"
 
       - uses: actions/setup-node@v4
         with:
