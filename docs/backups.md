@@ -17,13 +17,15 @@ Nada de esto se pega en un chat ni en un mail. Se hace en tu PC.
 
 ### 1. Conectar rclone con tu Google Drive
 
-En PowerShell:
+En PowerShell **normal, no «como administrador»**: la configuración de rclone y
+el login de `gh` son de tu usuario, y una ventana de administrador no encuentra
+`winget` («El término 'winget' no se reconoce…»).
 
 ```powershell
 winget install Rclone.Rclone
 ```
 
-Cerrá y abrí PowerShell, y después:
+Cerrá y abrí PowerShell (otra vez normal), y después:
 
 ```powershell
 rclone config
