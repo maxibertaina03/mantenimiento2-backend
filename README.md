@@ -1,186 +1,102 @@
-# Mantenimiento — Backend (API)
+# Mantenimiento — API
 
-API REST para la **gestión de stock de materiales** de un área de mantenimiento, con
-trazabilidad completa de movimientos (entradas, salidas y ajustes).
+[![CI](https://github.com/maxibertaina03/mantenimiento2-backend/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/maxibertaina03/mantenimiento2-backend/actions/workflows/ci.yml)
 
-Construida con **NestJS + Prisma + PostgreSQL (Supabase)**.
+La API del sistema de mantenimiento de planta de **Lácteos Las Tres**: el pañol, las compras,
+las máquinas y sus services, las órdenes de trabajo y el inventario de informática.
 
-> Este repo es **autónomo**. El frontend vive en un repo separado (`mantenimiento2-frontend`)
-> y se comunica con esta API por HTTP.
+Las pantallas viven en otro repo,
+[`mantenimiento2-frontend`](https://github.com/maxibertaina03/mantenimiento2-frontend), y le
+hablan a esta API por HTTP.
 
----
+| | |
+|---|---|
+| **En producción** | `https://mantenimiento2-backend.onrender.com/api` (Render) |
+| **Documentación de la API** | [`/docs`](https://mantenimiento2-backend.onrender.com/docs) (Swagger) |
+| **Versión que corre** | `info.version` en [`/docs-json`](https://mantenimiento2-backend.onrender.com/docs-json): versión + commit |
+| **Base** | PostgreSQL en Supabase |
+
+## Qué hace
+
+El código está partido en cinco **contextos**, cada uno con sus reglas:
+
+| Contexto | Qué maneja |
+|---|---|
+| **Pañol** | Materiales, stock y cada entrada, salida o ajuste, con su corrección auditada. |
+| **Compras** | Órdenes de compra: borrador, envío al proveedor (correo o WhatsApp), recepción en partes con remito, reclamo de lo que falta, comprobantes. |
+| **Equipos** | Ficha de cada máquina: fotos, manuales, repuestos, componentes, QR y planes de mantenimiento con aviso de lo que vence. |
+| **Trabajos** | Órdenes de trabajo (en fábrica o en un taller de afuera), materiales usados y el calendario de tareas y rutinas. |
+| **Informática** | Inventario de PCs, cámaras y celulares, y un baúl de contraseñas cifradas. |
+
+La descripción completa —contextos, tablas, pantallas, permisos, procesos automáticos— está en
+**[docs/sistema.md](docs/sistema.md)**.
 
 ## Stack
 
-- **NestJS** (TypeScript), arquitectura modular (un módulo por dominio).
-- **Patrón repository**: los servicios no tocan Prisma; cada módulo tiene su repositorio.
-- **Prisma** como ORM. Schema en `prisma/schema.prisma`.
-- **PostgreSQL** alojado en **Supabase** (usado solo como Postgres gestionado).
-- **class-validator / class-transformer** + `ValidationPipe` global (whitelist + transform).
-- **Swagger** en `/docs`.
-- Filtro de excepciones global → respuestas JSON uniformes.
-- **CORS** habilitado para el origen del frontend.
+Node 22 · NestJS 10 · TypeScript · Prisma 5 · PostgreSQL · Clerk (login) · Brevo (correo) ·
+Supabase Storage (archivos) · Sentry · Jest
 
----
+## Arquitectura en una línea
 
-## Requisitos
-
-- Node.js 18+ y npm.
-- Una base PostgreSQL (recomendado: proyecto en [Supabase](https://supabase.com)).
-
----
-
-## 1. Instalar dependencias
-
-```bash
-npm install
-```
-
-## 2. Variables de entorno
-
-Copiá el ejemplo y completá con tus datos:
-
-```bash
-cp .env.example .env
-```
-
-| Variable       | Descripción                                                                 |
-| -------------- | --------------------------------------------------------------------------- |
-| `DATABASE_URL` | Connection string del **pooler** de Supabase (con `?pgbouncer=true`). Runtime. |
-| `DIRECT_URL`   | Connection string **directa** (puerto 5432). Solo para migraciones.         |
-| `PORT`         | Puerto del servidor (default `3000`).                                       |
-| `FRONTEND_URL` | Origen permitido por CORS (default `http://localhost:5173`).                |
-
-> En Supabase: **Project Settings → Database → Connection string**.
-> Usá el pooler (puerto 6543) para `DATABASE_URL` y la conexión directa (5432) para `DIRECT_URL`.
-
-## 3. Generar el cliente Prisma y aplicar migraciones
-
-```bash
-npm run prisma:generate     # genera el cliente tipado
-npm run prisma:migrate      # crea/aplica la migración inicial (usa DIRECT_URL)
-```
-
-## 4. Cargar datos de ejemplo (seed)
-
-```bash
-npm run seed
-```
-
-Crea categorías, proveedores, usuarios y materiales con algunos movimientos
-(incluye un material que queda bajo el stock mínimo, para probar la alerta).
-
-## 5. Levantar la API
-
-```bash
-npm run start:dev      # desarrollo (watch)
-# o
-npm run build && npm run start:prod
-```
-
-- API:     `http://localhost:3000/api`
-- Swagger: `http://localhost:3000/docs`
-
----
-
-## Endpoints principales
-
-Todos bajo el prefijo `/api`.
-
-| Recurso       | Endpoints                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------ |
-| Proveedores   | `GET/POST /proveedores`, `GET/PATCH/DELETE /proveedores/:id`                                |
-| Categorías    | `GET/POST /categorias-material`, `GET/PATCH/DELETE /categorias-material/:id`                |
-| Materiales    | `GET/POST /materiales`, `GET/PATCH/DELETE /materiales/:id`                                  |
-|               | `GET /materiales/bajo-stock` — materiales con stock ≤ mínimo                                |
-|               | `GET /materiales/:id/historial` — material + sus movimientos                               |
-| Movimientos   | `POST /movimientos` — registra y actualiza stock (transacción)                             |
-|               | `GET /movimientos?materialId=&tipo=&motivo=&fechaDesde=&fechaHasta=` — listado con filtros |
-| Usuarios      | `GET/POST /usuarios`, `GET/PATCH/DELETE /usuarios/:id`                                      |
-
-### Reglas de negocio del stock
-
-- `stockActual` es **derivado**: solo cambia al registrar movimientos (nunca se edita a mano).
-- `ENTRADA` suma, `SALIDA` resta, `AJUSTE` **fija** el stock al valor de `cantidad` (absoluto).
-- No se permiten salidas que dejen el stock negativo (devuelve `400`). Para corregir, usar `AJUSTE`.
-- Cada movimiento registra su `motivo` (COMPRA, TRABAJO, AJUSTE, DEVOLUCION, OTRO) para trazabilidad.
-
----
-
-## Autenticación (Clerk)
-
-La API usa **Clerk** para autenticar. El `GuardAutenticacion` (en `src/common/auth/`) está
-registrado como **guard global**: toda la app queda detrás del login, salvo rutas marcadas
-con `@Public()`.
-
-Flujo del guard:
-1. Verifica el JWT de Clerk del header `Authorization: Bearer <token>`.
-2. **Just-in-time provisioning**: en el primer request de cada usuario, crea (o vincula por
-   email) su fila en la tabla `usuarios`, guardando el ID de Clerk en `idExterno` y rol
-   `OPERARIO` por defecto.
-3. Adjunta el usuario a la request (disponible vía `@UsuarioActual()`). Los movimientos
-   registran automáticamente quién los creó.
-
-### Configurar Clerk
-
-1. Creá una aplicación en [clerk.com](https://clerk.com).
-2. En **API Keys**, copiá la **Secret key** (`sk_test_…`).
-3. En el `.env`:
-   ```
-   CLERK_SECRET_KEY="sk_test_..."
-   AUTH_DISABLED="false"
-   ```
-4. Reiniciá la API. A partir de ahí, cada request necesita un JWT válido de Clerk
-   (el frontend lo adjunta solo; en Swagger usá el botón **Authorize** y pegá un token).
-
-### `AUTH_DISABLED` (solo desarrollo)
-
-`AUTH_DISABLED="true"` deja **todos** los endpoints abiertos (sin verificar token). Útil
-para probar sin login mientras configurás Clerk. Default seguro: `"false"`.
-
-> El `Usuario.idExterno` (nullable) almacena el ID de Clerk. El guard es el único punto que
-> toca la autenticación; la lógica de negocio de los módulos no cambia.
-
----
-
-## Escalabilidad (preparado, no implementado)
-
-El sistema apunta a gestionar también **herramientas, máquinas, equipos y vehículos**, que
-son **activos individuales rastreables** (con número de serie, estado, ubicación, asignación),
-a diferencia de los materiales que son **consumibles** (cantidad + movimientos).
-
-La carpeta `src/common/` concentra lo reutilizable (Prisma, filtros, auth, DTOs comunes) para
-agregar a futuro un módulo `activos` sin reescribir lo existente.
-
----
-
-## Estructura
+Cada contexto (`src/contextos/<contexto>`) tiene cuatro capas —`dominio`, `puertos`,
+`aplicacion`, `infraestructura`— y las dependencias apuntan hacia adentro: las reglas de negocio
+no conocen Nest, ni Prisma, ni HTTP, y se prueban en milisegundos. Un contexto usa a otro solo
+por su `index.ts`; el lint lo controla. Detalle en [docs/sistema.md](docs/sistema.md#3-el-backend-mantenimiento2-backend)
+y en [docs/plan-arquitectura.md](docs/plan-arquitectura.md).
 
 ```
 src/
-├── main.ts                 # bootstrap: ValidationPipe, CORS, Swagger, filtro global
-├── app.module.ts
-├── config/                 # validación del .env
-├── common/                 # prisma, filtros, auth no-op, DTOs comunes
-└── modules/                # un módulo por dominio (controller + service + repository + dto)
-    ├── proveedores/
-    ├── categorias-material/
-    ├── materiales/
-    ├── movimientos-stock/
-    └── usuarios/
+├── contextos/      panol · compras · equipos · trabajos · informatica
+├── modules/        catálogos simples (proveedores, categorías, unidades, usuarios…)
+├── common/         login y permisos, base, correo, almacén, errores, monitoreo
+└── main.ts
+prisma/             schema.prisma y las migraciones (escritas a mano)
+test/               de punta a punta (base en memoria) y de integración (Postgres real)
+scripts/            conteos, ensayo de migraciones, copias locales, backups
+docs/               documentación técnica
 ```
 
-## Scripts
+## Levantarlo en una máquina
 
-| Script                    | Acción                              |
-| ------------------------- | ----------------------------------- |
-| `npm run start:dev`       | Levanta en modo watch               |
-| `npm run build`           | Compila a `dist/`                   |
-| `npm run start:prod`      | Corre el build                      |
-| `npm run prisma:generate` | Genera el cliente Prisma            |
-| `npm run prisma:migrate`  | Crea/aplica migraciones (dev)       |
-| `npm run prisma:deploy`   | Aplica migraciones (producción)     |
-| `npm run seed`            | Carga datos de ejemplo              |
-| `npm run prisma:studio`   | Abre Prisma Studio                  |
-| `npm run lint`            | ESLint + fix                        |
+Hace falta **Node 22** y un **PostgreSQL local** (por ejemplo, `mantenimiento`).
+
+```bash
+npm ci
+cp .env.example .env        # ENTORNO=local y una base local: ver los comentarios del archivo
+npm run local:migrar        # crea las tablas en la base local
+npm run local:api           # API en http://localhost:3000/api, Swagger en /docs
 ```
+
+Para probar sin Clerk: `AUTH_DISABLED="true"` y `USUARIO_DEV` con el correo de un usuario de la
+base local. Para trabajar con datos reales sin tocar producción,
+`npm run local:copiar-produccion` trae una copia a la base local.
+
+> **El `.env` es siempre local.** Producción se toca solo nombrando `.env.produccion` a propósito,
+> y dos guardias impiden levantar contra Supabase o correr un comando destructivo por error. Ver
+> [CONTRIBUTING.md](CONTRIBUTING.md#las-bases-y-los-archivos-de-entorno).
+
+## Tests
+
+```bash
+npm test                    # unitarios: reglas y casos de uso, sin base
+npm run test:e2e            # la API por HTTP, con la app real y una base en memoria
+npm run test:integracion    # contra un Postgres real y vacío (docs/tests-de-integracion.md)
+```
+
+El CI corre los tres, más el lint y la compilación, en cada push y pull request.
+
+## Cómo se trabaja
+
+Ramas, formato de los commits, pull requests, versiones y migraciones:
+**[CONTRIBUTING.md](CONTRIBUTING.md)**. Los cambios de cada versión: **[CHANGELOG.md](CHANGELOG.md)**.
+
+## Documentación
+
+| Documento | De qué trata |
+|---|---|
+| [docs/sistema.md](docs/sistema.md) | El sistema completo: qué hace cada parte y cómo está armado |
+| [docs/plan-arquitectura.md](docs/plan-arquitectura.md) | Por qué está organizado en contextos y capas, y cómo se llegó |
+| [docs/tests-de-integracion.md](docs/tests-de-integracion.md) | Los tests contra Postgres real |
+| [docs/backups.md](docs/backups.md) | El backup nocturno cifrado y cómo restaurarlo |
+| [docs/avisos-de-mantenimiento.md](docs/avisos-de-mantenimiento.md) | El correo diario con los services que vencen |
+| [docs/base-de-prueba.md](docs/base-de-prueba.md) | Las bases de datos y los archivos de entorno |
