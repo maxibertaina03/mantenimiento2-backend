@@ -130,6 +130,7 @@ model CategoriaMaterial {
   descripcion String?
 
   materiales Material[]
+  tomas      TomaInventario[]
 
   @@map("categorias_material")
 }
@@ -186,6 +187,7 @@ model EstanteriaMaterial {
   actualizadoEn DateTime @updatedAt
 
   materiales Material[]
+  tomas      TomaInventario[]
 
   @@map("estanterias_material")
 }
@@ -243,6 +245,7 @@ model Material {
   movimientos      MovimientoStock[]
   renglonesOrdenes RenglonOrdenCompra[]
   usadoEnEquipos   RepuestoEquipo[]
+  renglonesToma    RenglonToma[]
 
   @@index([categoriaId])
   @@index([unidadId])
@@ -283,6 +286,9 @@ model MovimientoStock {
   renglonOrigen RenglonOrdenCompra?
   /// La entrega de una orden de compra que generó esta ENTRADA.
   entregaOrigen RecepcionRenglon?   @relation("EntradaDeRecepcion")
+
+  /// Si es el AJUSTE de una toma de inventario, el renglón que lo explica.
+  ajusteDeToma RenglonToma? @relation("AjusteDeToma")
 
   /// Si la salida la generó una orden de trabajo, el renglón que la reclama.
   /// Es lo que permite ir del movimiento al trabajo, además de al revés.
@@ -340,6 +346,9 @@ model Usuario {
   tareasAsignadas     TareaProgramada[]      @relation("TareasAsignadas")
   tareasCreadas       TareaProgramada[]      @relation("TareasCreadas")
   postergaciones      PostergacionTarea[]    @relation("PostergacionesHechas")
+  tomasAbiertas       TomaInventario[]       @relation("TomasAbiertas")
+  tomasCerradas       TomaInventario[]       @relation("TomasCerradas")
+  renglonesContados   RenglonToma[]          @relation("RenglonesContados")
   rutinasAsignadas    RutinaTarea[]          @relation("RutinasAsignadas")
   rutinasCreadas      RutinaTarea[]          @relation("RutinasCreadas")
   trabajosAbiertos    OrdenTrabajo[]         @relation("TrabajosAbiertos")
@@ -786,6 +795,71 @@ model RecepcionRenglon {
 // Contadores atómicos para numerar documentos (una fila por serie, ej "OC-2026").
 // Se incrementa con un INSERT ... ON CONFLICT DO UPDATE, que es atómico y no
 // sufre la race de "leer el máximo y sumarle uno".
+/// Una toma de inventario: contar lo que hay en el pañol y ajustar el stock.
+///
+/// Se abre sobre una categoría, una estantería o todo el pañol, y arma un
+/// renglón por material en uso. Se cuenta (pueden contar varias personas a la
+/// vez), se ven las diferencias y, al confirmar, cada diferencia genera un
+/// AJUSTE por el camino de siempre, con las reglas del pañol.
+model TomaInventario {
+  id     String @id @default(uuid())
+  /// TI-2026-0001, con el mismo contador que las órdenes.
+  numero String @unique
+
+  /// Qué se cuenta. Las dos vacías: todo el pañol.
+  categoriaId  String?
+  estanteriaId String?
+
+  /// ABIERTA | CERRADA | ANULADA. Texto: las reglas son del dominio.
+  estado String  @default("ABIERTA")
+  notas  String?
+
+  abiertaEn       DateTime  @default(now())
+  abiertaPorId    String?
+  cerradaEn       DateTime?
+  cerradaPorId    String?
+  motivoAnulacion String?
+
+  categoria  CategoriaMaterial?  @relation(fields: [categoriaId], references: [id])
+  estanteria EstanteriaMaterial? @relation(fields: [estanteriaId], references: [id])
+  abiertaPor Usuario?            @relation("TomasAbiertas", fields: [abiertaPorId], references: [id])
+  cerradaPor Usuario?            @relation("TomasCerradas", fields: [cerradaPorId], references: [id])
+  renglones  RenglonToma[]
+
+  @@index([estado])
+  @@map("tomas_inventario")
+}
+
+/// Un material dentro de una toma: lo que se contó y qué pasó al confirmar.
+model RenglonToma {
+  id         String @id @default(uuid())
+  tomaId     String
+  materialId String
+
+  /// Lo que se contó. Vacío mientras no se cuenta.
+  contado       Decimal?  @db.Decimal(14, 3)
+  /// El stock que figuraba en el momento de contarlo: la diferencia es contra esto.
+  stockAlContar Decimal?  @db.Decimal(14, 3)
+  contadoEn     DateTime?
+  contadoPorId  String?
+
+  /// AJUSTADO | SIN_DIFERENCIA | RECONTAR, al confirmar. Vacío: todavía no.
+  /// RECONTAR: el material se movió después de contarlo, y ajustarlo a ciegas
+  /// borraría ese movimiento.
+  resultado    String?
+  /// El AJUSTE que generó, si había diferencia.
+  movimientoId String? @unique
+
+  toma       TomaInventario   @relation(fields: [tomaId], references: [id], onDelete: Cascade)
+  material   Material         @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  contadoPor Usuario?         @relation("RenglonesContados", fields: [contadoPorId], references: [id])
+  movimiento MovimientoStock? @relation("AjusteDeToma", fields: [movimientoId], references: [id])
+
+  @@unique([tomaId, materialId])
+  @@index([materialId])
+  @@map("renglones_toma")
+}
+
 model ContadorDocumento {
   clave  String @id
   ultimo Int    @default(0)

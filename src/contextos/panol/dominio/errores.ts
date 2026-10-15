@@ -39,3 +39,6 @@ export class ErrorNombreRepetido extends comun.ErrorDatosInvalidos {}
 
 /** Borrarlo se llevaría su historial. → 400 */
 export class ErrorMaterialConHistorial extends comun.ErrorDatosInvalidos {}
+
+/** La operación no es posible en el estado actual (una toma ya cerrada, por ejemplo). */
+export class ErrorTransicionInvalida extends comun.ErrorTransicionInvalida {}
