@@ -1,4 +1,4 @@
-import { Rutina, Tarea } from '../dominio/tarea';
+import { Postergacion, Rutina, Tarea } from '../dominio/tarea';
 import {
   FiltroTareas,
   RepositorioTareas,
@@ -21,6 +21,7 @@ export class RepositorioTareasEnMemoria implements RepositorioTareas {
       planNombre: tarea.planId ? `Plan ${tarea.planId}` : null,
       rutinaTitulo: tarea.rutinaId ? `Rutina ${tarea.rutinaId}` : null,
       ordenTrabajoNumero: tarea.ordenTrabajoId ? `OT-${tarea.ordenTrabajoId}` : null,
+      postergaciones: (tarea as Partial<TareaConRelaciones>).postergaciones ?? [],
     };
   }
 
@@ -41,8 +42,12 @@ export class RepositorioTareasEnMemoria implements RepositorioTareas {
       (tarea.planId !== null && t.planId === tarea.planId) ||
       (tarea.rutinaId !== null && t.rutinaId === tarea.rutinaId);
 
+    // Por su día, o por el original si se postergó: como la base.
     const ya = this.tareas.some(
-      (t) => mismaOrigen(t) && t.fecha.getTime() === tarea.fecha.getTime(),
+      (t) =>
+        mismaOrigen(t) &&
+        (t.fecha.getTime() === tarea.fecha.getTime() ||
+          t.fechaOriginal?.getTime() === tarea.fecha.getTime()),
     );
     if (ya) return false;
 
@@ -75,6 +80,24 @@ export class RepositorioTareasEnMemoria implements RepositorioTareas {
     if (indice === -1) throw new Error(`No existe la tarea ${id}`);
     this.tareas[indice] = this.conNombres({ ...this.tareas[indice], ...cambios });
     return this.tareas[indice];
+  }
+
+  async postergar(
+    id: string,
+    cambios: Pick<Tarea, 'fecha' | 'fechaOriginal'>,
+    postergacion: Postergacion,
+    usuarioId: string | null,
+  ): Promise<TareaConRelaciones> {
+    const actual = await this.actualizar(id, cambios);
+    actual.postergaciones = [
+      ...actual.postergaciones,
+      {
+        ...postergacion,
+        usuarioNombre: usuarioId ? `Usuario ${usuarioId}` : null,
+        creadoEn: new Date(),
+      },
+    ];
+    return actual;
   }
 
   async listarRutinas(soloActivas: boolean): Promise<RutinaConRelaciones[]> {

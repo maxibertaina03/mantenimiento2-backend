@@ -66,6 +66,21 @@ export class AsignarTareaDto {
   asignadoAId!: string;
 }
 
+export class PostergarTareaDto {
+  @ApiProperty({ example: '2026-10-13', description: 'El día nuevo' })
+  @IsDateString()
+  fecha!: string;
+
+  @ApiProperty({
+    example: 'Falta el repuesto',
+    description: 'Por qué se posterga: queda registrado.',
+  })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(300)
+  motivo!: string;
+}
+
 export class CompletarTareaDto {
   @ApiProperty({ description: 'Qué se hizo. Va a la orden de trabajo que sale de esto.' })
   @IsString()

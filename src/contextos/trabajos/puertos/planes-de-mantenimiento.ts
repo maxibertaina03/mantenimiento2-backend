@@ -48,6 +48,13 @@ export interface PlanesDeMantenimiento {
      */
     yaHechoHasta?: Date,
   ): Promise<void>;
+
+  /**
+   * Posterga el próximo service del plan. Las reglas (no vencido, sin pasar de
+   * la vez siguiente) son de los planes. Devuelve la fecha con la que quedó,
+   * que puede correrse al siguiente día de trabajo.
+   */
+  postergar(planId: string, nuevaFecha: Date): Promise<Date>;
 }
 
 export const PLANES_DE_MANTENIMIENTO = Symbol('PlanesDeMantenimiento');

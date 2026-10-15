@@ -31,6 +31,11 @@ export interface Tarea {
   descripcion: string | null;
   /** El día en que hay que hacerla. */
   fecha: Date;
+  /**
+   * Si se postergó, el día que tenía al principio. El calendario la reconoce
+   * por este día: una rutina postergada no vuelve a aparecer en el original.
+   */
+  fechaOriginal: Date | null;
   estado: EstadoTarea;
   /**
    * Quién tiene que hacerla. Puede estar vacía.
@@ -93,6 +98,7 @@ export function crearTarea(datos: DatosNuevaTarea): Omit<Tarea, 'id' | 'creadoEn
     // Al revés que una orden de trabajo, una tarea SÍ puede ser futura: es
     // justamente lo que todavía no se hizo.
     fecha: soloElDia(datos.fecha),
+    fechaOriginal: null,
     estado: 'PENDIENTE',
     asignadoAId: datos.asignadoAId ?? null,
     equipoId: datos.equipoId ?? null,
@@ -183,6 +189,66 @@ export function cerrarPorTrabajoRegistrado(
     asignadoAId: tarea.asignadoAId ?? hechaPorId,
     ordenTrabajoId,
   };
+}
+
+/** Una postergación: de qué día a qué día, y por qué. */
+export interface Postergacion {
+  desde: Date;
+  hasta: Date;
+  motivo: string;
+}
+
+const dia = (f: Date) => f.toISOString().slice(0, 10);
+const formatoDia = (f: Date) => dia(f).split('-').reverse().join('/');
+
+/**
+ * Postergar una tarea: «la vamos a hacer, pero unos días más tarde».
+ *
+ * - Solo si está pendiente y todavía no venció: lo vencido no se posterga, se
+ *   hace.
+ * - A una fecha posterior, y antes de `tope` si hay uno: la vez siguiente que
+ *   toca esa misma rutina. Postergar no puede comerse la próxima.
+ * - Con motivo: queda escrito por qué se corrió.
+ * - Conserva el día original (el primero, si se posterga dos veces).
+ */
+export function postergarTarea(
+  tarea: Tarea,
+  nuevaFecha: Date,
+  motivo: string,
+  hoy: Date,
+  tope: Date | null = null,
+): { cambios: Pick<Tarea, 'fecha' | 'fechaOriginal'>; postergacion: Postergacion } {
+  validarQueEstaPendiente(tarea, 'postergar');
+  if (dia(tarea.fecha) < dia(hoy)) {
+    throw new ErrorTransicionInvalida(
+      `«${tarea.titulo}» ya venció: lo vencido no se posterga, se hace.`,
+    );
+  }
+  const hasta = soloElDia(nuevaFecha);
+  if (dia(hasta) <= dia(tarea.fecha)) {
+    throw new ErrorDatosInvalidos('La fecha nueva tiene que ser posterior a la que tenía.');
+  }
+  if (tope && dia(hasta) >= dia(tope)) {
+    throw new ErrorDatosInvalidos(
+      `Se puede postergar hasta antes del ${formatoDia(tope)}, que es cuando vuelve a tocar. ` +
+        'Más que eso ya no es postergar: es saltearse una vez.',
+    );
+  }
+  const texto = limpiar(motivo);
+  if (texto === null || texto.length < 3) {
+    throw new ErrorDatosInvalidos('Contá por qué se posterga: queda registrado.');
+  }
+  return {
+    cambios: { fecha: hasta, fechaOriginal: tarea.fechaOriginal ?? tarea.fecha },
+    postergacion: { desde: tarea.fecha, hasta, motivo: texto },
+  };
+}
+
+/** La vez siguiente que toca una rutina, después de `despuesDe`; null si no hay más. */
+export function siguienteDeRutina(rutina: Rutina, despuesDe: Date): Date | null {
+  const desde = new Date(soloElDia(despuesDe).getTime() + UN_DIA_MS);
+  const hasta = new Date(desde.getTime() + (rutina.cadaDias + 14) * UN_DIA_MS);
+  return ocurrenciasDeRutina({ ...rutina, activa: true }, desde, hasta)[0] ?? null;
 }
 
 export function cancelarTarea(tarea: Tarea): Pick<Tarea, 'estado'> {

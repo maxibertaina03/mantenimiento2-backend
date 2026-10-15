@@ -116,7 +116,8 @@ export const casosDeUsoTrabajos: Provider[] = [
       usuarios: ConsultaUsuarios,
       trabajos: RegistrarTrabajoHecho,
       reloj: Reloj,
-    ) => new GestionarTareas(tareas, equipos, equiposIt, usuarios, trabajos, reloj),
+      planes: PlanesDeMantenimiento,
+    ) => new GestionarTareas(tareas, equipos, equiposIt, usuarios, trabajos, reloj, planes),
     inject: [
       REPOSITORIO_TAREAS,
       CONSULTA_EQUIPOS,
@@ -124,6 +125,7 @@ export const casosDeUsoTrabajos: Provider[] = [
       CONSULTA_USUARIOS,
       RegistrarTrabajoHecho,
       RELOJ_TRABAJOS,
+      PLANES_DE_MANTENIMIENTO,
     ],
   },
 ];

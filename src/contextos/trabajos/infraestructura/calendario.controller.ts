@@ -25,6 +25,7 @@ import {
   AsignarTareaDto,
   CambiarRutinaDto,
   CompletarTareaDto,
+  PostergarTareaDto,
   CrearRutinaDto,
   CrearTareaDto,
   VerCalendarioDto,
@@ -142,6 +143,22 @@ export class CalendarioController {
       },
       usuario?.id ?? null,
     );
+  }
+
+  @Permisos(PERMISOS.TAREAS_EDITAR)
+  @Post(':id/postergar')
+  @ApiOperation({
+    summary: 'Postergarla a otro día, con el motivo',
+    description:
+      'Solo si todavía no venció, y sin pasar de la vez siguiente que toca. Si es de un plan, ' +
+      'el plan se mueve con ella.',
+  })
+  postergar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PostergarTareaDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.gestionar.postergar(id, new Date(dto.fecha), dto.motivo, usuario?.id ?? null);
   }
 
   @Permisos(PERMISOS.TAREAS_EDITAR)

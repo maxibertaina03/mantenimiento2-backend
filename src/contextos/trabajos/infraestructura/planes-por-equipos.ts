@@ -62,4 +62,8 @@ export class PlanesPorEquipos implements PlanesDeMantenimiento {
   ): Promise<void> {
     await this.planes.adelantarDespuesDeTrabajo(planId, fechaDelTrabajo, yaHechoHasta);
   }
+
+  postergar(planId: string, nuevaFecha: Date): Promise<Date> {
+    return this.planes.postergar(planId, nuevaFecha);
+  }
 }
