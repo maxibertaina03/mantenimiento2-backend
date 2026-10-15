@@ -72,8 +72,8 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Repo | Código | Tests |
 |---|---|---|
-| Backend | 5 contextos, 41 tablas, 40 migraciones | 1.116 unitarios, 194 de punta a punta, 20 de integración |
-| Frontend | 16 pantallas | 591 tests |
+| Backend | 5 contextos, 43 tablas, 41 migraciones | 1.164 unitarios, 194 de punta a punta, 24 de integración |
+| Frontend | 18 pantallas | 604 tests |
 
 ---
 
@@ -96,7 +96,7 @@ mantenimiento2-backend/
 │   ├── modules/              catálogos simples (guardan un nombre y lo devuelven)
 │   └── common/               lo compartido: login, permisos, base, correo, errores…
 ├── prisma/
-│   ├── schema.prisma         el modelo de la base (41 tablas)
+│   ├── schema.prisma         el modelo de la base (43 tablas)
 │   └── migrations/           cada cambio a la base, en orden y escrito a mano
 ├── test/                     tests de punta a punta y de integración
 ├── scripts/                  herramientas de mantenimiento (conteos, ensayos, copias)
@@ -133,8 +133,9 @@ Materiales, stock y movimientos.
 - **Movimientos:** cada entrada, salida o ajuste. El stock se calcula con ellos. Un movimiento se puede corregir y la corrección queda auditada (`EdicionMovimiento`).
 - **Regla de la fecha de ajuste:** no se puede cargar un movimiento con fecha anterior al último ajuste de inventario de ese material, porque desarmaría el conteo.
 - **Avisos de bajo stock:** materiales por debajo del mínimo y cobertura de alertas.
+- **Toma de inventario** (`TomaInventario`, `RenglonToma`): se abre sobre una categoría, una estantería o todo el pañol (TI-2026-0001) con un renglón por material en uso. Se cuenta desde el celular (a ciegas: no se muestra cuánto figura) o con la planilla impresa, y pueden contar varias personas a la vez. Al **confirmar**, cada diferencia genera un AJUSTE por el camino de siempre, con la nota de la toma. Si un material tuvo movimientos después de contarlo, no se ajusta: queda para **volver a contar**. La toma sigue abierta mientras falte contar, así se cuenta por tandas; «Cerrar la toma» la termina y lo no contado no se toca. Se anula solo si no ajustó nada.
 - **Puerta pública:** `MaterialesService` y `MovimientosStockService`, que usan compras (al recibir) y trabajos (al usar materiales).
-- **Endpoints:** `/api/materiales…`, `/api/movimientos…`.
+- **Endpoints:** `/api/materiales…`, `/api/movimientos…`, `/api/tomas-inventario…` (abrir, `/:id/renglones/:renglonId` para contar, `/:id/confirmar`, `/:id/cerrar`, `/:id/anular`).
 
 #### Compras (`contextos/compras`)
 
@@ -235,11 +236,11 @@ Hay cuatro roles: **ADMIN**, **GERENCIA**, **ADMINISTRATIVO** y **MANTENIMIENTO*
 
 ### 3.7 La base de datos
 
-41 tablas, definidas en `prisma/schema.prisma`, agrupadas así:
+43 tablas, definidas en `prisma/schema.prisma`, agrupadas así:
 
 | Área | Tablas |
 |---|---|
-| Pañol | `Material`, `CategoriaMaterial`, `UnidadMedida`, `EstanteriaMaterial`, `MovimientoStock`, `EdicionMovimiento` |
+| Pañol | `Material`, `CategoriaMaterial`, `UnidadMedida`, `EstanteriaMaterial`, `MovimientoStock`, `EdicionMovimiento`, `TomaInventario`, `RenglonToma` |
 | Compras | `OrdenCompra`, `RenglonOrdenCompra`, `RecepcionOrden`, `RecepcionRenglon`, `EnvioOrden`, `ComprobanteOrden`, `Proveedor`, `ContadorDocumento` |
 | Equipos | `Equipo`, `UbicacionEquipo`, `TipoEquipoPlanta`, `MarcaEquipo`, `ModeloEquipo`, `FotoEquipo`, `ManualEquipo`, `MontajeEquipo`, `RepuestoEquipo`, `PlanMantenimiento`, `AvisoEnviado`, `Intervencion` (sin uso, ver abajo) |
 | Trabajos | `OrdenTrabajo`, `MaterialUsadoTrabajo`, `EnvioOrdenTrabajo`, `TareaProgramada`, `PostergacionTarea`, `RutinaTarea` |
@@ -281,6 +282,7 @@ mantenimiento2-frontend/src/
 | `/materiales/:id` | Detalle de material | Ficha, historial de movimientos y equipos que lo usan |
 | `/movimientos` | Historial | Todas las entradas y salidas, con su corrección auditada |
 | `/movimientos/nuevo` | Nuevo movimiento | Cargar entradas y salidas, también con el lector de QR |
+| `/inventario` | Toma de inventario | Abrir una toma, contar (también escaneando el QR), ver diferencias, confirmar; planilla e informe en PDF |
 | `/calendario` | Calendario | Mes con tareas por persona, rutinas, nuevas tareas, imprimir por semana o por mes |
 | `/ordenes-trabajo` | Órdenes de trabajo | Abrir, cargar materiales, cerrar, reabrir, imprimir; mandarla a un taller y registrar la vuelta. Filtro «En talleres externos» (`?afuera=1`) |
 | `/ordenes-compra` | Órdenes de compra | Crear, emitir, enviar, recibir en partes, reclamar lo que falta, precios, comprobantes, PDF |
