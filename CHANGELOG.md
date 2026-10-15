@@ -4,6 +4,14 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.3.0] — 2026-10-16
+
+### Cambiado
+
+- **La toma de inventario tiene permisos propios:** ver las tomas, abrir y contar, y confirmar
+  (ajusta el stock), cerrar y anular. Antes usaba los de movimientos. Arrancan solo para el
+  administrador, que los reparte desde la pantalla Permisos.
+
 ## [1.2.0] — 2026-10-16
 
 ### Agregado
@@ -58,6 +66,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.3.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.3.0
 [1.2.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.2.0
 [1.1.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.1.0
 [1.0.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.0.0
