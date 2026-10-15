@@ -4,6 +4,17 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.2.0] — 2026-10-16
+
+### Agregado
+
+- **Toma de inventario.** Se abre sobre una categoría, una estantería o todo el pañol, y se
+  cuenta material por material. Al confirmar, cada diferencia se ajusta con un movimiento de
+  AJUSTE que lleva la nota de la toma. Si un material se movió después de contarlo, no se
+  ajusta: queda para volver a contar. Se puede contar por tandas: la toma sigue abierta
+  mientras falte contar, y se cierra sola cuando está todo (o a mano, dejando lo no contado
+  como estaba).
+
 ## [1.1.0] — 2026-10-15
 
 ### Agregado
@@ -47,5 +58,6 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.2.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.2.0
 [1.1.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.1.0
 [1.0.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.0.0

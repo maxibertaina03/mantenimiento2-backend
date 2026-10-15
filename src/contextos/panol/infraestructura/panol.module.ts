@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { CONSULTA_CATALOGOS } from '../puertos/consulta-catalogos';
 import { REPOSITORIO_MATERIALES } from '../puertos/repositorio-materiales';
 import { REPOSITORIO_MOVIMIENTOS } from '../puertos/repositorio-movimientos';
+import { REPOSITORIO_TOMAS } from '../puertos/repositorio-tomas';
+import { InventarioController, TomasInventarioService } from './inventario/inventario.controller';
+import { PrismaRepositorioTomas } from './inventario/prisma-repositorio-tomas';
 import { MaterialesController } from './materiales/materiales.controller';
 import { MaterialesService } from './materiales/materiales.service';
 import { PrismaRepositorioMateriales } from './materiales/prisma-repositorio-materiales';
@@ -26,13 +29,15 @@ import { PrismaConsultaCatalogos } from './prisma-consulta-catalogos';
  * lugar del contexto donde se nombran las dos cosas a la vez.
  */
 @Module({
-  controllers: [MaterialesController, MovimientosStockController],
+  controllers: [MaterialesController, MovimientosStockController, InventarioController],
   providers: [
     MaterialesService,
     MovimientosStockService,
     { provide: REPOSITORIO_MATERIALES, useClass: PrismaRepositorioMateriales },
     { provide: REPOSITORIO_MOVIMIENTOS, useClass: PrismaRepositorioMovimientos },
     { provide: CONSULTA_CATALOGOS, useClass: PrismaConsultaCatalogos },
+    { provide: REPOSITORIO_TOMAS, useClass: PrismaRepositorioTomas },
+    TomasInventarioService,
   ],
   exports: [MaterialesService, MovimientosStockService],
 })
