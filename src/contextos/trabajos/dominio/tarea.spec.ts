@@ -19,6 +19,7 @@ const tarea = (cambios: Partial<Tarea> = {}): Tarea => ({
   titulo: 'Revisar presion de caldera',
   descripcion: null,
   fecha: dia('2026-09-25'),
+  fechaOriginal: null,
   estado: 'PENDIENTE',
   asignadoAId: 'u1',
   equipoId: null,

@@ -72,7 +72,7 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Repo | Código | Tests |
 |---|---|---|
-| Backend | 5 contextos, 40 tablas, 39 migraciones | 1.116 unitarios, 194 de punta a punta, 20 de integración |
+| Backend | 5 contextos, 41 tablas, 40 migraciones | 1.116 unitarios, 194 de punta a punta, 20 de integración |
 | Frontend | 16 pantallas | 591 tests |
 
 ---
@@ -96,7 +96,7 @@ mantenimiento2-backend/
 │   ├── modules/              catálogos simples (guardan un nombre y lo devuelven)
 │   └── common/               lo compartido: login, permisos, base, correo, errores…
 ├── prisma/
-│   ├── schema.prisma         el modelo de la base (40 tablas)
+│   ├── schema.prisma         el modelo de la base (41 tablas)
 │   └── migrations/           cada cambio a la base, en orden y escrito a mano
 ├── test/                     tests de punta a punta y de integración
 ├── scripts/                  herramientas de mantenimiento (conteos, ensayos, copias)
@@ -160,10 +160,14 @@ Máquinas de planta y herramientas.
 - **Manuales:** PDFs de hasta 25 MB, como máximo 10 por equipo, en un bucket privado.
 - **Componentes (montajes):** un motor montado en una bomba. Se puede trasladar y queda el historial.
 - **Repuestos:** qué materiales del pañol lleva cada máquina, con cantidad y si hay stock.
-- **Planes de mantenimiento:** «cada N días», con los **días de la semana que trabaja la planta**, por defecto de lunes a viernes. Si la próxima fecha cae un día no marcado, pasa al siguiente que sí. El plan cuenta desde el día real del trabajo, pero nunca vuelve a caer en un día que ya se hizo.
+- **Planes de mantenimiento:** «cada N días», con los **días de la semana que trabaja la planta**, por defecto de lunes a viernes. Si la próxima fecha cae un día no marcado, pasa al siguiente que sí. Cada plan elige **cómo se cuenta el próximo** (`modoProxima`):
+  - **desde que se hizo** (`DESDE_TRABAJO`, el de siempre): tocaba el sábado 10/10, se hizo el 14/10, cada 14 días → 28/10;
+  - **respetando el calendario** (`CALENDARIO`): el mismo caso → 24/10. Si se hizo tan tarde que la fecha siguiente también pasó, salta a la primera que todavía no pasó.
+  En los dos, nunca vuelve a caer en un día que ya se hizo.
+- **Postergar** (`postergarPlan`): el próximo service se puede correr unos días, solo si todavía no venció y sin pasar de la vez siguiente. Se guarda la fecha original (`postergadoDesde`) para seguir contando desde ahí.
 - **Avisos por correo:** los servicios que vencen. Los dispara un workflow de GitHub, que hoy está apagado a pedido.
 - **Importación:** alta masiva a partir de las fotos de la planta.
-- **Puerta pública:** `EquiposModule`, `GestionarPlanes` (trabajos avisa que un service se hizo) y `EstadoPorTaller` (trabajos avisa que una máquina salió a un taller o volvió).
+- **Puerta pública:** `EquiposModule`, `GestionarPlanes` (trabajos avisa que un service se hizo, o que se postergó) y `EstadoPorTaller` (trabajos avisa que una máquina salió a un taller o volvió).
 - **Endpoints:** `/api/equipos…`, `/api/equipos/:id/fotos|manuales|repuestos|componentes`, `/api/equipos/planes/vencen`, `/api/ubicaciones-equipo`, catálogos y `/api/avisos/procesar`.
 
 #### Trabajos (`contextos/trabajos`)
@@ -176,6 +180,7 @@ Máquinas de planta y herramientas.
   - las rutinas que se repiten («cada N días», con sus días de la semana);
   - lo que alguien programó a mano.
 - **Servicio externo:** una orden puede hacerse en un taller de afuera (llenar un tubo, rebobinar un motor). Desde la ficha del equipo, «Mandar a servicio externo» la abre y baja el PDF que viaja con el equipo. La orden se le **manda al taller** por correo (con el PDF, el destinatario lo arma el servidor) o por WhatsApp, y cada envío queda en `EnvioOrdenTrabajo`. Mientras está abierta, la máquina figura «En reparación». «**Volvió del taller**» la cierra con lo que hizo el taller, su **remito o factura** (`comprobanteExterno`) y lo que cobró.
+- **Postergar una tarea** que todavía no venció: a otro día, con el motivo, y sin pasar de la vez siguiente que toca. Queda en `PostergacionTarea` (quién, de qué día a qué día, por qué). La tarea guarda su día original (`fechaOriginal`), así el calendario no vuelve a generar una rutina en el día que se dejó. Si es de un plan, el plan se mueve con ella.
 - **Dar por hecha** una tarea crea su orden de trabajo, descuenta los materiales y, si la tarea es de un plan, corre el plan.
 - **Hoy:** lo de cada persona más lo que no es de nadie.
 - **`RegistrarTrabajoDePlan`:** es el único lugar que sabe qué pasa cuando se hace el trabajo de un plan: el plan corre y la tarea del calendario queda hecha, venga el trabajo de donde venga.
@@ -230,14 +235,14 @@ Hay cuatro roles: **ADMIN**, **GERENCIA**, **ADMINISTRATIVO** y **MANTENIMIENTO*
 
 ### 3.7 La base de datos
 
-40 tablas, definidas en `prisma/schema.prisma`, agrupadas así:
+41 tablas, definidas en `prisma/schema.prisma`, agrupadas así:
 
 | Área | Tablas |
 |---|---|
 | Pañol | `Material`, `CategoriaMaterial`, `UnidadMedida`, `EstanteriaMaterial`, `MovimientoStock`, `EdicionMovimiento` |
 | Compras | `OrdenCompra`, `RenglonOrdenCompra`, `RecepcionOrden`, `RecepcionRenglon`, `EnvioOrden`, `ComprobanteOrden`, `Proveedor`, `ContadorDocumento` |
 | Equipos | `Equipo`, `UbicacionEquipo`, `TipoEquipoPlanta`, `MarcaEquipo`, `ModeloEquipo`, `FotoEquipo`, `ManualEquipo`, `MontajeEquipo`, `RepuestoEquipo`, `PlanMantenimiento`, `AvisoEnviado`, `Intervencion` (sin uso, ver abajo) |
-| Trabajos | `OrdenTrabajo`, `MaterialUsadoTrabajo`, `EnvioOrdenTrabajo`, `TareaProgramada`, `RutinaTarea` |
+| Trabajos | `OrdenTrabajo`, `MaterialUsadoTrabajo`, `EnvioOrdenTrabajo`, `TareaProgramada`, `PostergacionTarea`, `RutinaTarea` |
 | Informática | `EquipoIT`, `AsignacionEquipoIT`, `TipoEquipo`, `Responsable`, `Credencial`, `RotacionCredencial`, `VistaCredencial` |
 | Usuarios | `Usuario`, `PermisoRol` |
 
@@ -281,7 +286,7 @@ mantenimiento2-frontend/src/
 | `/ordenes-compra` | Órdenes de compra | Crear, emitir, enviar, recibir en partes, reclamar lo que falta, precios, comprobantes, PDF |
 | `/equipos` | Equipos y herramientas | Lista de máquinas, alta, importación, QR |
 | `/equipos/:id` | Ficha del equipo | Resumen, repuestos, trabajos, planes, componentes, manuales y fotos; «Mandar a servicio externo» y el aviso de en qué taller está. Con `?desde=qr`, modo rápido «al pie de la máquina». |
-| `/servicios` | Servicios | Lo que vence (semana, 15 días, mes, 3 meses) y «Dar por hecho» |
+| `/servicios` | Servicios | Lo que vence (semana, 15 días, mes, 3 meses), «Postergar» y «Dar por hecho» |
 | `/equipos-it` | Equipos IT | Inventario, alta, asignar a una persona, importar CSV, QR |
 | `/credenciales` | Contraseñas | El baúl: ver, revelar, rotar |
 | `/proveedores` | Proveedores | Alta y edición |
@@ -293,6 +298,7 @@ Cada ruta pide su permiso (`RutaConPermiso`). Lo que el usuario no puede usar no
 ### 4.3 Cómo está hecho
 
 - **Datos:** cada recurso tiene su archivo en `api/`, con hooks de React Query (`useEquipos`, `useCrearOrden`, …). Los hooks guardan en caché, reintentan y refrescan solos después de un cambio.
+- **Listas con filtros:** Materiales y Equipos guardan el filtro, la búsqueda y la página en la dirección (`lib/listaEnUrl.ts`). Entrar a una ficha y volver deja la lista como estaba, y un enlace como `/equipos?estado=EN_REPARACION` abre la lista ya filtrada.
 - **Cliente HTTP:** `lib/apiClient.ts` agrega el token de Clerk, espera el arranque en frío de Render y muestra los errores de la API en castellano.
 - **Permisos en pantalla:** `usePuede()` y `P` (en `lib/permisos.ts`) esconden los botones que el usuario no puede usar. El servidor igual controla todo.
 - **PDFs:** con jsPDF y membrete (`lib/pdf*.ts`): orden de compra, orden de trabajo, etiquetas QR.

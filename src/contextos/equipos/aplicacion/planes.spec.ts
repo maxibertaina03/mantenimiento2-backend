@@ -270,3 +270,49 @@ describe('los días que trabaja la planta', () => {
     );
   });
 });
+
+describe('GestionarPlanes — postergar y respetar el calendario', () => {
+  async function planDelSabado() {
+    const { crearEquipo, gestionar, planes } = armar();
+    const equipo = await crearEquipo.ejecutar({ nombre: 'Tina 2' });
+    const plan = await gestionar.crear({
+      equipoId: equipo.id,
+      nombre: 'Limpieza de tina',
+      periodicidadDias: 14,
+      diasSemana: [1, 2, 3, 4, 5, 6],
+      proximaFecha: fecha('2026-09-05'), // sábado
+      modoProxima: 'CALENDARIO',
+    });
+    return { gestionar, planes, plan };
+  }
+
+  it('postergado y hecho, el próximo se cuenta desde la fecha original', async () => {
+    const { gestionar, planes, plan } = await planDelSabado();
+    expect((await gestionar.postergar(plan.id, fecha('2026-09-08'))).toISOString()).toContain(
+      '2026-09-08',
+    );
+
+    await gestionar.adelantarDespuesDeTrabajo(plan.id, fecha('2026-09-08'), fecha('2026-09-08'));
+    const fila = (await planes.buscarPorId(plan.id))!;
+    expect(fila.proximaFecha.toISOString()).toContain('2026-09-19');
+    expect(fila.postergadoDesde).toBeNull();
+  });
+
+  it('editar el nombre no borra la postergación; corregir la fecha a mano, sí', async () => {
+    const { gestionar, planes, plan } = await planDelSabado();
+    await gestionar.postergar(plan.id, fecha('2026-09-08'));
+
+    // El formulario manda la fecha siempre, aunque solo se cambie el nombre.
+    await gestionar.actualizar(plan.id, { nombre: 'Limpieza', proximaFecha: fecha('2026-09-08') });
+    expect((await planes.buscarPorId(plan.id))!.postergadoDesde).not.toBeNull();
+
+    await gestionar.actualizar(plan.id, { proximaFecha: fecha('2026-09-10') });
+    expect((await planes.buscarPorId(plan.id))!.postergadoDesde).toBeNull();
+  });
+
+  it('se puede cambiar el modo de un plan existente', async () => {
+    const { gestionar, plan } = await planDelSabado();
+    const cambiado = await gestionar.actualizar(plan.id, { modoProxima: 'DESDE_TRABAJO' });
+    expect(cambiado.modoProxima).toBe('DESDE_TRABAJO');
+  });
+});

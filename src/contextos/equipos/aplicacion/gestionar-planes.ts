@@ -1,15 +1,24 @@
 import { ErrorNoEncontrado } from '../dominio/errores';
 import {
   DatosNuevoPlan,
+  ModoProxima,
   PlanConEstado,
   conEstado,
   crearPlan,
   ordenarPorUrgencia,
-  proximaFechaTrasTrabajo,
+  postergarPlan,
+  proximaFechaSegunPlan,
 } from '../dominio/plan-mantenimiento';
 import { RepositorioEquipos } from '../puertos/repositorio-equipos';
 import { PlanConEquipo, RepositorioPlanes } from '../puertos/repositorio-planes';
 import { Reloj } from '../puertos/reloj';
+
+/** Si la fecha nueva es otro día (la hora no cuenta). */
+function cambioLaFecha(nueva: Date | undefined, actual: Date): boolean {
+  return (
+    nueva !== undefined && nueva.toISOString().slice(0, 10) !== actual.toISOString().slice(0, 10)
+  );
+}
 
 export interface PlanDeEquipoConEstado extends PlanConEquipo {
   estado: PlanConEstado['estado'];
@@ -54,6 +63,7 @@ export class GestionarPlanes {
       periodicidadDias?: number;
       diasSemana?: number[];
       proximaFecha?: Date;
+      modoProxima?: ModoProxima;
       activo?: boolean;
     },
   ): Promise<PlanConEstado> {
@@ -69,10 +79,17 @@ export class GestionarPlanes {
       periodicidadDias: cambios.periodicidadDias ?? actual.periodicidadDias,
       diasSemana: cambios.diasSemana ?? actual.diasSemana,
       proximaFecha: cambios.proximaFecha ?? actual.proximaFecha,
+      modoProxima: cambios.modoProxima ?? actual.modoProxima,
     });
 
     const plan = await this.planes.actualizar(id, {
       ...validado,
+      // Corregir la fecha a mano deja de lado la postergación: la fecha que
+      // se escribe es la que vale de ahí en adelante. Solo si cambió de
+      // verdad: el formulario manda la fecha siempre, aunque se edite el nombre.
+      postergadoDesde: cambioLaFecha(cambios.proximaFecha, actual.proximaFecha)
+        ? null
+        : actual.postergadoDesde,
       activo: cambios.activo ?? actual.activo,
     });
     return conEstado(plan, this.reloj.ahora());
@@ -111,13 +128,24 @@ export class GestionarPlanes {
     const plan = await this.planes.buscarPorId(planId);
     if (!plan) return; // el plan pudo borrarse entre medio; no vale romper por eso
 
+    // Según el modo del plan: desde que se hizo, o respetando el calendario.
     await this.planes.actualizar(planId, {
-      proximaFecha: proximaFechaTrasTrabajo(
-        fechaDelTrabajo,
-        plan.periodicidadDias,
-        plan.diasSemana,
-        yaHechoHasta,
-      ),
+      proximaFecha: proximaFechaSegunPlan(plan, fechaDelTrabajo, yaHechoHasta),
+      postergadoDesde: null,
     });
+  }
+
+  /**
+   * Posterga el próximo service: «lo vamos a hacer, pero unos días más
+   * tarde». Las reglas (no vencido, sin pasar de la vez siguiente) son del
+   * dominio. Devuelve la fecha con la que quedó, que puede correrse al
+   * siguiente día de trabajo.
+   */
+  async postergar(planId: string, nuevaFecha: Date): Promise<Date> {
+    const plan = await this.planes.buscarPorId(planId);
+    if (!plan) throw new ErrorNoEncontrado(`No existe el plan con id ${planId}`);
+    const cambios = postergarPlan(plan, nuevaFecha, this.reloj.ahora());
+    await this.planes.actualizar(planId, cambios);
+    return cambios.proximaFecha;
   }
 }

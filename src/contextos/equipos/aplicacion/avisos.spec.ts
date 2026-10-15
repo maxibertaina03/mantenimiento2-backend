@@ -49,6 +49,8 @@ async function plan(
     equipoId,
     nombre: datos.nombre ?? 'Cambio de aceite',
     tareas: null,
+    modoProxima: 'DESDE_TRABAJO',
+    postergadoDesde: null,
     periodicidadDias: 90,
     diasSemana: [0, 1, 2, 3, 4, 5, 6],
     proximaFecha: enDias(datos.dias),

@@ -3,13 +3,30 @@ import {
   TODOS_LOS_DIAS,
   validarDiasSemana,
 } from '../../../common/dominio/dias-de-trabajo';
-import { ErrorDatosInvalidos } from './errores';
+import { ErrorDatosInvalidos, ErrorTransicionInvalida } from './errores';
 import { EstadoEquipo, requiereMantenimiento } from './estado-equipo';
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000;
 
 /** Cuántos días antes se avisa por correo. */
 export const DIAS_DE_AVISO = 7;
+
+/**
+ * Cómo se cuenta el próximo service después de hacer uno.
+ *
+ * - `DESDE_TRABAJO`: desde el día en que se hizo. Tocaba el sábado 10/10, se
+ *   hizo el miércoles 14/10, cada 14 días → el 28/10. Es como fue siempre.
+ * - `CALENDARIO`: se respetan las fechas planificadas aunque haya atrasos: el
+ *   mismo caso da el 24/10. Sirve cuando el service va atado a un día fijo
+ *   (el sábado que para la planta).
+ */
+export const MODOS_PROXIMA = ['DESDE_TRABAJO', 'CALENDARIO'] as const;
+export type ModoProxima = (typeof MODOS_PROXIMA)[number];
+
+export const ETIQUETA_MODO_PROXIMA: Record<ModoProxima, string> = {
+  DESDE_TRABAJO: 'Contar desde que se hizo',
+  CALENDARIO: 'Respetar el calendario',
+};
 
 export interface PlanMantenimiento {
   id: string;
@@ -21,6 +38,14 @@ export interface PlanMantenimiento {
   diasSemana: number[];
   /** Cuándo toca la próxima vez. Se calcula, pero se puede corregir a mano. */
   proximaFecha: Date;
+  /** Cómo se cuenta el próximo después de hacer uno. */
+  modoProxima: ModoProxima;
+  /**
+   * Si se postergó: la fecha que tenía antes. En un plan que respeta el
+   * calendario, el siguiente se sigue contando desde acá y no desde la
+   * postergada. Se borra al registrar el trabajo.
+   */
+  postergadoDesde: Date | null;
   activo: boolean;
 }
 
@@ -32,6 +57,8 @@ export interface DatosNuevoPlan {
   /** Sin esto, lunes a viernes. */
   diasSemana?: number[] | null;
   proximaFecha: Date;
+  /** Sin esto, desde que se hizo: como fue siempre. */
+  modoProxima?: ModoProxima;
 }
 
 /** Cuán urgente está un plan. Ordena la pantalla de servicios que vencen. */
@@ -121,7 +148,137 @@ export function proximaFechaTrasTrabajo(
   return proxima;
 }
 
+/** El día, como texto: para comparar días sin que moleste la hora. */
+const dia = (f: Date) => f.toISOString().slice(0, 10);
+
+/** `fecha` más `n` días, corrida al siguiente día de trabajo si cae en uno que no. */
+function sumarDias(fecha: Date, n: number, diasSemana: readonly number[]): Date {
+  const resultado = new Date(fecha.getTime());
+  resultado.setUTCDate(resultado.getUTCDate() + n);
+  return alSiguienteDiaDeTrabajo(resultado, diasSemana);
+}
+
+/**
+ * La próxima fecha respetando el calendario: la siguiente fecha planificada
+ * (`programada` + N veces la periodicidad) que todavía no pasó.
+ *
+ * Tocaba el sábado 10/10, cada 14 días:
+ * - hecho el 14/10 → 24/10;
+ * - hecho el 26/10, cuando el 24/10 ya pasó → 07/11. Salta a la siguiente que
+ *   viene en vez de nacer vencido.
+ *
+ * Tampoco puede caer en el día de la tarea que se acaba de cerrar, o antes.
+ *
+ * @param programada la fecha que tenía planificada (la original, si se postergó)
+ */
+export function proximaFechaEnCalendario(
+  programada: Date,
+  periodicidadDias: number,
+  diasSemana: readonly number[],
+  fechaDelTrabajo: Date,
+  yaHechoHasta?: Date | null,
+): Date {
+  const limite = [dia(fechaDelTrabajo), yaHechoHasta ? dia(yaHechoHasta) : ''].sort().pop()!;
+  // Se salta directo cerca del límite: un plan diario atrasado un año no
+  // tiene que probar 365 fechas una por una.
+  const atraso = Math.max(0, diasEntre(programada, new Date(`${limite}T00:00:00.000Z`)));
+  let veces = Math.max(1, Math.floor(atraso / periodicidadDias));
+  for (;;) {
+    const candidata = sumarDias(programada, veces * periodicidadDias, diasSemana);
+    if (dia(candidata) > limite) return candidata;
+    veces += 1;
+  }
+}
+
+/** La próxima fecha de un plan después de hacer el trabajo, según su modo. */
+export function proximaFechaSegunPlan(
+  plan: Pick<
+    PlanMantenimiento,
+    'modoProxima' | 'proximaFecha' | 'postergadoDesde' | 'periodicidadDias' | 'diasSemana'
+  >,
+  fechaDelTrabajo: Date,
+  yaHechoHasta?: Date | null,
+): Date {
+  if (plan.modoProxima === 'CALENDARIO') {
+    return proximaFechaEnCalendario(
+      plan.postergadoDesde ?? plan.proximaFecha,
+      plan.periodicidadDias,
+      plan.diasSemana,
+      fechaDelTrabajo,
+      yaHechoHasta,
+    );
+  }
+  return proximaFechaTrasTrabajo(
+    fechaDelTrabajo,
+    plan.periodicidadDias,
+    plan.diasSemana,
+    yaHechoHasta,
+  );
+}
+
+/**
+ * Postergar el próximo service: «lo vamos a hacer, pero dos o tres días más
+ * tarde».
+ *
+ * - Solo si todavía no venció: lo vencido no se posterga, se hace.
+ * - La fecha nueva tiene que ser posterior a la que tenía, y anterior a la vez
+ *   siguiente que toca (la original más la periodicidad): postergar no puede
+ *   comerse el próximo service.
+ * - Si cae un día que no se trabaja, pasa al siguiente que sí.
+ * - Se guarda la original (la primera, si se posterga dos veces) para contar el
+ *   siguiente desde ahí en los planes que respetan el calendario.
+ */
+export function postergarPlan(
+  plan: Pick<
+    PlanMantenimiento,
+    'nombre' | 'proximaFecha' | 'postergadoDesde' | 'periodicidadDias' | 'diasSemana' | 'activo'
+  >,
+  nuevaFecha: Date,
+  hoy: Date,
+): Pick<PlanMantenimiento, 'proximaFecha' | 'postergadoDesde'> {
+  if (!plan.activo) {
+    throw new ErrorTransicionInvalida(
+      `El plan «${plan.nombre}» está pausado: no hay nada que postergar.`,
+    );
+  }
+  if (diasParaVencer(plan.proximaFecha, hoy) < 0) {
+    throw new ErrorTransicionInvalida(
+      `«${plan.nombre}» ya venció: lo vencido no se posterga, se hace. Registrá el trabajo ` +
+        'cuando se haga.',
+    );
+  }
+  const fecha = alSiguienteDiaDeTrabajo(nuevaFecha, plan.diasSemana);
+  if (dia(fecha) <= dia(plan.proximaFecha)) {
+    throw new ErrorDatosInvalidos('La fecha nueva tiene que ser posterior a la que tenía.');
+  }
+  const original = plan.postergadoDesde ?? plan.proximaFecha;
+  const siguiente = sumarDias(original, plan.periodicidadDias, plan.diasSemana);
+  if (dia(fecha) >= dia(siguiente)) {
+    throw new ErrorDatosInvalidos(
+      `Se puede postergar hasta antes del ${formatoDia(siguiente)}, que es cuando vuelve a ` +
+        'tocar. Más que eso ya no es postergar: es saltearse un service.',
+    );
+  }
+  return { proximaFecha: fecha, postergadoDesde: original };
+}
+
+/** 24/10/2026, para los mensajes. */
+function formatoDia(fecha: Date): string {
+  const [a, m, d] = dia(fecha).split('-');
+  return `${d}/${m}/${a}`;
+}
+
 const MAXIMO_DIAS = 3650; // diez años
+
+function validarModo(modo: ModoProxima | undefined): ModoProxima {
+  if (modo === undefined) return 'DESDE_TRABAJO';
+  if (!MODOS_PROXIMA.includes(modo)) {
+    throw new ErrorDatosInvalidos(
+      'El modo tiene que ser «desde que se hizo» o «respetar el calendario».',
+    );
+  }
+  return modo;
+}
 
 export function crearPlan(datos: DatosNuevoPlan): Omit<PlanMantenimiento, 'id'> {
   const nombre = datos.nombre.trim().replace(/\s+/g, ' ');
@@ -151,6 +308,8 @@ export function crearPlan(datos: DatosNuevoPlan): Omit<PlanMantenimiento, 'id'> 
     diasSemana,
     // Una fecha cargada a mano en un sábado también pasa al lunes.
     proximaFecha: alSiguienteDiaDeTrabajo(datos.proximaFecha, diasSemana),
+    modoProxima: validarModo(datos.modoProxima),
+    postergadoDesde: null,
     activo: true,
   };
 }

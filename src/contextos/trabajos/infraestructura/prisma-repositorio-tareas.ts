@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { SELECT_NOMBRE_EQUIPO_IT, nombreDeEquipoIt } from './prisma-consulta-equipos-it';
-import { EstadoTarea, Rutina, Tarea } from '../dominio/tarea';
+import { EstadoTarea, Postergacion, Rutina, Tarea } from '../dominio/tarea';
 import {
   FiltroTareas,
   RepositorioTareas,
@@ -17,6 +17,10 @@ const RELACIONES = {
   plan: { select: { nombre: true } },
   rutina: { select: { titulo: true } },
   ordenTrabajo: { select: { numero: true } },
+  postergaciones: {
+    orderBy: { creadoEn: 'asc' },
+    include: { usuario: { select: { nombre: true } } },
+  },
 } as const;
 
 const RELACIONES_RUTINA = {
@@ -41,6 +45,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       titulo: fila.titulo,
       descripcion: fila.descripcion,
       fecha: fila.fecha,
+      fechaOriginal: fila.fechaOriginal,
       estado: fila.estado as EstadoTarea,
       asignadoAId: fila.asignadoAId,
       equipoId: fila.equipoId,
@@ -56,6 +61,13 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       planNombre: fila.plan?.nombre ?? null,
       rutinaTitulo: fila.rutina?.titulo ?? null,
       ordenTrabajoNumero: fila.ordenTrabajo?.numero ?? null,
+      postergaciones: fila.postergaciones.map((p) => ({
+        desde: p.desde,
+        hasta: p.hasta,
+        motivo: p.motivo,
+        usuarioNombre: p.usuario?.nombre ?? null,
+        creadoEn: p.creadoEn,
+      })),
     };
   }
 
@@ -85,6 +97,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       titulo: tarea.titulo,
       descripcion: tarea.descripcion,
       fecha: tarea.fecha,
+      fechaOriginal: tarea.fechaOriginal,
       estado: tarea.estado,
       asignadoAId: tarea.asignadoAId,
       equipoId: tarea.equipoId,
@@ -113,6 +126,18 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
    * base decida con su índice único y tratando el choque como éxito.
    */
   async crearSiNoExiste(tarea: Omit<Tarea, 'id' | 'creadoEn'>): Promise<boolean> {
+    // Una que se postergó ya no está en su día, pero sigue siendo la de ese
+    // día: si no se mirara, la rutina la volvería a crear en el original.
+    if (tarea.planId || tarea.rutinaId) {
+      const postergada = await this.prisma.tareaProgramada.findFirst({
+        where: {
+          fechaOriginal: tarea.fecha,
+          ...(tarea.planId ? { planId: tarea.planId } : { rutinaId: tarea.rutinaId }),
+        },
+        select: { id: true },
+      });
+      if (postergada) return false;
+    }
     try {
       await this.prisma.tareaProgramada.create({ data: this.datos(tarea) });
       return true;
@@ -123,6 +148,23 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       }
       throw error;
     }
+  }
+
+  async postergar(
+    id: string,
+    cambios: Pick<Tarea, 'fecha' | 'fechaOriginal'>,
+    postergacion: Postergacion,
+    usuarioId: string | null,
+  ): Promise<TareaConRelaciones> {
+    // En una transacción: la tarea movida sin su registro, o al revés, sería
+    // una historia que no cierra.
+    const fila = await this.prisma.$transaction(async (tx) => {
+      await tx.postergacionTarea.create({
+        data: { tareaId: id, ...postergacion, usuarioId },
+      });
+      return tx.tareaProgramada.update({ where: { id }, data: cambios, include: RELACIONES });
+    });
+    return this.aDominio(fila);
   }
 
   async buscarPorId(id: string): Promise<TareaConRelaciones | null> {

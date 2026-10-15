@@ -4,6 +4,13 @@ import { PlanesDeMantenimiento, VencimientoDePlan } from '../puertos/planes-de-m
 export class PlanesEnMemoria implements PlanesDeMantenimiento {
   /** Lo que se fue avisando, para revisarlo en el test. */
   readonly avisos: { planId: string; fecha: Date; yaHechoHasta?: Date }[] = [];
+  /** Lo que se fue postergando. */
+  readonly postergaciones: { planId: string; fecha: Date }[] = [];
+  /**
+   * Si está, `postergar` lo usa para decidir (correr la fecha o rechazar),
+   * como haría el plan de verdad. Sin esto, acepta la fecha tal cual.
+   */
+  reglaDePostergar?: (planId: string, fecha: Date) => Date;
 
   constructor(
     private readonly planes: { id: string; equipoId: string }[] = [],
@@ -29,5 +36,11 @@ export class PlanesEnMemoria implements PlanesDeMantenimiento {
         ? { planId, fecha: fechaDelTrabajo, yaHechoHasta }
         : { planId, fecha: fechaDelTrabajo },
     );
+  }
+
+  async postergar(planId: string, nuevaFecha: Date): Promise<Date> {
+    const fecha = this.reglaDePostergar ? this.reglaDePostergar(planId, nuevaFecha) : nuevaFecha;
+    this.postergaciones.push({ planId, fecha });
+    return fecha;
   }
 }

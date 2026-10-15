@@ -8,12 +8,15 @@ import {
   crearTarea,
   DatosNuevaRutina,
   DatosNuevaTarea,
+  postergarTarea,
   Rutina,
+  siguienteDeRutina,
   validarQueSePuedeCompletar,
 } from '../dominio/tarea';
 import { ConsultaEquipos } from '../puertos/consulta-equipos';
 import { ConsultaEquiposIt } from '../puertos/consulta-equipos-it';
 import { ConsultaUsuarios } from '../puertos/consulta-usuarios';
+import { PlanesDeMantenimiento } from '../puertos/planes-de-mantenimiento';
 import {
   RepositorioTareas,
   RutinaConRelaciones,
@@ -51,6 +54,8 @@ export class GestionarTareas {
     private readonly usuarios: ConsultaUsuarios,
     private readonly trabajos: RegistrarTrabajoHecho,
     private readonly reloj: Reloj,
+    // Para postergar las tareas de un plan: el plan se mueve con ellas.
+    private readonly planes?: PlanesDeMantenimiento,
   ) {}
 
   private async traer(id: string): Promise<TareaConRelaciones> {
@@ -102,6 +107,38 @@ export class GestionarTareas {
     const tarea = await this.traer(id);
     await this.validarAsignado(usuarioId);
     return this.repo.actualizar(id, asignarTarea(tarea, usuarioId));
+  }
+
+  /**
+   * Posterga una tarea que todavía no venció.
+   *
+   * - De una rutina: hasta antes de la vez siguiente que toca.
+   * - De un plan: el plan se mueve con ella (si no, Servicios la mostraría
+   *   vencida al pasar el día original), y las reglas del tope son del plan.
+   *   Primero se valida la tarea, así un rechazo no deja el plan movido.
+   */
+  async postergar(
+    id: string,
+    nuevaFecha: Date,
+    motivo: string,
+    usuarioId: string | null,
+  ): Promise<TareaConRelaciones> {
+    const tarea = await this.traer(id);
+    const hoy = this.reloj.ahora();
+
+    let tope: Date | null = null;
+    if (tarea.rutinaId) {
+      const rutina = await this.repo.buscarRutina(tarea.rutinaId);
+      if (rutina) tope = siguienteDeRutina(rutina, tarea.fechaOriginal ?? tarea.fecha);
+    }
+    let { cambios, postergacion } = postergarTarea(tarea, nuevaFecha, motivo, hoy, tope);
+
+    if (tarea.planId && this.planes) {
+      const fechaDelPlan = await this.planes.postergar(tarea.planId, nuevaFecha);
+      // El plan puede correrla al siguiente día de trabajo: la tarea va ahí.
+      ({ cambios, postergacion } = postergarTarea(tarea, fechaDelPlan, motivo, hoy, tope));
+    }
+    return this.repo.postergar(id, cambios, postergacion, usuarioId);
   }
 
   async cancelar(id: string): Promise<TareaConRelaciones> {

@@ -1,4 +1,10 @@
-import { Rutina, Tarea } from '../dominio/tarea';
+import { Postergacion, Rutina, Tarea } from '../dominio/tarea';
+
+/** Una postergación ya registrada, con quién la hizo. */
+export interface PostergacionRegistrada extends Postergacion {
+  usuarioNombre: string | null;
+  creadoEn: Date;
+}
 
 /** Una tarea con los nombres ya resueltos, lista para el calendario. */
 export interface TareaConRelaciones extends Tarea {
@@ -8,6 +14,8 @@ export interface TareaConRelaciones extends Tarea {
   planNombre: string | null;
   rutinaTitulo: string | null;
   ordenTrabajoNumero: string | null;
+  /** Las veces que se postergó, de la primera a la última. */
+  postergaciones: PostergacionRegistrada[];
 }
 
 export interface RutinaConRelaciones extends Rutina {
@@ -47,6 +55,14 @@ export interface RepositorioTareas {
   buscarPorId(id: string): Promise<TareaConRelaciones | null>;
   listarEntre(desde: Date, hasta: Date, filtro: FiltroTareas): Promise<TareaConRelaciones[]>;
   actualizar(id: string, cambios: Partial<Tarea>): Promise<TareaConRelaciones>;
+
+  /** Mueve la tarea y deja asentado el porqué, las dos cosas juntas. */
+  postergar(
+    id: string,
+    cambios: Pick<Tarea, 'fecha' | 'fechaOriginal'>,
+    postergacion: Postergacion,
+    usuarioId: string | null,
+  ): Promise<TareaConRelaciones>;
 
   listarRutinas(soloActivas: boolean): Promise<RutinaConRelaciones[]>;
   crearRutina(rutina: Omit<Rutina, 'id' | 'creadoEn'>): Promise<RutinaConRelaciones>;
