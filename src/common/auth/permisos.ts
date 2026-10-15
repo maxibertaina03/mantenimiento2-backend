@@ -20,6 +20,15 @@ export const PERMISOS = {
   /** Corregir un movimiento ya cargado. Quién puede corregir CUÁL es otra regla. */
   MOVIMIENTOS_EDITAR: 'movimientos.editar',
 
+  // ── Toma de inventario ────────────────────────────────────────────────────
+  // Propios y no los de movimientos: quién cuenta y quién ajusta el stock de
+  // todo el pañol lo decide el administrador, aparte de quién carga una salida.
+  INVENTARIO_VER: 'inventario.ver',
+  /** Abrir una toma y cargar lo contado. No mueve stock. */
+  INVENTARIO_CONTAR: 'inventario.contar',
+  /** Confirmar (ajusta el stock a lo contado), cerrar y anular. */
+  INVENTARIO_AJUSTAR: 'inventario.ajustar',
+
   /**
    * Las listas auxiliares: categorías, unidades, estanterías, marcas, modelos,
    * tipos y ubicaciones.
@@ -146,6 +155,19 @@ export const DESCRIPCION_PERMISOS: Record<Permiso, { grupo: string; etiqueta: st
   [PERMISOS.MOVIMIENTOS_EDITAR]: {
     grupo: 'Materiales',
     etiqueta: 'Corregir un movimiento ya cargado',
+  },
+
+  [PERMISOS.INVENTARIO_VER]: {
+    grupo: 'Toma de inventario',
+    etiqueta: 'Ver las tomas y sus informes',
+  },
+  [PERMISOS.INVENTARIO_CONTAR]: {
+    grupo: 'Toma de inventario',
+    etiqueta: 'Abrir una toma y cargar lo contado',
+  },
+  [PERMISOS.INVENTARIO_AJUSTAR]: {
+    grupo: 'Toma de inventario',
+    etiqueta: 'Confirmar (ajusta el stock), cerrar y anular una toma',
   },
 
   [PERMISOS.CATALOGOS_VER]: {
