@@ -339,6 +339,7 @@ model Usuario {
 
   tareasAsignadas     TareaProgramada[]      @relation("TareasAsignadas")
   tareasCreadas       TareaProgramada[]      @relation("TareasCreadas")
+  postergaciones      PostergacionTarea[]    @relation("PostergacionesHechas")
   rutinasAsignadas    RutinaTarea[]          @relation("RutinasAsignadas")
   rutinasCreadas      RutinaTarea[]          @relation("RutinasCreadas")
   trabajosAbiertos    OrdenTrabajo[]         @relation("TrabajosAbiertos")
@@ -1199,6 +1200,16 @@ model PlanMantenimiento {
   /// corre, y si el sistema no deja moverla la gente deja de usarlo.
   proximaFecha DateTime
 
+  /// Cómo se cuenta el próximo después de hacer uno: DESDE_TRABAJO (desde el
+  /// día en que se hizo, como fue siempre) o CALENDARIO (se respetan las
+  /// fechas planificadas aunque haya atrasos). Texto y no enum, como el estado
+  /// del equipo: las reglas las controla el dominio.
+  modoProxima String @default("DESDE_TRABAJO")
+
+  /// Si el próximo se postergó: la fecha que tenía antes. Un plan que respeta
+  /// el calendario sigue contando desde acá. Se borra al registrar el trabajo.
+  postergadoDesde DateTime?
+
   /// Los planes en desuso se desactivan en vez de borrarse, para no perder las
   /// intervenciones que los referencian.
   activo Boolean @default(true)
@@ -1558,6 +1569,11 @@ model TareaProgramada {
   /// distintas.
   fecha DateTime
 
+  /// Si se postergó: el día que tenía al principio. El calendario la reconoce
+  /// por este día, así una rutina postergada no se vuelve a generar en su día
+  /// original. Vacío si nunca se movió.
+  fechaOriginal DateTime?
+
   /// PENDIENTE | HECHA | CANCELADA.
   estado String @default("PENDIENTE")
 
@@ -1578,13 +1594,14 @@ model TareaProgramada {
   creadaPorId String?
   creadoEn    DateTime @default(now())
 
-  asignadoA    Usuario?           @relation("TareasAsignadas", fields: [asignadoAId], references: [id])
-  creadaPor    Usuario?           @relation("TareasCreadas", fields: [creadaPorId], references: [id])
-  equipo       Equipo?            @relation(fields: [equipoId], references: [id], onDelete: SetNull)
-  equipoIt     EquipoIT?          @relation(fields: [equipoItId], references: [id], onDelete: SetNull)
-  plan         PlanMantenimiento? @relation(fields: [planId], references: [id], onDelete: Cascade)
-  rutina       RutinaTarea?       @relation(fields: [rutinaId], references: [id], onDelete: Cascade)
-  ordenTrabajo OrdenTrabajo?      @relation(fields: [ordenTrabajoId], references: [id], onDelete: SetNull)
+  asignadoA      Usuario?            @relation("TareasAsignadas", fields: [asignadoAId], references: [id])
+  creadaPor      Usuario?            @relation("TareasCreadas", fields: [creadaPorId], references: [id])
+  equipo         Equipo?             @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  equipoIt       EquipoIT?           @relation(fields: [equipoItId], references: [id], onDelete: SetNull)
+  plan           PlanMantenimiento?  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  rutina         RutinaTarea?        @relation(fields: [rutinaId], references: [id], onDelete: Cascade)
+  ordenTrabajo   OrdenTrabajo?       @relation(fields: [ordenTrabajoId], references: [id], onDelete: SetNull)
+  postergaciones PostergacionTarea[]
 
   /// Un vencimiento de plan genera UNA tarea, y una repetición de rutina
   /// también. Es lo que hace que generarlas al leer el calendario se pueda
@@ -1604,6 +1621,26 @@ model TareaProgramada {
 /// "Revisar la presión de la caldera todas las mañanas" no es el service de una
 /// máquina: es una rutina del día. Cargarla una vez y que el calendario la
 /// reparta es la diferencia entre que se haga y que no.
+/// Cada vez que se postergó una tarea: de qué día a qué día, quién y por qué.
+///
+/// «Se va a hacer, pero dos o tres días más tarde» es una decisión, y queda
+/// escrita: sin esto, una tarea que se corre tres veces parece una sola.
+model PostergacionTarea {
+  id        String   @id @default(uuid())
+  tareaId   String
+  desde     DateTime
+  hasta     DateTime
+  motivo    String
+  usuarioId String?
+  creadoEn  DateTime @default(now())
+
+  tarea   TareaProgramada @relation(fields: [tareaId], references: [id], onDelete: Cascade)
+  usuario Usuario?        @relation("PostergacionesHechas", fields: [usuarioId], references: [id])
+
+  @@index([tareaId])
+  @@map("postergaciones_tarea")
+}
+
 model RutinaTarea {
   id          String  @id @default(uuid())
   titulo      String

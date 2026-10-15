@@ -1,32 +1,39 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
-import { PlanMantenimiento } from '../dominio/plan-mantenimiento';
+import { ModoProxima, PlanMantenimiento } from '../dominio/plan-mantenimiento';
 import { PlanConEquipo, RepositorioPlanes } from '../puertos/repositorio-planes';
+
+/** El modo viene de la base como texto; el dominio lo conoce como tipo. */
+function aPlan<T extends { modoProxima: string }>(fila: T): T & { modoProxima: ModoProxima } {
+  return { ...fila, modoProxima: fila.modoProxima as ModoProxima };
+}
 
 @Injectable()
 export class PrismaRepositorioPlanes implements RepositorioPlanes {
   constructor(private readonly prisma: PrismaService) {}
 
-  crear(plan: Omit<PlanMantenimiento, 'id'>): Promise<PlanMantenimiento> {
-    return this.prisma.planMantenimiento.create({ data: plan });
+  async crear(plan: Omit<PlanMantenimiento, 'id'>): Promise<PlanMantenimiento> {
+    return aPlan(await this.prisma.planMantenimiento.create({ data: plan }));
   }
 
-  actualizar(
+  async actualizar(
     id: string,
     cambios: Partial<Omit<PlanMantenimiento, 'id'>>,
   ): Promise<PlanMantenimiento> {
-    return this.prisma.planMantenimiento.update({ where: { id }, data: cambios });
+    return aPlan(await this.prisma.planMantenimiento.update({ where: { id }, data: cambios }));
   }
 
-  buscarPorId(id: string): Promise<PlanMantenimiento | null> {
-    return this.prisma.planMantenimiento.findUnique({ where: { id } });
+  async buscarPorId(id: string): Promise<PlanMantenimiento | null> {
+    const fila = await this.prisma.planMantenimiento.findUnique({ where: { id } });
+    return fila ? aPlan(fila) : null;
   }
 
-  listarPorEquipo(equipoId: string): Promise<PlanMantenimiento[]> {
-    return this.prisma.planMantenimiento.findMany({
+  async listarPorEquipo(equipoId: string): Promise<PlanMantenimiento[]> {
+    const filas = await this.prisma.planMantenimiento.findMany({
       where: { equipoId },
       orderBy: [{ activo: 'desc' }, { proximaFecha: 'asc' }],
     });
+    return filas.map(aPlan);
   }
 
   async listarQueVencenHasta(fechaCorte: Date): Promise<PlanConEquipo[]> {
@@ -52,6 +59,8 @@ export class PrismaRepositorioPlanes implements RepositorioPlanes {
       periodicidadDias: f.periodicidadDias,
       diasSemana: f.diasSemana,
       proximaFecha: f.proximaFecha,
+      modoProxima: f.modoProxima as ModoProxima,
+      postergadoDesde: f.postergadoDesde,
       activo: f.activo,
       equipoNombre: f.equipo.nombre,
       equipoEstado: f.equipo.estado,

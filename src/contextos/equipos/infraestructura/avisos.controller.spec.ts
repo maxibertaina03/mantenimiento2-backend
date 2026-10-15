@@ -39,6 +39,8 @@ async function planQueVence(planes: RepositorioPlanesEnMemoria, dias: number) {
     equipoId: 'eq-1',
     nombre: 'Cambio de aceite',
     tareas: null,
+    modoProxima: 'DESDE_TRABAJO',
+    postergadoDesde: null,
     periodicidadDias: 90,
     diasSemana: [0, 1, 2, 3, 4, 5, 6],
     proximaFecha,

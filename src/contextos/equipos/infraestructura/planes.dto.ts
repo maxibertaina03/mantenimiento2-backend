@@ -12,7 +12,13 @@ import {
   Max,
   Min,
   MinLength,
+  IsIn,
 } from 'class-validator';
+import { MODOS_PROXIMA, ModoProxima } from '../dominio/plan-mantenimiento';
+
+const DESCRIPCION_MODO =
+  'Cómo se cuenta el próximo después de hacer uno: DESDE_TRABAJO (desde el día en que se ' +
+  'hizo) o CALENDARIO (respeta las fechas planificadas aunque haya atrasos).';
 
 export class CrearPlanDto {
   @ApiProperty({ example: 'Cambio de aceite' })
@@ -48,6 +54,11 @@ export class CrearPlanDto {
   @ApiProperty({ example: '2026-12-01', description: 'Cuándo toca la próxima vez' })
   @IsDateString()
   proximaFecha!: string;
+
+  @ApiPropertyOptional({ enum: MODOS_PROXIMA, description: DESCRIPCION_MODO })
+  @IsOptional()
+  @IsIn(MODOS_PROXIMA)
+  modoProxima?: ModoProxima;
 }
 
 export class ActualizarPlanDto {
@@ -72,4 +83,9 @@ export class ActualizarPlanDto {
 
   @ApiPropertyOptional() @IsOptional() @IsDateString() proximaFecha?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() activo?: boolean;
+
+  @ApiPropertyOptional({ enum: MODOS_PROXIMA, description: DESCRIPCION_MODO })
+  @IsOptional()
+  @IsIn(MODOS_PROXIMA)
+  modoProxima?: ModoProxima;
 }
