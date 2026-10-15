@@ -4,6 +4,24 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.1.0] — 2026-10-15
+
+### Agregado
+
+- **Respetar el calendario.** Cada plan de mantenimiento elige cómo se cuenta el próximo
+  service: desde que se hizo (como siempre) o respetando las fechas planificadas. Tocaba el
+  sábado 10/10, se hizo el 14/10, cada 14 días: el próximo es el 28/10 o el 24/10. Si se hizo
+  tan tarde que la fecha siguiente también pasó, salta a la que viene. Los planes que ya
+  existían siguen contando desde que se hizo.
+- **Postergar tareas** que todavía no vencieron, con el motivo, sin pasar de la vez siguiente
+  que tocan. Si la tarea es de un plan, el service se corre con ella y no figura vencido.
+  Queda registrado quién la postergó, de qué día a qué día y por qué.
+
+### Documentación
+
+- Los backups: PowerShell normal (no como administrador) y el client_id propio de Google.
+- Las listas guardan filtro y página en la dirección.
+
 ## [1.0.0] — 2026-10-14
 
 Primera versión numerada: es el sistema tal como está en producción desde junio de 2026, con
@@ -29,4 +47,5 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.1.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.1.0
 [1.0.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.0.0
