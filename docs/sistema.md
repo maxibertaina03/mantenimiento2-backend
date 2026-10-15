@@ -293,6 +293,7 @@ Cada ruta pide su permiso (`RutaConPermiso`). Lo que el usuario no puede usar no
 ### 4.3 Cómo está hecho
 
 - **Datos:** cada recurso tiene su archivo en `api/`, con hooks de React Query (`useEquipos`, `useCrearOrden`, …). Los hooks guardan en caché, reintentan y refrescan solos después de un cambio.
+- **Listas con filtros:** Materiales y Equipos guardan el filtro, la búsqueda y la página en la dirección (`lib/listaEnUrl.ts`). Entrar a una ficha y volver deja la lista como estaba, y un enlace como `/equipos?estado=EN_REPARACION` abre la lista ya filtrada.
 - **Cliente HTTP:** `lib/apiClient.ts` agrega el token de Clerk, espera el arranque en frío de Render y muestra los errores de la API en castellano.
 - **Permisos en pantalla:** `usePuede()` y `P` (en `lib/permisos.ts`) esconden los botones que el usuario no puede usar. El servidor igual controla todo.
 - **PDFs:** con jsPDF y membrete (`lib/pdf*.ts`): orden de compra, orden de trabajo, etiquetas QR.
