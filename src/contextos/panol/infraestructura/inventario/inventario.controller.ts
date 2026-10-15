@@ -97,8 +97,8 @@ export class TomasInventarioService {
 /**
  * La toma de inventario: abrir, contar, confirmar.
  *
- * Contar lo puede quien carga movimientos; confirmar (que ajusta el stock) y
- * anular, quien puede corregir movimientos.
+ * Con permisos propios, que reparte el administrador: ver, contar (abrir y
+ * cargar conteos) y ajustar (confirmar, cerrar y anular).
  */
 @ApiTags('Toma de inventario')
 @ApiBearerAuth()
@@ -110,28 +110,28 @@ export class InventarioController {
     return this.servicio.casoDeUso;
   }
 
-  @Permisos(PERMISOS.MOVIMIENTOS_VER)
+  @Permisos(PERMISOS.INVENTARIO_VER)
   @Get()
   @ApiOperation({ summary: 'Las tomas, la última primero' })
   listar() {
     return traducirErrores(() => this.tomas.listar());
   }
 
-  @Permisos(PERMISOS.MOVIMIENTOS_CREAR)
+  @Permisos(PERMISOS.INVENTARIO_CONTAR)
   @Post()
   @ApiOperation({ summary: 'Abrir una toma sobre una categoría, una estantería o todo el pañol' })
   abrir(@Body() dto: AbrirTomaDto, @UsuarioActual() usuario?: Usuario) {
     return traducirErrores(() => this.tomas.abrir(dto, usuario?.id ?? null));
   }
 
-  @Permisos(PERMISOS.MOVIMIENTOS_VER)
+  @Permisos(PERMISOS.INVENTARIO_VER)
   @Get(':id')
   @ApiOperation({ summary: 'La toma con sus renglones y el resumen' })
   detalle(@Param('id', ParseUUIDPipe) id: string) {
     return traducirErrores(() => this.tomas.detalle(id));
   }
 
-  @Permisos(PERMISOS.MOVIMIENTOS_CREAR)
+  @Permisos(PERMISOS.INVENTARIO_CONTAR)
   @Patch(':id/renglones/:renglonId')
   @ApiOperation({ summary: 'Cargar (o corregir, o borrar) lo que se contó de un material' })
   contar(
@@ -145,7 +145,7 @@ export class InventarioController {
     );
   }
 
-  @Permisos(PERMISOS.MOVIMIENTOS_EDITAR)
+  @Permisos(PERMISOS.INVENTARIO_AJUSTAR)
   @Post(':id/confirmar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -158,7 +158,7 @@ export class InventarioController {
     return traducirErrores(() => this.tomas.confirmar(id, usuario?.id ?? null));
   }
 
-  @Permisos(PERMISOS.MOVIMIENTOS_EDITAR)
+  @Permisos(PERMISOS.INVENTARIO_AJUSTAR)
   @Post(':id/cerrar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -169,7 +169,7 @@ export class InventarioController {
     return traducirErrores(() => this.tomas.cerrar(id, usuario?.id ?? null));
   }
 
-  @Permisos(PERMISOS.MOVIMIENTOS_EDITAR)
+  @Permisos(PERMISOS.INVENTARIO_AJUSTAR)
   @Post(':id/anular')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Anular una toma que todavía no ajustó nada' })
