@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { EstadoEquipoIT, TipoAccesoRemoto, TipoDisco } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
@@ -18,6 +18,9 @@ import {
 /** Formato MAC: 6 pares hexadecimales separados por ":" o "-". */
 const REGEX_MAC = /^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$/;
 
+// Nombre propio en Swagger: los equipos de planta también tienen un
+// CrearEquipoDto, y con el mismo nombre uno pisaba al otro en /docs.
+@ApiSchema({ name: 'CrearEquipoItDto' })
 export class CrearEquipoDto {
   @ApiPropertyOptional({
     description: 'Etiqueta de inventario pegada al equipo (única)',

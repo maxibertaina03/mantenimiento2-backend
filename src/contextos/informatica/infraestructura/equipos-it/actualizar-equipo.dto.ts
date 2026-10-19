@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
+import { ApiSchema, PartialType } from '@nestjs/swagger';
 import { CrearEquipoDto } from './crear-equipo.dto';
 
 /**
@@ -6,4 +6,5 @@ import { CrearEquipoDto } from './crear-equipo.dto';
  * La asignación NO se cambia por acá — tiene su propio endpoint para que quede
  * registrada en el historial (ver AsignarEquipoDto).
  */
+@ApiSchema({ name: 'ActualizarEquipoItDto' })
 export class ActualizarEquipoDto extends PartialType(CrearEquipoDto) {}
