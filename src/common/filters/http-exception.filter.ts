@@ -7,8 +7,20 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { STATUS_CODES } from 'node:http';
 import { Request, Response } from 'express';
 import { reportarError } from '../monitoreo/monitoreo';
+
+/**
+ * Un error de las librerías HTTP (body-parser y compañía) que ya sabe que es
+ * culpa del pedido: trae un `status` 4xx y `expose: true`, la convención de
+ * `http-errors`.
+ */
+function esErrorDelCliente(e: unknown): e is Error & { status: number } {
+  if (!(e instanceof Error)) return false;
+  const { status, expose } = e as Error & { status?: unknown; expose?: unknown };
+  return typeof status === 'number' && status >= 400 && status < 500 && expose === true;
+}
 
 /**
  * Filtro global de excepciones.
@@ -25,6 +37,10 @@ export class FiltroExcepcionesHttp implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    // `originalUrl` y no `url`: desde NestJS 12, para una ruta que no existe el
+    // error llega con `url` relativa al prefijo (/no-existe en vez de
+    // /api/no-existe). `originalUrl` es siempre la dirección completa pedida.
+    const ruta = request.originalUrl ?? request.url;
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let mensaje: string | string[] = 'Error interno del servidor';
@@ -47,26 +63,36 @@ export class FiltroExcepcionesHttp implements ExceptionFilter {
       // sin esto, un error de SQL solo se veia como "P2010" y era imposible
       // diagnosticarlo sin reproducirlo a mano.
       this.logger.error(
-        `${request.method} ${request.url} -> Prisma ${exception.code}: ${exception.message}`,
+        `${request.method} ${ruta} -> Prisma ${exception.code}: ${exception.message}`,
       );
+    } else if (esErrorDelCliente(exception)) {
+      // Los errores del lector del cuerpo (body-parser) no son HttpException:
+      // traen su código en `status`. Sin esto, mandar un archivo de más de
+      // 8 MB respondía 500, como si se hubiera roto el servidor.
+      statusCode = exception.status;
+      error = STATUS_CODES[statusCode] ?? error;
+      mensaje =
+        statusCode === HttpStatus.PAYLOAD_TOO_LARGE
+          ? 'Lo que se mandó es demasiado grande: el máximo son 8 MB.'
+          : exception.message;
     } else if (exception instanceof Error) {
       mensaje = exception.message;
     }
 
     if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
-        `${request.method} ${request.url} -> ${statusCode}`,
+        `${request.method} ${ruta} -> ${statusCode}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
       // Y aviso a Sentry, si está configurado (SENTRY_DSN en Render).
-      reportarError(exception, { metodo: request.method, ruta: request.url, estado: statusCode });
+      reportarError(exception, { metodo: request.method, ruta, estado: statusCode });
     }
 
     response.status(statusCode).json({
       statusCode,
       error,
       message: mensaje,
-      path: request.url,
+      path: ruta,
       timestamp: new Date().toISOString(),
     });
   }

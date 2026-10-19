@@ -44,6 +44,42 @@ describe('FiltroExcepcionesHttp - forma de la respuesta', () => {
     expect(cuerpo().timestamp).toBeTruthy();
   });
 
+  it('la ruta es la pedida entera, aunque `url` venga sin el prefijo /api', () => {
+    // Así llega desde NestJS 12 una ruta que no existe.
+    const { filtro } = armar();
+    const json = jest.fn();
+    const host = {
+      switchToHttp: () => ({
+        getResponse: () => ({ status: () => ({ json }) }),
+        getRequest: () => ({ method: 'GET', url: '/no-existe', originalUrl: '/api/no-existe' }),
+      }),
+    } as any;
+    filtro.catch(new NotFoundException('Cannot GET /api/no-existe'), host);
+    expect(json.mock.calls[0][0]).toMatchObject({ statusCode: 404, path: '/api/no-existe' });
+  });
+
+  it('un cuerpo demasiado grande es un 413 del cliente, no un 500', () => {
+    // Así lo lanza body-parser cuando se pasa del límite de 8 MB.
+    const demasiado = Object.assign(new Error('request entity too large'), {
+      status: 413,
+      expose: true,
+    });
+    const { filtro, host, status, cuerpo, errores } = armar();
+    filtro.catch(demasiado, host);
+    expect(status).toHaveBeenCalledWith(HttpStatus.PAYLOAD_TOO_LARGE);
+    expect(cuerpo()).toMatchObject({
+      error: 'Payload Too Large',
+      message: expect.stringMatching(/8 MB/),
+    });
+    expect(errores).toHaveLength(0); // no se loguea como falla del servidor
+  });
+
+  it('un error cualquiera sin código del cliente sigue siendo 500', () => {
+    const { filtro, host, status } = armar();
+    filtro.catch(Object.assign(new Error('se rompió algo'), { status: 413 }), host); // sin expose
+    expect(status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+  });
+
   it('conserva el mensaje de las excepciones de negocio', () => {
     const { filtro, host, cuerpo } = armar();
     filtro.catch(new BadRequestException('Stock insuficiente: hay 5'), host);
