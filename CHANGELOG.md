@@ -4,6 +4,16 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.4.0] — 2026-10-19
+
+### Agregado
+
+- **Foto del material.** Cada material puede tener una foto, para reconocer en el estante los
+  repuestos que por el nombre solo no se sabe qué son. Se pone, se cambia o se saca desde la
+  ficha (permiso de editar materiales).
+- **Último inventario.** La ficha del material dice cuándo se lo contó por última vez: en qué
+  toma, cuánto se contó y cuánto figuraba. Un ajuste cargado a mano también cuenta.
+
 ## [1.3.0] — 2026-10-16
 
 ### Cambiado
@@ -66,6 +76,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.4.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.4.0
 [1.3.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.3.0
 [1.2.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.2.0
 [1.1.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.1.0
