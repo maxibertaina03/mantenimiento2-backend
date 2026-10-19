@@ -64,7 +64,7 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 | Capa | Tecnología |
 |---|---|
 | Frontend | React 18, TypeScript, Vite, React Router, TanStack React Query, jsPDF (PDFs), Clerk (login), Sentry |
-| Backend | Node 22, NestJS 10, TypeScript, Prisma 5 (acceso a la base), class-validator, Clerk, Nodemailer / Brevo, Sentry |
+| Backend | Node 24, NestJS 12 (sobre Express 5), TypeScript 5, Prisma 5 (acceso a la base), class-validator, Clerk, Nodemailer / Brevo, Sentry; tests con Jest 30 |
 | Base | PostgreSQL (Supabase) |
 | Tests | Jest (backend), Vitest + Testing Library (frontend), Postgres real en el CI |
 
@@ -322,10 +322,12 @@ Cada ruta pide su permiso (`RutaConPermiso`). Lo que el usuario no puede usar no
 
 | Tipo | Dónde | Cuántos | Qué prueban |
 |---|---|---|---|
-| Unitarios (backend) | `src/**/*.spec.ts` | 1.116 | Reglas del dominio y casos de uso, con dobles en memoria |
+| Unitarios (backend) | `src/**/*.spec.ts` | 1.179 | Reglas del dominio y casos de uso, con dobles en memoria |
 | De punta a punta (backend) | `test/*.e2e-spec.ts` | 194 | La API por HTTP, con la app real y una base en memoria |
-| De integración (backend) | `test/integracion/` | 20 | Calendario, planes, compras y servicio externo contra un **Postgres real y vacío** |
-| Frontend | `src/**/*.test.tsx` | 591 | Pantallas y componentes, como los usa una persona |
+| De integración (backend) | `test/integracion/` | 24 | Calendario, planes, compras y servicio externo contra un **Postgres real y vacío** |
+| Frontend | `src/**/*.test.tsx` | 610 | Pantallas y componentes, como los usa una persona |
+
+Se corren con `npm test`, `npm run test:e2e` y `npm run test:integracion`, no con `npx jest` a secas: NestJS 12 viene como ESM y Jest 30 solo lo carga si Node arranca con `--experimental-vm-modules`, que los scripts ya ponen.
 
 Los tests de integración tienen una guardia: solo corren contra una base local o la del CI, cuyo nombre termine en `_integracion`. Nunca pueden tocar producción.
 
@@ -392,7 +394,8 @@ Los valores no se escriben en ningún lado del código. Viven en el panel de Ren
 
 ## 7. Pendientes conocidos
 
-- **Dependencias con salto de versión:** NestJS 12 (backend), jsPDF 4 y React Router 7 (frontend) cierran las alertas de seguridad que quedan. Ninguna es grave para cómo se usa el sistema, pero conviene hacerlo como un proyecto propio, probando la API y los PDF.
+- **TypeScript 6 y el CLI de Nest 12:** el sistema corre sobre NestJS 12, pero `@nestjs/cli` y `@nestjs/schematics` (solo compilan y generan archivos) quedaron en la 11, porque la 12 exige TypeScript 6. No tienen alertas de seguridad.
+- **Sentry 10/11:** las 19 alertas moderadas que quedan en el backend vienen de `@sentry/node` 9. Conviene subirlo cuando se cargue `SENTRY_DSN`, así se prueba de verdad.
 - **Sentry:** cargar `SENTRY_DSN` en Render y `VITE_SENTRY_DSN` en Vercel.
 - **Pasar los dos repos de GitHub a privados.** Hoy son públicos: se ve el código (no hay claves en el historial; se revisó entero).
 - **Tabla `Intervencion`:** se puede borrar en una migración propia y ensayada, si algún día se quiere.

@@ -33,7 +33,7 @@ La descripción completa —contextos, tablas, pantallas, permisos, procesos aut
 
 ## Stack
 
-Node 22 · NestJS 10 · TypeScript · Prisma 5 · PostgreSQL · Clerk (login) · Brevo (correo) ·
+Node 24 · NestJS 12 · TypeScript · Prisma 5 · PostgreSQL · Clerk (login) · Brevo (correo) ·
 Supabase Storage (archivos) · Sentry · Jest
 
 ## Arquitectura en una línea
@@ -58,7 +58,7 @@ docs/               documentación técnica
 
 ## Levantarlo en una máquina
 
-Hace falta **Node 22** y un **PostgreSQL local** (por ejemplo, `mantenimiento`).
+Hace falta **Node 24** y un **PostgreSQL local** (por ejemplo, `mantenimiento`).
 
 ```bash
 npm ci
