@@ -1,5 +1,6 @@
 import { Decimal } from '../../../common/dominio/decimal';
 import { MotivoMovimiento, TipoMovimiento } from '../dominio/movimiento';
+import { AjusteManual, ConteoEnToma } from '../dominio/ultimo-inventario';
 
 /**
  * Puerto del repositorio de materiales.
@@ -22,6 +23,7 @@ export interface MaterialConRelaciones {
   estanteriaId: string | null;
   fila: number | null;
   qrGeneradoEn: Date | null;
+  fotoUrl: string | null;
   notas: string | null;
   creadoEn: Date;
   actualizadoEn: Date;
@@ -103,6 +105,8 @@ export interface CambiosMaterial {
   estanteriaId?: string | null;
   fila?: number | null;
   activo?: boolean;
+  /** `null` le saca la foto. */
+  fotoUrl?: string | null;
 }
 
 export interface RepositorioMateriales {
@@ -131,4 +135,11 @@ export interface RepositorioMateriales {
   /** `soloSinUnidad` completa los huecos sin pisar lo corregido a mano. */
   asignarUnidadMasiva(unidadId: string, soloSinUnidad: boolean): Promise<number>;
   contarMovimientos(id: string): Promise<number>;
+  /**
+   * El último conteo del material en una toma confirmada, y el último AJUSTE
+   * cargado a mano. Decide cuál vale el dominio.
+   */
+  buscarUltimosConteos(
+    id: string,
+  ): Promise<{ toma: ConteoEnToma | null; ajuste: AjusteManual | null }>;
 }

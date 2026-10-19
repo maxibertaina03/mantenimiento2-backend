@@ -129,13 +129,14 @@ El backend está partido en **cinco contextos** (*bounded contexts*). Cada uno e
 
 Materiales, stock y movimientos.
 
-- **Materiales:** nombre, categoría, unidad de medida, ubicación (estantería y fila), stock actual y mínimo, QR. Un material con historia no se borra: se desactiva y conserva su historial.
+- **Materiales:** nombre, categoría, unidad de medida, ubicación (estantería y fila), stock actual y mínimo, QR y una **foto** para reconocerlo en el estante (`Material.fotoUrl`, en el mismo bucket público que las de los equipos, carpeta `materiales/`). Un material con historia no se borra: se desactiva y conserva su historial.
+- **Último inventario:** la ficha dice cuándo se contó el material por última vez: el renglón más reciente de una toma confirmada (ajustado o sin diferencia) o un AJUSTE cargado a mano, lo que sea más nuevo. Lo contado sin confirmar o para recontar no cuenta.
 - **Movimientos:** cada entrada, salida o ajuste. El stock se calcula con ellos. Un movimiento se puede corregir y la corrección queda auditada (`EdicionMovimiento`).
 - **Regla de la fecha de ajuste:** no se puede cargar un movimiento con fecha anterior al último ajuste de inventario de ese material, porque desarmaría el conteo.
 - **Avisos de bajo stock:** materiales por debajo del mínimo y cobertura de alertas.
 - **Toma de inventario** (`TomaInventario`, `RenglonToma`): se abre sobre una categoría, una estantería o todo el pañol (TI-2026-0001) con un renglón por material en uso. Se cuenta desde el celular (a ciegas: no se muestra cuánto figura) o con la planilla impresa, y pueden contar varias personas a la vez. Al **confirmar**, cada diferencia genera un AJUSTE por el camino de siempre, con la nota de la toma. Si un material tuvo movimientos después de contarlo, no se ajusta: queda para **volver a contar**. La toma sigue abierta mientras falte contar, así se cuenta por tandas; «Cerrar la toma» la termina y lo no contado no se toca. Se anula solo si no ajustó nada.
 - **Puerta pública:** `MaterialesService` y `MovimientosStockService`, que usan compras (al recibir) y trabajos (al usar materiales).
-- **Endpoints:** `/api/materiales…`, `/api/movimientos…`, `/api/tomas-inventario…` (abrir, `/:id/renglones/:renglonId` para contar, `/:id/confirmar`, `/:id/cerrar`, `/:id/anular`).
+- **Endpoints:** `/api/materiales…` (con `/:id/foto` para ponerla o sacarla y `/fotos/estado`), `/api/movimientos…`, `/api/tomas-inventario…` (abrir, `/:id/renglones/:renglonId` para contar, `/:id/confirmar`, `/:id/cerrar`, `/:id/anular`).
 
 #### Compras (`contextos/compras`)
 
@@ -279,7 +280,7 @@ mantenimiento2-frontend/src/
 |---|---|---|
 | `/inicio` | Hoy | Las tareas de cada uno y una tarjeta por cada cosa pendiente (equipos parados, services, talleres externos, reponer, mercadería por llegar, órdenes sin enviar); tocando una se ve su lista |
 | `/materiales` | Materiales | Buscar y filtrar el pañol, editar, imprimir QR de estantes |
-| `/materiales/:id` | Detalle de material | Ficha, historial de movimientos y equipos que lo usan |
+| `/materiales/:id` | Detalle de material | Ficha con su foto y la fecha del último inventario, historial de movimientos y equipos que lo usan |
 | `/movimientos` | Historial | Todas las entradas y salidas, con su corrección auditada |
 | `/movimientos/nuevo` | Nuevo movimiento | Cargar entradas y salidas, también con el lector de QR |
 | `/inventario` | Toma de inventario | Abrir una toma, contar (también escaneando el QR), ver diferencias, confirmar; planilla e informe en PDF |

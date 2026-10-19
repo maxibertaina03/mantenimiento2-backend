@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { FotoMaterial } from '../aplicacion/foto-material';
+import { ALMACEN_FOTOS_MATERIALES, AlmacenFotosMateriales } from '../puertos/almacen-fotos';
 import { CONSULTA_CATALOGOS } from '../puertos/consulta-catalogos';
-import { REPOSITORIO_MATERIALES } from '../puertos/repositorio-materiales';
+import { REPOSITORIO_MATERIALES, RepositorioMateriales } from '../puertos/repositorio-materiales';
 import { REPOSITORIO_MOVIMIENTOS } from '../puertos/repositorio-movimientos';
 import { REPOSITORIO_TOMAS } from '../puertos/repositorio-tomas';
 import { InventarioController, TomasInventarioService } from './inventario/inventario.controller';
@@ -8,6 +10,7 @@ import { PrismaRepositorioTomas } from './inventario/prisma-repositorio-tomas';
 import { MaterialesController } from './materiales/materiales.controller';
 import { MaterialesService } from './materiales/materiales.service';
 import { PrismaRepositorioMateriales } from './materiales/prisma-repositorio-materiales';
+import { SupabaseAlmacenFotosMateriales } from './materiales/supabase-almacen-fotos';
 import { MovimientosStockController } from './movimientos/movimientos-stock.controller';
 import { MovimientosStockService } from './movimientos/movimientos-stock.service';
 import { PrismaRepositorioMovimientos } from './movimientos/prisma-repositorio-movimientos';
@@ -38,6 +41,13 @@ import { PrismaConsultaCatalogos } from './prisma-consulta-catalogos';
     { provide: CONSULTA_CATALOGOS, useClass: PrismaConsultaCatalogos },
     { provide: REPOSITORIO_TOMAS, useClass: PrismaRepositorioTomas },
     TomasInventarioService,
+    { provide: ALMACEN_FOTOS_MATERIALES, useClass: SupabaseAlmacenFotosMateriales },
+    {
+      provide: FotoMaterial,
+      useFactory: (repo: RepositorioMateriales, almacen: AlmacenFotosMateriales) =>
+        new FotoMaterial(repo, almacen),
+      inject: [REPOSITORIO_MATERIALES, ALMACEN_FOTOS_MATERIALES],
+    },
   ],
   exports: [MaterialesService, MovimientosStockService],
 })

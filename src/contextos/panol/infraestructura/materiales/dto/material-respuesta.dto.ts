@@ -60,6 +60,12 @@ export class MaterialRespuestaDto {
   })
   qrGeneradoEn!: Date | null;
 
+  @ApiPropertyOptional({
+    description: 'La foto para reconocerlo en el estante. null = no tiene.',
+    nullable: true,
+  })
+  fotoUrl!: string | null;
+
   @ApiPropertyOptional({ nullable: true })
   notas!: string | null;
 
@@ -89,6 +95,7 @@ export class MaterialRespuestaDto {
       estanteriaNombre: m.estanteria?.nombre ?? null,
       fila: m.fila,
       qrGeneradoEn: m.qrGeneradoEn,
+      fotoUrl: m.fotoUrl,
       notas: m.notas,
       creadoEn: m.creadoEn,
       actualizadoEn: m.actualizadoEn,

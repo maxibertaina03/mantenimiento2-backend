@@ -234,6 +234,11 @@ model Material {
   /// quedan sin pegar en el estante.
   qrGeneradoEn DateTime?
 
+  /// Una foto para reconocerlo en el estante: hay repuestos que por el nombre
+  /// solo no se sabe qué son. Va al mismo almacén público que las de los
+  /// equipos; vacía, no tiene.
+  fotoUrl String?
+
   notas         String?
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt

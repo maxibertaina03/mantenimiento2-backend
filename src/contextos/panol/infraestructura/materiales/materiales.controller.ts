@@ -12,6 +12,10 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FotoMaterial } from '../../aplicacion/foto-material';
+import { traducirErrores } from '../traducir-errores';
+import { CambiarFotoMaterialDto } from './dto/cambiar-foto-material.dto';
+import { MaterialRespuestaDto } from './dto/material-respuesta.dto';
 import { AsignarUnidadMasivaDto } from './dto/asignar-unidad-masiva.dto';
 import { CrearMaterialDto } from './dto/crear-material.dto';
 import { MarcarQrMaterialesDto } from './dto/marcar-qr.dto';
@@ -24,7 +28,10 @@ import { PERMISOS } from '../../../../common/auth/permisos';
 @ApiTags('Materiales')
 @Controller('materiales')
 export class MaterialesController {
-  constructor(private readonly service: MaterialesService) {}
+  constructor(
+    private readonly service: MaterialesService,
+    private readonly foto: FotoMaterial,
+  ) {}
 
   @Permisos(PERMISOS.MATERIALES_EDITAR)
   @Post()
@@ -84,6 +91,36 @@ export class MaterialesController {
   @ApiOperation({ summary: 'Asignar una unidad por defecto a los materiales que no tienen' })
   asignarUnidadMasiva(@Body() dto: AsignarUnidadMasivaDto) {
     return this.service.asignarUnidadMasiva(dto);
+  }
+
+  // Declarada ANTES de @Get(':id') o la ruta la tomaría como un id.
+  @Permisos(PERMISOS.MATERIALES_VER)
+  @Get('fotos/estado')
+  @ApiOperation({
+    summary: 'Si la carga de fotos está disponible',
+    description: 'La pantalla oculta la carga de la foto cuando no lo está.',
+  })
+  estadoFotos() {
+    return { disponible: this.foto.estaDisponible() };
+  }
+
+  @Permisos(PERMISOS.MATERIALES_EDITAR)
+  @Post(':id/foto')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Poner o cambiar la foto de un material' })
+  cambiarFoto(@Param('id', ParseUUIDPipe) id: string, @Body() dto: CambiarFotoMaterialDto) {
+    return traducirErrores(async () =>
+      MaterialRespuestaDto.desde(
+        await this.foto.cambiar(id, Buffer.from(dto.imagenBase64, 'base64'), dto.nombreArchivo),
+      ),
+    );
+  }
+
+  @Permisos(PERMISOS.MATERIALES_EDITAR)
+  @Delete(':id/foto')
+  @ApiOperation({ summary: 'Sacarle la foto a un material' })
+  quitarFoto(@Param('id', ParseUUIDPipe) id: string) {
+    return traducirErrores(async () => MaterialRespuestaDto.desde(await this.foto.quitar(id)));
   }
 
   @Permisos(PERMISOS.MATERIALES_VER)

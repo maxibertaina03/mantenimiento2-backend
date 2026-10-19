@@ -81,6 +81,33 @@ describe('Toma de inventario (integración, Postgres real)', () => {
     expect(await stock(ids.cinta)).toBe(7); // la salida quedó; no se pisó
     expect(conf.body.toma.estado).toBe('ABIERTA');
 
+    // La ficha de cada material dice cuándo se lo contó por última vez.
+    const ultimo = async (materialId: string) =>
+      (await t.http.get(`/api/materiales/${materialId}/historial`).expect(200)).body
+        .ultimoInventario;
+    expect(await ultimo(ids.cable)).toEqual(
+      expect.objectContaining({
+        origen: 'TOMA',
+        tomaNumero: toma.body.numero,
+        contado: 7,
+        figuraba: 10,
+        resultado: 'AJUSTADO',
+      }),
+    );
+    expect(await ultimo(ids.llave)).toEqual(
+      expect.objectContaining({ origen: 'TOMA', resultado: 'SIN_DIFERENCIA' }),
+    );
+    // Contada pero para recontar: ese número no se aceptó, así que nunca se contó.
+    expect(await ultimo(ids.cinta)).toBeNull();
+    // Un ajuste cargado a mano también es haberlo contado.
+    await t.http
+      .post('/api/movimientos')
+      .send({ materialId: ids.ruleman, tipo: 'AJUSTE', motivo: 'AJUSTE', cantidad: 4 })
+      .expect(201);
+    expect(await ultimo(ids.ruleman)).toEqual(
+      expect.objectContaining({ origen: 'AJUSTE', contado: 4, tomaNumero: null }),
+    );
+
     // El ajuste quedó en el historial como cualquier otro, con la nota de la toma.
     const ajuste = await t.prisma.movimientoStock.findFirstOrThrow({
       where: { materialId: ids.cable, tipo: 'AJUSTE' },
