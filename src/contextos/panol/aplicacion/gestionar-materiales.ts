@@ -7,6 +7,7 @@ import {
   validarNombreLibre,
   validarUbicacion,
 } from '../dominio/material';
+import { UltimoInventario, ultimoInventario } from '../dominio/ultimo-inventario';
 import { ConsultaCatalogos } from '../puertos/consulta-catalogos';
 import { Reloj, relojDelSistema } from '../puertos/reloj';
 import {
@@ -119,10 +120,14 @@ export class GestionarMateriales {
     return material;
   }
 
-  async obtenerConHistorial(id: string): Promise<MaterialConHistorial> {
+  /** La ficha: con su historial y la última vez que se lo contó. */
+  async obtenerConHistorial(
+    id: string,
+  ): Promise<MaterialConHistorial & { ultimoInventario: UltimoInventario | null }> {
     const material = await this.repo.buscarConHistorial(id);
     if (!material) throw new ErrorNoEncontrado(`No existe el material con id ${id}`);
-    return material;
+    const { toma, ajuste } = await this.repo.buscarUltimosConteos(id);
+    return { ...material, ultimoInventario: ultimoInventario(toma, ajuste) };
   }
 
   listarBajoStock(): Promise<MaterialConRelaciones[]> {

@@ -11,6 +11,7 @@ import {
   OrdenMateriales,
   RepositorioMateriales,
 } from '../../puertos/repositorio-materiales';
+import { AjusteManual, ConteoEnToma } from '../../dominio/ultimo-inventario';
 
 /**
  * Traduce el filtro del pañol al `where` de Prisma.
@@ -110,6 +111,7 @@ export function aDatosDeCambio(cambios: CambiosMaterial): Prisma.MaterialUpdateI
       : {}),
     ...(cambios.fila !== undefined ? { fila: cambios.fila } : {}),
     ...(cambios.activo !== undefined ? { activo: cambios.activo } : {}),
+    ...(cambios.fotoUrl !== undefined ? { fotoUrl: cambios.fotoUrl } : {}),
   };
 }
 
@@ -263,5 +265,54 @@ export class PrismaRepositorioMateriales implements RepositorioMateriales {
 
   contarMovimientos(id: string): Promise<number> {
     return this.prisma.movimientoStock.count({ where: { materialId: id } });
+  }
+
+  async buscarUltimosConteos(
+    id: string,
+  ): Promise<{ toma: ConteoEnToma | null; ajuste: AjusteManual | null }> {
+    const [renglon, movimiento] = await Promise.all([
+      // Solo lo confirmado: un número contado sin aceptar todavía no es inventario.
+      this.prisma.renglonToma.findFirst({
+        where: {
+          materialId: id,
+          resultado: { in: ['AJUSTADO', 'SIN_DIFERENCIA'] },
+          contadoEn: { not: null },
+          contado: { not: null },
+        },
+        orderBy: { contadoEn: 'desc' },
+        include: {
+          toma: { select: { numero: true } },
+          contadoPor: { select: { nombre: true } },
+        },
+      }),
+      // Los AJUSTE de una toma ya están arriba; acá van los cargados a mano.
+      this.prisma.movimientoStock.findFirst({
+        where: { materialId: id, tipo: 'AJUSTE', ajusteDeToma: null },
+        orderBy: { fecha: 'desc' },
+        include: { usuario: { select: { nombre: true } } },
+      }),
+    ]);
+
+    return {
+      toma:
+        renglon && renglon.contadoEn && renglon.contado && renglon.resultado
+          ? {
+              fecha: renglon.contadoEn,
+              tomaId: renglon.tomaId,
+              tomaNumero: renglon.toma.numero,
+              contado: renglon.contado,
+              figuraba: renglon.stockAlContar,
+              resultado: renglon.resultado,
+              porNombre: renglon.contadoPor?.nombre ?? null,
+            }
+          : null,
+      ajuste: movimiento
+        ? {
+            fecha: movimiento.fecha,
+            cantidad: movimiento.cantidad,
+            porNombre: movimiento.usuario?.nombre ?? null,
+          }
+        : null,
+    };
   }
 }

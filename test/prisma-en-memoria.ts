@@ -56,6 +56,9 @@ export function crearPrismaEnMemoria() {
     ordenesTrabajo: [] as any[],
     materialesUsados: [] as any[],
     contadores: [] as any[],
+    // Las tomas de inventario se prueban contra Postgres; acá alcanza con que
+    // la ficha del material pueda preguntar y no encuentre ninguna.
+    renglonesToma: [] as any[],
     permisosRol: [] as any[],
     // Marca, modelo y ubicacion dejaron de ser texto libre y pasaron a ser
     // catalogos compartidos con los equipos de planta. El fake no los tenia, y
@@ -683,6 +686,7 @@ export function crearPrismaEnMemoria() {
       telefono: null,
       notas: null,
     })),
+    renglonToma: delegate(db.renglonesToma),
     movimientoStock: delegate(db.movimientos, () => ({
       fecha: new Date(),
       proveedorId: null,
