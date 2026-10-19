@@ -7,6 +7,11 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2021",
+    // Lo que Node 24 ya trae (Array#at, Object.hasOwn…). Antes lo declaraban
+    // los tipos de Node 20; los de 24 lo dejan en manos de `lib`. El `target`
+    // no se sube a propósito: cambiaría cómo se compilan los campos de clase,
+    // que los decoradores de Nest leen.
+    "lib": ["ES2022"],
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
