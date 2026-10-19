@@ -72,8 +72,10 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Repo | Código | Tests |
 |---|---|---|
-| Backend | 5 contextos, 43 tablas, 41 migraciones | 1.164 unitarios, 194 de punta a punta, 24 de integración |
-| Frontend | 18 pantallas | 604 tests |
+| Backend | 5 contextos, 43 tablas, 42 migraciones | 1.176 unitarios, 194 de punta a punta, 24 de integración |
+| Frontend | 18 pantallas | 610 tests |
+
+Números de la v1.4.1 (2026-10-19).
 
 ---
 
@@ -283,7 +285,8 @@ mantenimiento2-frontend/src/
 | `/materiales/:id` | Detalle de material | Ficha con su foto y la fecha del último inventario, historial de movimientos y equipos que lo usan |
 | `/movimientos` | Historial | Todas las entradas y salidas, con su corrección auditada |
 | `/movimientos/nuevo` | Nuevo movimiento | Cargar entradas y salidas, también con el lector de QR |
-| `/inventario` | Toma de inventario | Abrir una toma, contar (también escaneando el QR), ver diferencias, confirmar; planilla e informe en PDF |
+| `/inventario` | Tomas de inventario | La lista de tomas y «Nueva toma» (por categoría, estantería o todo el pañol) |
+| `/inventario/:id` | Una toma | Contar (también escaneando el QR), ver diferencias, confirmar, cerrar o anular; planilla para contar e informe en PDF |
 | `/calendario` | Calendario | Mes con tareas por persona, rutinas, nuevas tareas, imprimir por semana o por mes |
 | `/ordenes-trabajo` | Órdenes de trabajo | Abrir, cargar materiales, cerrar, reabrir, imprimir; mandarla a un taller y registrar la vuelta. Filtro «En talleres externos» (`?afuera=1`) |
 | `/ordenes-compra` | Órdenes de compra | Crear, emitir, enviar, recibir en partes, reclamar lo que falta, precios, comprobantes, PDF |
@@ -343,7 +346,7 @@ Los tests de integración tienen una guardia: solo corren contra una base local 
 | Workflow | Cuándo | Estado |
 |---|---|---|
 | `ci.yml` | En cada push y pull request | Activo |
-| `backup-produccion.yml` | Todas las noches a las 03:00 | **Pendiente:** faltan 3 claves (ver `docs/backups.md`) |
+| `backup-produccion.yml` | Todas las noches a las 03:00 | Activo desde 2026-10-14: copia cifrada a Google Drive (ver `docs/backups.md`) |
 | `avisos-mantenimiento.yml` | 07:00, correo con los servicios que vencen | Apagado a pedido; se dispara a mano |
 
 ### 5.4 Scripts útiles (`scripts/`)
@@ -357,6 +360,11 @@ Los tests de integración tienen una guardia: solo corren contra una base local 
 | `caracterizar-compras.mjs`, `caracterizar-panol.mjs` | Graban las respuestas de la API para comparar antes y después de un cambio. |
 | `restaurar-backup.mjs` | Descifra un backup y lo restaura, solo en la base local. |
 | `guardia-entorno.js` | Bloquea los comandos peligrosos de Prisma si la base no es local. |
+| `verificar-repositorios.mjs` | Escribe y lee contra Postgres dentro de una transacción que se deshace, para comprobar que lo que se guarda vuelve igual. |
+| `permisos-actuales.mjs` | Muestra qué permisos tiene cada rol, leídos de la base. Solo lee. |
+| `verificar-commits.mjs` | Revisa que los commits tengan el formato acordado. Lo corre también el CI. |
+
+`scripts/historicos/` guarda los arreglos de una sola vez que ya se aplicaron (borrar una orden, clasificar equipos, repartir permisos…). **No se vuelven a correr**: su README dice qué hizo cada uno.
 
 ### 5.5 Variables de entorno
 
@@ -384,7 +392,7 @@ Los valores no se escriben en ningún lado del código. Viven en el panel de Ren
 
 ## 7. Pendientes conocidos
 
-- **Activar el backup nocturno:** cargar `RCLONE_CONFIG`, `DIRECT_URL_PRODUCCION` y `CLAVE_BACKUP` en GitHub, siguiendo `docs/backups.md`. Hoy no hay copia de producción.
+- **Dependencias con salto de versión:** NestJS 12 (backend), jsPDF 4 y React Router 7 (frontend) cierran las alertas de seguridad que quedan. Ninguna es grave para cómo se usa el sistema, pero conviene hacerlo como un proyecto propio, probando la API y los PDF.
 - **Sentry:** cargar `SENTRY_DSN` en Render y `VITE_SENTRY_DSN` en Vercel.
 - **Pasar los dos repos de GitHub a privados.** Hoy son públicos: se ve el código (no hay claves en el historial; se revisó entero).
 - **Tabla `Intervencion`:** se puede borrar en una migración propia y ensayada, si algún día se quiere.

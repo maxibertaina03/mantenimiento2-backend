@@ -4,6 +4,22 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.4.1] — 2026-10-19
+
+### Seguridad
+
+- Dependencias al día sin cambios de comportamiento: `proxy-addr` (vulnerabilidad crítica),
+  `brace-expansion` y `nodemailer` 10, que envía los correos cuando no se usa Brevo.
+
+### Cambiado
+
+- Los scripts de arreglos de una sola vez, ya aplicados, pasaron a `scripts/historicos/` con
+  una nota de qué hizo cada uno y la advertencia de no volver a correrlos.
+
+### Documentación
+
+- Los números del sistema, la pantalla de una toma de inventario y los scripts que faltaban.
+
 ## [1.4.0] — 2026-10-19
 
 ### Agregado
@@ -76,6 +92,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.4.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.4.1
 [1.4.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.4.0
 [1.3.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.3.0
 [1.2.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.2.0
