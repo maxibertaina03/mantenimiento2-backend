@@ -60,7 +60,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
 
       - name: Instalar dependencias
@@ -82,15 +82,18 @@ jobs:
       - name: Compilar
         run: npx tsc --noEmit -p tsconfig.json
 
+      # Los tests van por los scripts de package.json: Jest 30 necesita que Node
+      # arranque con --experimental-vm-modules para cargar NestJS 12, que viene
+      # como ESM, y la opción está definida ahí una sola vez.
       - name: Tests unitarios
-        run: npx jest --ci
+        run: npm test -- --ci
 
       - name: Tests de punta a punta
-        run: npx jest --ci --config ./test/jest-e2e.js
+        run: npm run test:e2e -- --ci
 
       - name: Tests de integración (Postgres real, vacío)
         # Aplica las migraciones a la base del servicio de arriba y prueba el
         # calendario, los planes y los trabajos con consultas de verdad.
-        run: npx jest --ci --config ./test/integracion/jest-integracion.js
+        run: npm run test:integracion -- --ci
         env:
           INTEGRACION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mantenimiento_integracion
