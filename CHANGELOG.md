@@ -4,6 +4,15 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.5.1] — 2026-10-20
+
+### Cambiado (para quien desarrolla)
+
+- **npm fijado en 11.19 o más nuevo** (`engines` + `.npmrc` con `engine-strict`), y
+  `packageManager: npm@11.19.1`. Con un npm más viejo el `package-lock.json` sale distinto al
+  que espera el CI y `npm ci` falla en GitHub; ahora npm se niega a instalar y dice qué
+  versión hace falta.
+
 ## [1.5.0] — 2026-10-19
 
 ### Seguridad
@@ -117,6 +126,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.5.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.1
 [1.5.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.0
 [1.4.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.4.1
 [1.4.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.4.0
