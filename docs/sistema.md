@@ -63,10 +63,10 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | React 18, TypeScript, Vite, React Router, TanStack React Query, jsPDF (PDFs), Clerk (login), Sentry |
+| Frontend | React 18, TypeScript, Vite, React Router 7, TanStack React Query, jsPDF 4 (PDFs), Clerk (login), Sentry; se compila con Node 24 |
 | Backend | Node 24, NestJS 12 (sobre Express 5), TypeScript 5, Prisma 5 (acceso a la base), class-validator, Clerk, Nodemailer / Brevo, Sentry; tests con Jest 30 |
 | Base | PostgreSQL (Supabase) |
-| Tests | Jest (backend), Vitest + Testing Library (frontend), Postgres real en el CI |
+| Tests | Jest 30 (backend), Vitest + Testing Library (frontend), Postgres real en el CI |
 
 ### Tamaño
 
@@ -341,6 +341,7 @@ Los tests de integración tienen una guardia: solo corren contra una base local 
   3. pull request `develop` → `main`, con el resumen de lo que entra;
   4. al mergearlo, Render y Vercel despliegan solos;
   5. se marca la versión: tag `vX.Y.Z` y Release en GitHub, con la entrada del `CHANGELOG.md`.
+- **Node 24 y npm 11.19 en todos lados** (las PCs, el CI, Render y Vercel). `engines` y el `.npmrc` (`engine-strict`) hacen que npm se niegue a instalar con una versión más vieja: el `package-lock.json` que arma no coincide con el del CI y `npm ci` falla en GitHub aunque localmente ande. Es un mínimo y no una versión exacta, para que Render y Vercel puedan traer un npm más nuevo.
 - **Ver qué versión corre:** en `/docs-json`, el campo `info.version` dice la versión y el commit que están corriendo en producción.
 
 ### 5.3 Procesos automáticos (`.github/workflows`)
@@ -395,8 +396,9 @@ Los valores no se escriben en ningún lado del código. Viven en el panel de Ren
 ## 7. Pendientes conocidos
 
 - **TypeScript 6 y el CLI de Nest 12:** el sistema corre sobre NestJS 12, pero `@nestjs/cli` y `@nestjs/schematics` (solo compilan y generan archivos) quedaron en la 11, porque la 12 exige TypeScript 6. No tienen alertas de seguridad.
-- **Sentry 10/11:** las 19 alertas moderadas que quedan en el backend vienen de `@sentry/node` 9. Conviene subirlo cuando se cargue `SENTRY_DSN`, así se prueba de verdad.
-- **Sentry:** cargar `SENTRY_DSN` en Render y `VITE_SENTRY_DSN` en Vercel.
+- **Sentry:** cargar `SENTRY_DSN` en Render y `VITE_SENTRY_DSN` en Vercel, y en ese momento subir `@sentry/node` de la 9 a la actual: de ahí vienen las 19 alertas moderadas que quedan en el backend, y con el DSN cargado se prueba de verdad.
+- **pnpm en vez de npm:** más estricto (no deja usar un paquete sin declararlo, como pasó con `dotenv`), más rápido, y no corre scripts de instalación sin autorizarlos. Conviene hacerlo junto con TypeScript 6 y el CLI de Nest 12, como una sola tanda de herramientas: toca el CI, Render y Vercel.
+- **Scripts de instalación:** npm 11.19 avisa que esbuild, core-js y @clerk/shared corren scripts al instalarse sin estar autorizados. Hoy es solo un aviso; una versión futura de npm (o pnpm) los bloquea por defecto, y esbuild lo necesita para compilar las pantallas. Hay que autorizarlos explícitamente.
 - **Pasar los dos repos de GitHub a privados.** Hoy son públicos: se ve el código (no hay claves en el historial; se revisó entero).
 - **Tabla `Intervencion`:** se puede borrar en una migración propia y ensayada, si algún día se quiere.
 

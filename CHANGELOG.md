@@ -4,6 +4,14 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.5.2] — 2026-10-20
+
+### Documentación
+
+- `docs/sistema.md` al día con las actualizaciones de octubre: versiones del frontend (React
+  Router 7, jsPDF 4), Node 24 y npm 11.19 en todos lados y por qué, y los pendientes nuevos
+  (pnpm, autorizar los scripts de instalación; Sentry en un solo punto).
+
 ## [1.5.1] — 2026-10-20
 
 ### Cambiado (para quien desarrolla)
@@ -126,6 +134,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.5.2]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.2
 [1.5.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.1
 [1.5.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.0
 [1.4.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.4.1
