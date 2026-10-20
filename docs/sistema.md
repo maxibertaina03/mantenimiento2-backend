@@ -63,7 +63,7 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | React 18, TypeScript, Vite, React Router 7, TanStack React Query, jsPDF 4 (PDFs), Clerk (login), Sentry; se compila con Node 24 |
+| Frontend | React 18, TypeScript, Vite, React Router 7, TanStack React Query, jsPDF 4 (PDFs), Lucide (íconos), Inter (tipografía), Clerk (login), Sentry; se compila con Node 24 |
 | Backend | Node 24, NestJS 12 (sobre Express 5), TypeScript 5, Prisma 5 (acceso a la base), class-validator, Clerk, Nodemailer / Brevo, Sentry; tests con Jest 30 |
 | Base | PostgreSQL (Supabase) |
 | Tests | Jest 30 (backend), Vitest + Testing Library (frontend), Postgres real en el CI |
@@ -303,6 +303,8 @@ Cada ruta pide su permiso (`RutaConPermiso`). Lo que el usuario no puede usar no
 
 ### 4.3 Cómo está hecho
 
+- **Diseño:** todo color, tamaño de letra, radio y sombra es una variable al principio de `src/index.css` (`--primario`, `--texto-sm`, `--radio`…). Para cambiar el aspecto del sistema se tocan esas variables, no cada pantalla; un color o tamaño nuevo se agrega ahí. La tipografía es Inter, incluida en el sistema (`@fontsource-variable/inter`). Los íconos son de Lucide (`lucide-react`) con la clase `icono`, nunca emojis: cada sistema operativo los dibuja distinto. Los carteles (`alerta-error`, `alerta-aviso`, `alerta-exito`) traen su ícono solos.
+- **Celular:** abajo de 768 px aparece la barra fija con los accesos de todos los días (`Layout.tsx`, `BARRA_INFERIOR`), las ventanas salen desde abajo, y las tablas con `tabla-cards` se ven como tarjetas: la primera celda es el título y cada `td` lleva `data-etiqueta` con el nombre de su columna.
 - **Datos:** cada recurso tiene su archivo en `api/`, con hooks de React Query (`useEquipos`, `useCrearOrden`, …). Los hooks guardan en caché, reintentan y refrescan solos después de un cambio.
 - **Listas con filtros:** Materiales y Equipos guardan el filtro, la búsqueda y la página en la dirección (`lib/listaEnUrl.ts`). Entrar a una ficha y volver deja la lista como estaba, y un enlace como `/equipos?estado=EN_REPARACION` abre la lista ya filtrada.
 - **Cliente HTTP:** `lib/apiClient.ts` agrega el token de Clerk, espera el arranque en frío de Render y muestra los errores de la API en castellano.
