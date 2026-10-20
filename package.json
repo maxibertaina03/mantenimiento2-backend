@@ -1,6 +1,6 @@
 {
   "name": "mantenimiento2-backend",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "API de gestión de mantenimiento (stock de materiales) - NestJS + Prisma",
   "private": true,
   "engines": {

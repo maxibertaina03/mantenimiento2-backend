@@ -4,6 +4,13 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.5.3] — 2026-10-20
+
+### Documentación
+
+- Cómo está hecho el diseño de las pantallas (variables, tipografía, íconos, celular), con el
+  rediseño del frontend v1.6.0.
+
 ## [1.5.2] — 2026-10-20
 
 ### Documentación
@@ -134,6 +141,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.5.3]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.3
 [1.5.2]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.2
 [1.5.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.1
 [1.5.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.0
