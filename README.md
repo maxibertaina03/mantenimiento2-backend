@@ -58,7 +58,9 @@ docs/               documentación técnica
 
 ## Levantarlo en una máquina
 
-Hace falta **Node 24** y un **PostgreSQL local** (por ejemplo, `mantenimiento`).
+Hace falta **Node 24** con **npm 11.19 o más nuevo** (`npm install -g npm@11.19.1`). npm se niega a instalar con
+una versión más vieja: el `package-lock.json` que arma no coincide con el del CI y `npm ci` falla en
+GitHub aunque acá ande. Y un **PostgreSQL local** (por ejemplo, `mantenimiento`).
 
 ```bash
 npm ci
