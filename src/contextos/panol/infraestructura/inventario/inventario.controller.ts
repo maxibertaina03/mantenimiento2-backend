@@ -21,10 +21,12 @@ import {
 import type { Usuario } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -71,6 +73,20 @@ export class ContarDto {
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
   contado!: number | null;
+}
+
+export class ReubicarDto {
+  @ApiProperty({ format: 'uuid', description: 'La estantería donde quedó el material' })
+  @IsUUID()
+  estanteriaId!: string;
+
+  @ApiPropertyOptional({ nullable: true, example: 3, description: 'La fila. Vacía: no se sabe.' })
+  @ValidateIf((_, valor) => valor !== null && valor !== undefined)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(99)
+  fila?: number | null;
 }
 
 export class AnularTomaDto {
@@ -142,6 +158,31 @@ export class InventarioController {
   ) {
     return traducirErrores(() =>
       this.tomas.contar(id, renglonId, dto.contado, usuario?.id ?? null),
+    );
+  }
+
+  @Permisos(PERMISOS.INVENTARIO_CONTAR)
+  @Post(':id/renglones/:renglonId/reubicar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cambiar de lugar un material de la toma',
+    description:
+      'El material queda con la ubicación nueva en todo el sistema, y la toma guarda de dónde ' +
+      'a dónde se movió, quién y cuándo. Solo con la toma abierta.',
+  })
+  reubicar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('renglonId', ParseUUIDPipe) renglonId: string,
+    @Body() dto: ReubicarDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return traducirErrores(() =>
+      this.tomas.reubicar(
+        id,
+        renglonId,
+        { estanteriaId: dto.estanteriaId, fila: dto.fila ?? null },
+        usuario?.id ?? null,
+      ),
     );
   }
 

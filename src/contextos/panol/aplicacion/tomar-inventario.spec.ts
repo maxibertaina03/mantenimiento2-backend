@@ -11,6 +11,7 @@ import { Reloj } from '../puertos/reloj';
 import {
   RenglonConMaterial,
   RepositorioTomas,
+  ReubicacionConNombres,
   TomaConRelaciones,
 } from '../puertos/repositorio-tomas';
 import { RegistrarMovimientos } from './registrar-movimientos';
@@ -142,6 +143,7 @@ class TomasEnMemoria implements RepositorioTomas {
       movimientoId: null,
       materialNombre: this.materiales.find((m) => m.id === materialId)!.nombre,
       unidad: 'u',
+      estanteriaId: null,
       estanteriaNombre: null,
       fila: null,
       stockActual: 0,
@@ -178,6 +180,33 @@ class TomasEnMemoria implements RepositorioTomas {
   async seMovioDespues(materialId: string) {
     return this.movidos.has(materialId);
   }
+  /** Las estanterías en uso. */
+  estanterias = new Set(['est-a', 'est-b']);
+  async estanteriaActiva(id: string) {
+    return this.estanterias.has(id);
+  }
+  registro: (ReubicacionConNombres & { hechaPorId: string | null })[] = [];
+  async reubicar(d: Parameters<RepositorioTomas['reubicar']>[0]) {
+    for (const r of this.renglonesGuardados.filter((x) => x.materialId === d.materialId)) {
+      r.estanteriaId = d.hacia.estanteriaId;
+      r.fila = d.hacia.fila;
+    }
+    this.registro.push({
+      id: `reub-${this.registro.length + 1}`,
+      materialId: d.materialId,
+      materialNombre: d.materialId,
+      desdeEstanteria: d.desde.estanteriaId,
+      desdeFila: d.desde.fila,
+      haciaEstanteria: d.hacia.estanteriaId,
+      haciaFila: d.hacia.fila,
+      hechaEn: d.hechaEn,
+      hechaPorId: d.hechaPorId,
+      hechaPorNombre: null,
+    });
+  }
+  async reubicaciones() {
+    return this.registro;
+  }
 }
 
 function armar(materiales: { id: string; nombre: string; stock: number }[]) {
@@ -210,6 +239,45 @@ describe('TomarInventario', () => {
     const toma = await tomas.abrir({ categoriaId: 'electricidad' }, 'u1');
     expect(toma.totalRenglones).toBe(3);
     expect(toma.estado).toBe('ABIERTA');
+  });
+
+  it('reubicar: el material cambia de lugar y la toma lo registra', async () => {
+    const { tomas, repo } = armar(MATERIALES);
+    await tomas.abrir({}, 'u1');
+    const renglon = await tomas.reubicar('toma-1', 'r-1', { estanteriaId: 'est-a', fila: 3 }, 'u2');
+    expect(renglon).toEqual(expect.objectContaining({ estanteriaId: 'est-a', fila: 3 }));
+    expect(repo.registro).toEqual([
+      expect.objectContaining({
+        materialId: 'cable',
+        desdeEstanteria: null,
+        desdeFila: null,
+        haciaEstanteria: 'est-a',
+        haciaFila: 3,
+        hechaPorId: 'u2',
+      }),
+    ]);
+    expect((await tomas.detalle('toma-1')).reubicaciones).toHaveLength(1);
+  });
+
+  it('reubicar: no al mismo lugar, ni a una estantería que no se usa, ni con la toma cerrada', async () => {
+    const { tomas, repo } = armar(MATERIALES);
+    await tomas.abrir({}, 'u1');
+    await tomas.reubicar('toma-1', 'r-1', { estanteriaId: 'est-a', fila: 3 }, 'u1');
+    await expect(
+      tomas.reubicar('toma-1', 'r-1', { estanteriaId: 'est-a', fila: 3 }, 'u1'),
+    ).rejects.toThrow(/ya está en ese lugar/);
+    await expect(
+      tomas.reubicar('toma-1', 'r-1', { estanteriaId: 'est-vieja', fila: null }, 'u1'),
+    ).rejects.toThrow(/no existe o ya no se usa/);
+    await expect(
+      tomas.reubicar('toma-1', 'r-99', { estanteriaId: 'est-b', fila: null }, 'u1'),
+    ).rejects.toThrow(/no está en esta toma/);
+
+    await tomas.cerrar('toma-1', 'u1');
+    await expect(
+      tomas.reubicar('toma-1', 'r-2', { estanteriaId: 'est-b', fila: 1 }, 'u1'),
+    ).rejects.toThrow(/cerrada: no se puede reubicar/);
+    expect(repo.registro).toHaveLength(1);
   });
 
   it('sin materiales en el alcance, no abre', async () => {

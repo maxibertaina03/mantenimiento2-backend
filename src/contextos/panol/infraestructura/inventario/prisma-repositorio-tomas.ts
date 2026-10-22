@@ -6,10 +6,12 @@ import {
   RenglonToma,
   ResultadoRenglon,
   TomaInventario,
+  Ubicacion,
 } from '../../dominio/toma-inventario';
 import {
   RenglonConMaterial,
   RepositorioTomas,
+  ReubicacionConNombres,
   TomaConRelaciones,
 } from '../../puertos/repositorio-tomas';
 
@@ -26,6 +28,7 @@ const RELACIONES_RENGLON = {
     select: {
       nombre: true,
       stockActual: true,
+      estanteriaId: true,
       fila: true,
       unidad: { select: { simbolo: true } },
       estanteria: { select: { nombre: true, orden: true } },
@@ -84,6 +87,7 @@ export class PrismaRepositorioTomas implements RepositorioTomas {
       movimientoId: fila.movimientoId,
       materialNombre: fila.material.nombre,
       unidad: fila.material.unidad?.simbolo ?? 'u',
+      estanteriaId: fila.material.estanteriaId,
       estanteriaNombre: fila.material.estanteria?.nombre ?? null,
       fila: fila.material.fila,
       stockActual: fila.material.stockActual.toNumber(),
@@ -227,5 +231,65 @@ export class PrismaRepositorioTomas implements RepositorioTomas {
       where: { materialId, creadoEn: { gt: desde } },
     });
     return cuantos > 0;
+  }
+
+  async estanteriaActiva(id: string): Promise<boolean> {
+    const estanteria = await this.prisma.estanteriaMaterial.findUnique({
+      where: { id },
+      select: { activo: true },
+    });
+    return estanteria?.activo ?? false;
+  }
+
+  async reubicar(datos: {
+    tomaId: string;
+    materialId: string;
+    desde: Ubicacion;
+    hacia: Ubicacion;
+    hechaEn: Date;
+    hechaPorId: string | null;
+  }): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.material.update({
+        where: { id: datos.materialId },
+        data: { estanteriaId: datos.hacia.estanteriaId, fila: datos.hacia.fila },
+      }),
+      this.prisma.reubicacionToma.create({
+        data: {
+          tomaId: datos.tomaId,
+          materialId: datos.materialId,
+          estanteriaAnteriorId: datos.desde.estanteriaId,
+          filaAnterior: datos.desde.fila,
+          estanteriaNuevaId: datos.hacia.estanteriaId,
+          filaNueva: datos.hacia.fila,
+          hechaEn: datos.hechaEn,
+          hechaPorId: datos.hechaPorId,
+        },
+      }),
+    ]);
+  }
+
+  async reubicaciones(tomaId: string): Promise<ReubicacionConNombres[]> {
+    const filas = await this.prisma.reubicacionToma.findMany({
+      where: { tomaId },
+      orderBy: { hechaEn: 'asc' },
+      include: {
+        material: { select: { nombre: true } },
+        estanteriaAnterior: { select: { nombre: true } },
+        estanteriaNueva: { select: { nombre: true } },
+        hechaPor: { select: { nombre: true } },
+      },
+    });
+    return filas.map((f) => ({
+      id: f.id,
+      materialId: f.materialId,
+      materialNombre: f.material.nombre,
+      desdeEstanteria: f.estanteriaAnterior?.nombre ?? null,
+      desdeFila: f.filaAnterior,
+      haciaEstanteria: f.estanteriaNueva?.nombre ?? null,
+      haciaFila: f.filaNueva,
+      hechaEn: f.hechaEn,
+      hechaPorNombre: f.hechaPor?.nombre ?? null,
+    }));
   }
 }

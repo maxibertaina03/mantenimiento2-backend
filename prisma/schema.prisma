@@ -186,8 +186,10 @@ model EstanteriaMaterial {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  materiales Material[]
-  tomas      TomaInventario[]
+  materiales         Material[]
+  tomas              TomaInventario[]
+  reubicacionesDesde ReubicacionToma[] @relation("ReubicacionesDesde")
+  reubicacionesHacia ReubicacionToma[] @relation("ReubicacionesHacia")
 
   @@map("estanterias_material")
 }
@@ -243,14 +245,15 @@ model Material {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  categoria        CategoriaMaterial      @relation(fields: [categoriaId], references: [id])
-  unidad           UnidadMedida?          @relation(fields: [unidadId], references: [id])
-  estanteria       EstanteriaMaterial?    @relation(fields: [estanteriaId], references: [id])
-  usosEnTrabajos   MaterialUsadoTrabajo[]
-  movimientos      MovimientoStock[]
-  renglonesOrdenes RenglonOrdenCompra[]
-  usadoEnEquipos   RepuestoEquipo[]
-  renglonesToma    RenglonToma[]
+  categoria         CategoriaMaterial      @relation(fields: [categoriaId], references: [id])
+  unidad            UnidadMedida?          @relation(fields: [unidadId], references: [id])
+  estanteria        EstanteriaMaterial?    @relation(fields: [estanteriaId], references: [id])
+  usosEnTrabajos    MaterialUsadoTrabajo[]
+  movimientos       MovimientoStock[]
+  renglonesOrdenes  RenglonOrdenCompra[]
+  usadoEnEquipos    RepuestoEquipo[]
+  renglonesToma     RenglonToma[]
+  reubicacionesToma ReubicacionToma[]
 
   @@index([categoriaId])
   @@index([unidadId])
@@ -354,6 +357,7 @@ model Usuario {
   tomasAbiertas       TomaInventario[]         @relation("TomasAbiertas")
   tomasCerradas       TomaInventario[]         @relation("TomasCerradas")
   renglonesContados   RenglonToma[]            @relation("RenglonesContados")
+  reubicacionesToma   ReubicacionToma[]        @relation("Reubicaciones")
   rutinasAsignadas    RutinaTarea[]            @relation("RutinasAsignadas")
   rutinasCreadas      RutinaTarea[]            @relation("RutinasCreadas")
   pendientesAnotados  PendienteMantenimiento[] @relation("PendientesAnotados")
@@ -828,14 +832,42 @@ model TomaInventario {
   cerradaPorId    String?
   motivoAnulacion String?
 
-  categoria  CategoriaMaterial?  @relation(fields: [categoriaId], references: [id])
-  estanteria EstanteriaMaterial? @relation(fields: [estanteriaId], references: [id])
-  abiertaPor Usuario?            @relation("TomasAbiertas", fields: [abiertaPorId], references: [id])
-  cerradaPor Usuario?            @relation("TomasCerradas", fields: [cerradaPorId], references: [id])
-  renglones  RenglonToma[]
+  categoria     CategoriaMaterial?  @relation(fields: [categoriaId], references: [id])
+  estanteria    EstanteriaMaterial? @relation(fields: [estanteriaId], references: [id])
+  abiertaPor    Usuario?            @relation("TomasAbiertas", fields: [abiertaPorId], references: [id])
+  cerradaPor    Usuario?            @relation("TomasCerradas", fields: [cerradaPorId], references: [id])
+  renglones     RenglonToma[]
+  reubicaciones ReubicacionToma[]
 
   @@index([estado])
   @@map("tomas_inventario")
+}
+
+/// Un material que se cambió de lugar durante una toma: de dónde a dónde, quién
+/// y cuándo. El material queda con la ubicación nueva; esto es el registro.
+model ReubicacionToma {
+  id         String @id @default(uuid())
+  tomaId     String
+  materialId String
+
+  /// Dónde estaba. Vacía: no tenía ubicación.
+  estanteriaAnteriorId String?
+  filaAnterior         Int?
+  /// Dónde quedó.
+  estanteriaNuevaId    String?
+  filaNueva            Int?
+
+  hechaEn    DateTime @default(now())
+  hechaPorId String?
+
+  toma               TomaInventario      @relation(fields: [tomaId], references: [id], onDelete: Cascade)
+  material           Material            @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  estanteriaAnterior EstanteriaMaterial? @relation("ReubicacionesDesde", fields: [estanteriaAnteriorId], references: [id], onDelete: SetNull)
+  estanteriaNueva    EstanteriaMaterial? @relation("ReubicacionesHacia", fields: [estanteriaNuevaId], references: [id], onDelete: SetNull)
+  hechaPor           Usuario?            @relation("Reubicaciones", fields: [hechaPorId], references: [id], onDelete: SetNull)
+
+  @@index([tomaId])
+  @@map("reubicaciones_toma")
 }
 
 /// Un material dentro de una toma: lo que se contó y qué pasó al confirmar.

@@ -153,4 +153,49 @@ describe('Toma de inventario (integración, Postgres real)', () => {
       .send({ motivo: 'Ya no' })
       .expect(409);
   });
+
+  it('reubicar un material durante la toma: cambia su lugar y queda en el registro', async () => {
+    const estante = await t.prisma.estanteriaMaterial.create({ data: { nombre: 'Estantería 5' } });
+    const toma = await t.http.post('/api/tomas-inventario').send({ categoriaId }).expect(201);
+    const detalle = await t.http.get(`/api/tomas-inventario/${toma.body.id}`).expect(200);
+    const renglon = detalle.body.renglones.find(
+      (r: { materialId: string }) => r.materialId === ids.cable,
+    );
+
+    const movido = await t.http
+      .post(`/api/tomas-inventario/${toma.body.id}/renglones/${renglon.id}/reubicar`)
+      .send({ estanteriaId: estante.id, fila: 2 })
+      .expect(200);
+    expect(movido.body).toEqual(
+      expect.objectContaining({
+        estanteriaId: estante.id,
+        estanteriaNombre: 'Estantería 5',
+        fila: 2,
+      }),
+    );
+
+    // El material quedó ahí en todo el sistema, no solo en la toma.
+    const material = await t.prisma.material.findUniqueOrThrow({ where: { id: ids.cable } });
+    expect(material).toEqual(expect.objectContaining({ estanteriaId: estante.id, fila: 2 }));
+
+    const despues = await t.http.get(`/api/tomas-inventario/${toma.body.id}`).expect(200);
+    expect(despues.body.reubicaciones).toEqual([
+      expect.objectContaining({
+        materialNombre: 'Cable 2,5 mm',
+        desdeEstanteria: null,
+        haciaEstanteria: 'Estantería 5',
+        haciaFila: 2,
+      }),
+    ]);
+
+    // Al mismo lugar, no; una fila inválida, tampoco.
+    await t.http
+      .post(`/api/tomas-inventario/${toma.body.id}/renglones/${renglon.id}/reubicar`)
+      .send({ estanteriaId: estante.id, fila: 2 })
+      .expect(400);
+    await t.http
+      .post(`/api/tomas-inventario/${toma.body.id}/renglones/${renglon.id}/reubicar`)
+      .send({ estanteriaId: estante.id, fila: 0 })
+      .expect(400);
+  });
 });

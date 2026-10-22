@@ -8,11 +8,13 @@ import {
   validarAnulable,
   validarCierre,
   validarQueEstaAbierta,
+  validarReubicacion,
 } from '../dominio/toma-inventario';
 import { Reloj, relojDelSistema } from '../puertos/reloj';
 import {
   RenglonConMaterial,
   RepositorioTomas,
+  ReubicacionConNombres,
   TomaConRelaciones,
 } from '../puertos/repositorio-tomas';
 import { RegistrarMovimientos } from './registrar-movimientos';
@@ -21,6 +23,8 @@ export interface DetalleToma {
   toma: TomaConRelaciones;
   renglones: RenglonConMaterial[];
   resumen: ResumenToma;
+  /** Lo que se cambió de lugar durante la toma. */
+  reubicaciones: ReubicacionConNombres[];
 }
 
 /** Lo que pasó en una confirmación, para mostrarlo. */
@@ -91,7 +95,12 @@ export class TomarInventario {
   async detalle(id: string): Promise<DetalleToma> {
     const toma = await this.traer(id);
     const renglones = await this.repo.renglones(id);
-    return { toma, renglones, resumen: resumirToma(renglones) };
+    return {
+      toma,
+      renglones,
+      resumen: resumirToma(renglones),
+      reubicaciones: await this.repo.reubicaciones(id),
+    };
   }
 
   async contar(
@@ -109,6 +118,37 @@ export class TomarInventario {
       renglonId,
       contarRenglon(toma, renglon, cantidad, renglon.stockActual, this.reloj.ahora(), usuarioId),
     );
+  }
+
+  /**
+   * Cambia de lugar un material de la toma. Queda con la ubicación nueva en
+   * todo el sistema, y la toma guarda de dónde a dónde, para el informe.
+   */
+  async reubicar(
+    tomaId: string,
+    renglonId: string,
+    hacia: { estanteriaId: string; fila: number | null },
+    usuarioId: string | null,
+  ): Promise<RenglonConMaterial> {
+    const toma = await this.traer(tomaId);
+    const renglon = await this.repo.buscarRenglon(renglonId);
+    if (!renglon || renglon.tomaId !== tomaId) {
+      throw new ErrorNoEncontrado('Ese material no está en esta toma.');
+    }
+    const desde = { estanteriaId: renglon.estanteriaId, fila: renglon.fila };
+    validarReubicacion(toma, desde, hacia);
+    if (!(await this.repo.estanteriaActiva(hacia.estanteriaId))) {
+      throw new ErrorDatosInvalidos('Esa estantería no existe o ya no se usa.');
+    }
+    await this.repo.reubicar({
+      tomaId,
+      materialId: renglon.materialId,
+      desde,
+      hacia,
+      hechaEn: this.reloj.ahora(),
+      hechaPorId: usuarioId,
+    });
+    return (await this.repo.buscarRenglon(renglonId))!;
   }
 
   /**
