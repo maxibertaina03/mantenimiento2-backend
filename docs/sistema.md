@@ -72,10 +72,10 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Repo | Código | Tests |
 |---|---|---|
-| Backend | 5 contextos, 43 tablas, 42 migraciones | 1.176 unitarios, 194 de punta a punta, 24 de integración |
-| Frontend | 18 pantallas | 610 tests |
+| Backend | 5 contextos, 44 tablas, 43 migraciones | 1.186 unitarios, 194 de punta a punta, 27 de integración |
+| Frontend | 19 pantallas | 620 tests |
 
-Números de la v1.4.1 (2026-10-19).
+Números de la v1.6.0 (2026-10-22).
 
 ---
 
@@ -98,7 +98,7 @@ mantenimiento2-backend/
 │   ├── modules/              catálogos simples (guardan un nombre y lo devuelven)
 │   └── common/               lo compartido: login, permisos, base, correo, errores…
 ├── prisma/
-│   ├── schema.prisma         el modelo de la base (43 tablas)
+│   ├── schema.prisma         el modelo de la base (44 tablas)
 │   └── migrations/           cada cambio a la base, en orden y escrito a mano
 ├── test/                     tests de punta a punta y de integración
 ├── scripts/                  herramientas de mantenimiento (conteos, ensayos, copias)
@@ -183,12 +183,15 @@ Máquinas de planta y herramientas.
   - los services que vencen según cada plan;
   - las rutinas que se repiten («cada N días», con sus días de la semana);
   - lo que alguien programó a mano.
+
+  Cada tarea dice cada cuántos días se repite (`cadaDias`: la del plan o la de la rutina; vacía si se programó a mano). Con eso la pantalla separa **lo de todos los días** (`cadaDias = 1`, como las purgas diarias de cada compresor, que son planes y no rutinas) en su propia pestaña y en un solo renglón de Hoy, para que no tape los services.
 - **Servicio externo:** una orden puede hacerse en un taller de afuera (llenar un tubo, rebobinar un motor). Desde la ficha del equipo, «Mandar a servicio externo» la abre y baja el PDF que viaja con el equipo. La orden se le **manda al taller** por correo (con el PDF, el destinatario lo arma el servidor) o por WhatsApp, y cada envío queda en `EnvioOrdenTrabajo`. Mientras está abierta, la máquina figura «En reparación». «**Volvió del taller**» la cierra con lo que hizo el taller, su **remito o factura** (`comprobanteExterno`) y lo que cobró.
 - **Postergar una tarea** que todavía no venció: a otro día, con el motivo, y sin pasar de la vez siguiente que toca. Queda en `PostergacionTarea` (quién, de qué día a qué día, por qué). La tarea guarda su día original (`fechaOriginal`), así el calendario no vuelve a generar una rutina en el día que se dejó. Si es de un plan, el plan se mueve con ella.
 - **Dar por hecha** una tarea crea su orden de trabajo, descuenta los materiales y, si la tarea es de un plan, corre el plan.
 - **Hoy:** lo de cada persona más lo que no es de nadie.
+- **Anotador de pendientes** (`PendienteMantenimiento`, tabla `pendientes`): lo que quedó por hacer y no es una tarea del calendario («comprar rulemanes», «mandar a rebobinar el motor»), compartido por todo mantenimiento. Lleva el texto (hasta 500 caracteres), si es urgente y, opcionalmente, a quién le toca y el equipo. Se marca hecho (queda quién y cuándo) y se puede reabrir; las hechas se ven 60 días. Se lista con las urgentes primero y después las más viejas. Borrar solo puede quien lo anotó o un administrador: para el resto, se marca hecho. La lógica está en `dominio/pendiente.ts` y `aplicacion/gestionar-pendientes.ts`.
 - **`RegistrarTrabajoDePlan`:** es el único lugar que sabe qué pasa cuando se hace el trabajo de un plan: el plan corre y la tarea del calendario queda hecha, venga el trabajo de donde venga.
-- **Endpoints:** `/api/ordenes-trabajo…` (con `?ejecutor=EXTERNO`, `/:id/enviar-correo`, `/:id/registrar-whatsapp`, `/:id/envios`) y `/api/calendario…` (tareas, rutinas, `mias`, `planes/:id/tarea`).
+- **Endpoints:** `/api/ordenes-trabajo…` (con `?ejecutor=EXTERNO`, `/:id/enviar-correo`, `/:id/registrar-whatsapp`, `/:id/envios`) `/api/calendario…` (tareas, rutinas, `mias`, `planes/:id/tarea`) y `/api/pendientes…` (`?estado=abiertos|hechos`, `/personas`, `/:id/hecho`, `/:id/reabrir`).
 
 #### Informática (`contextos/informatica`)
 
@@ -234,19 +237,20 @@ Hay cuatro roles: **ADMIN**, **GERENCIA**, **ADMINISTRATIVO** y **MANTENIMIENTO*
 | Compras | `proveedores.ver/editar`, `ordenes.ver/editar/recibir/enviar` |
 | Trabajos | `trabajos.ver/editar/eliminar/asignar`, `tareas.ver/editar/asignar` |
 | Equipos | `equipos.ver/editar`, `servicios.ver/editar` |
+| Pendientes | `pendientes.ver/editar` |
 | Informática | `it.ver/editar`, `credenciales.ver/revelar/editar` |
 | Administración | `usuarios.administrar`, `permisos.administrar` |
 
 ### 3.7 La base de datos
 
-43 tablas, definidas en `prisma/schema.prisma`, agrupadas así:
+44 tablas, definidas en `prisma/schema.prisma`, agrupadas así:
 
 | Área | Tablas |
 |---|---|
 | Pañol | `Material`, `CategoriaMaterial`, `UnidadMedida`, `EstanteriaMaterial`, `MovimientoStock`, `EdicionMovimiento`, `TomaInventario`, `RenglonToma` |
 | Compras | `OrdenCompra`, `RenglonOrdenCompra`, `RecepcionOrden`, `RecepcionRenglon`, `EnvioOrden`, `ComprobanteOrden`, `Proveedor`, `ContadorDocumento` |
 | Equipos | `Equipo`, `UbicacionEquipo`, `TipoEquipoPlanta`, `MarcaEquipo`, `ModeloEquipo`, `FotoEquipo`, `ManualEquipo`, `MontajeEquipo`, `RepuestoEquipo`, `PlanMantenimiento`, `AvisoEnviado`, `Intervencion` (sin uso, ver abajo) |
-| Trabajos | `OrdenTrabajo`, `MaterialUsadoTrabajo`, `EnvioOrdenTrabajo`, `TareaProgramada`, `PostergacionTarea`, `RutinaTarea` |
+| Trabajos | `OrdenTrabajo`, `MaterialUsadoTrabajo`, `EnvioOrdenTrabajo`, `TareaProgramada`, `PostergacionTarea`, `RutinaTarea`, `PendienteMantenimiento` |
 | Informática | `EquipoIT`, `AsignacionEquipoIT`, `TipoEquipo`, `Responsable`, `Credencial`, `RotacionCredencial`, `VistaCredencial` |
 | Usuarios | `Usuario`, `PermisoRol` |
 
@@ -280,14 +284,15 @@ mantenimiento2-frontend/src/
 
 | Dirección | Página | Qué se hace |
 |---|---|---|
-| `/inicio` | Hoy | Las tareas de cada uno y una tarjeta por cada cosa pendiente (equipos parados, services, talleres externos, reponer, mercadería por llegar, órdenes sin enviar); tocando una se ve su lista |
+| `/inicio` | Hoy | Las tareas de cada uno y una tarjeta por cada cosa pendiente (equipos parados, services, talleres externos, reponer, mercadería por llegar, órdenes sin enviar, pendientes anotados); tocando una se ve su lista. Lo de todos los días va junto en un renglón que se despliega |
 | `/materiales` | Materiales | Buscar y filtrar el pañol, editar, imprimir QR de estantes |
 | `/materiales/:id` | Detalle de material | Ficha con su foto y la fecha del último inventario, historial de movimientos y equipos que lo usan |
 | `/movimientos` | Historial | Todas las entradas y salidas, con su corrección auditada |
 | `/movimientos/nuevo` | Nuevo movimiento | Cargar entradas y salidas, también con el lector de QR |
 | `/inventario` | Tomas de inventario | La lista de tomas y «Nueva toma» (por categoría, estantería o todo el pañol) |
 | `/inventario/:id` | Una toma | Contar (también escaneando el QR), ver diferencias, confirmar, cerrar o anular; planilla para contar e informe en PDF |
-| `/calendario` | Calendario | Mes con tareas por persona, rutinas, nuevas tareas, imprimir por semana o por mes |
+| `/calendario` | Calendario | Mes con tareas por persona (primero el equipo, abajo la tarea), en dos pestañas: services y tareas, y lo de todos los días (`?vista=diarias`); rutinas, nuevas tareas, imprimir por semana o por mes |
+| `/pendientes` | Pendientes | El anotador de mantenimiento: anotar con Enter, urgente, a quién le toca y equipo; filtros Todos · Míos · Urgentes; tildar hecho y ver las hechas |
 | `/ordenes-trabajo` | Órdenes de trabajo | Abrir, cargar materiales, cerrar, reabrir, imprimir; mandarla a un taller y registrar la vuelta. Filtro «En talleres externos» (`?afuera=1`) |
 | `/ordenes-compra` | Órdenes de compra | Crear, emitir, enviar, recibir en partes, reclamar lo que falta, precios, comprobantes, PDF |
 | `/equipos` | Equipos y herramientas | Lista de máquinas, alta, importación, QR |
@@ -420,4 +425,5 @@ Los valores no se escriben en ningún lado del código. Viven en el panel de Ren
 | **CI** | Integración continua: los controles automáticos en cada cambio. |
 | **Plan de mantenimiento** | «Cada N días, en estos días de la semana», sobre un equipo. |
 | **Rutina** | Una tarea que se repite sola en el calendario. |
+| **Pendiente** | Algo anotado para hacer que no es una tarea del calendario: comprar, mandar a reparar, avisar. |
 | **OC / OT** | Orden de compra / orden de trabajo. |
