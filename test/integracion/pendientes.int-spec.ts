@@ -56,6 +56,12 @@ describe('Pendientes (integración, Postgres real)', () => {
     expect((await t.http.get('/api/pendientes').expect(200)).body).toHaveLength(2);
   });
 
+  it('la lista de personas para asignar trae solo id y nombre', async () => {
+    const r = await t.http.get('/api/pendientes/personas').expect(200);
+    expect(r.body.length).toBeGreaterThan(0);
+    expect(Object.keys(r.body[0]).sort()).toEqual(['id', 'nombre']);
+  });
+
   it('un texto vacío no se guarda, y borrar lo saca del todo', async () => {
     await t.http.post('/api/pendientes').send({ texto: '   ' }).expect(400);
 

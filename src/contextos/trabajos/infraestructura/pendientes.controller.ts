@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Inject,
   HttpStatus,
   Param,
   ParseUUIDPipe,
@@ -19,6 +20,7 @@ import { UsuarioActual } from '../../../common/auth/decorators/usuario-actual.de
 import { PERMISOS } from '../../../common/auth/permisos';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { GestionarPendientes } from '../aplicacion/gestionar-pendientes';
+import { CONSULTA_USUARIOS, ConsultaUsuarios } from '../puertos/consulta-usuarios';
 import { CrearPendienteDto, EditarPendienteDto, ListarPendientesDto } from './pendientes.dto';
 
 /**
@@ -30,7 +32,23 @@ import { CrearPendienteDto, EditarPendienteDto, ListarPendientesDto } from './pe
 @UseFilters(FiltroErroresDominio)
 @Controller('pendientes')
 export class PendientesController {
-  constructor(private readonly gestionar: GestionarPendientes) {}
+  constructor(
+    private readonly gestionar: GestionarPendientes,
+    @Inject(CONSULTA_USUARIOS) private readonly usuarios: ConsultaUsuarios,
+  ) {}
+
+  /**
+   * A quién se le puede dar un pendiente. El anotador lo usa todo
+   * mantenimiento, que no puede listar el padrón ni ve las órdenes de trabajo:
+   * por eso tiene su propia lista, con id y nombre y nada más. Va antes que
+   * las rutas con `:id`.
+   */
+  @Permisos(PERMISOS.PENDIENTES_VER)
+  @Get('personas')
+  @ApiOperation({ summary: 'A quién se le puede dar un pendiente' })
+  async personas() {
+    return (await this.usuarios.listarAsignables()).map(({ id, nombre }) => ({ id, nombre }));
+  }
 
   @Permisos(PERMISOS.PENDIENTES_VER)
   @Get()
