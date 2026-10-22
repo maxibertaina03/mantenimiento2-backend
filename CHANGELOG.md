@@ -4,6 +4,12 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.6.1] — 2026-10-22
+
+### Documentación
+
+- `docs/sistema.md`: una coma que faltaba en la lista de endpoints de Trabajos.
+
 ## [1.6.0] — 2026-10-22
 
 ### Agregado
@@ -163,6 +169,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.6.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.6.1
 [1.6.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.6.0
 [1.5.3]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.3
 [1.5.2]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.2
