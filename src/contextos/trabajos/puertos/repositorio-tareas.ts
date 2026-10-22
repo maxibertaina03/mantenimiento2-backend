@@ -13,6 +13,12 @@ export interface TareaConRelaciones extends Tarea {
   equipoItNombre: string | null;
   planNombre: string | null;
   rutinaTitulo: string | null;
+  /**
+   * Cada cuántos días se repite: la del plan o la de la rutina. Vacía si se
+   * programó a mano. Con 1, es de todos los días: el calendario y Hoy las
+   * juntan aparte para que no tapen lo importante.
+   */
+  cadaDias: number | null;
   ordenTrabajoNumero: string | null;
   /** Las veces que se postergó, de la primera a la última. */
   postergaciones: PostergacionRegistrada[];

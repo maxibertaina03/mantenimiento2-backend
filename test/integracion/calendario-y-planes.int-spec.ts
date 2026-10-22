@@ -76,6 +76,8 @@ describe('Calendario y planes (integración, Postgres real)', () => {
         .expect(200);
       const delPlan = cal.body.tareas.filter((x: { planId: string }) => x.planId === plan.body.id);
       expect(delPlan.map((x: { fecha: string }) => textoDia(x.fecha))).toEqual([textoDia(lunes)]);
+      // Trae cada cuántos días se repite: con eso el calendario separa las diarias.
+      expect(delPlan[0].cadaDias).toBe(7);
     }
     expect(await tareasDelPlan(plan.body.id)).toHaveLength(1);
   });
