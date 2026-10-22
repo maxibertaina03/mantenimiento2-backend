@@ -348,23 +348,26 @@ model Usuario {
   intervencionesEjecutadas Intervencion[] @relation("IntervencionEjecutor")
   intervencionesCargadas   Intervencion[] @relation("IntervencionRegistro")
 
-  tareasAsignadas     TareaProgramada[]      @relation("TareasAsignadas")
-  tareasCreadas       TareaProgramada[]      @relation("TareasCreadas")
-  postergaciones      PostergacionTarea[]    @relation("PostergacionesHechas")
-  tomasAbiertas       TomaInventario[]       @relation("TomasAbiertas")
-  tomasCerradas       TomaInventario[]       @relation("TomasCerradas")
-  renglonesContados   RenglonToma[]          @relation("RenglonesContados")
-  rutinasAsignadas    RutinaTarea[]          @relation("RutinasAsignadas")
-  rutinasCreadas      RutinaTarea[]          @relation("RutinasCreadas")
-  trabajosAbiertos    OrdenTrabajo[]         @relation("TrabajosAbiertos")
-  trabajosAsignados   OrdenTrabajo[]         @relation("TrabajosAsignados")
-  trabajosCerrados    OrdenTrabajo[]         @relation("TrabajosCerrados")
-  materialesDeTrabajo MaterialUsadoTrabajo[] @relation("MaterialesDeTrabajo")
-  ordenesCreadas      OrdenCompra[]          @relation("OrdenesCreadas")
-  ordenesRecibidas    OrdenCompra[]          @relation("OrdenesRecibidas")
-  recepcionesDeOrden  RecepcionOrden[]       @relation("RecepcionesDeOrden")
-  enviosDeOrden       EnvioOrden[]           @relation("EnviosDeOrden")
-  enviosDeTrabajo     EnvioOrdenTrabajo[]    @relation("EnviosDeTrabajo")
+  tareasAsignadas     TareaProgramada[]        @relation("TareasAsignadas")
+  tareasCreadas       TareaProgramada[]        @relation("TareasCreadas")
+  postergaciones      PostergacionTarea[]      @relation("PostergacionesHechas")
+  tomasAbiertas       TomaInventario[]         @relation("TomasAbiertas")
+  tomasCerradas       TomaInventario[]         @relation("TomasCerradas")
+  renglonesContados   RenglonToma[]            @relation("RenglonesContados")
+  rutinasAsignadas    RutinaTarea[]            @relation("RutinasAsignadas")
+  rutinasCreadas      RutinaTarea[]            @relation("RutinasCreadas")
+  pendientesAnotados  PendienteMantenimiento[] @relation("PendientesAnotados")
+  pendientesAsignados PendienteMantenimiento[] @relation("PendientesAsignados")
+  pendientesHechos    PendienteMantenimiento[] @relation("PendientesHechos")
+  trabajosAbiertos    OrdenTrabajo[]           @relation("TrabajosAbiertos")
+  trabajosAsignados   OrdenTrabajo[]           @relation("TrabajosAsignados")
+  trabajosCerrados    OrdenTrabajo[]           @relation("TrabajosCerrados")
+  materialesDeTrabajo MaterialUsadoTrabajo[]   @relation("MaterialesDeTrabajo")
+  ordenesCreadas      OrdenCompra[]            @relation("OrdenesCreadas")
+  ordenesRecibidas    OrdenCompra[]            @relation("OrdenesRecibidas")
+  recepcionesDeOrden  RecepcionOrden[]         @relation("RecepcionesDeOrden")
+  enviosDeOrden       EnvioOrden[]             @relation("EnviosDeOrden")
+  enviosDeTrabajo     EnvioOrdenTrabajo[]      @relation("EnviosDeTrabajo")
 
   rotacionesDeCredencial RotacionCredencial[] @relation("RotacionesDeCredencial")
   comprobantesSubidos    ComprobanteOrden[]   @relation("ComprobantesSubidos")
@@ -1049,17 +1052,18 @@ model Equipo {
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  ubicacion      UbicacionEquipo?    @relation(fields: [ubicacionId], references: [id])
-  tipo           TipoEquipoPlanta?   @relation(fields: [tipoId], references: [id])
-  marca          MarcaEquipo?        @relation(fields: [marcaId], references: [id])
-  modelo         ModeloEquipo?       @relation(fields: [modeloId], references: [id])
-  proveedor      Proveedor?          @relation(fields: [proveedorId], references: [id])
-  renglonCompra  RenglonOrdenCompra? @relation(fields: [renglonOrdenCompraId], references: [id], onDelete: SetNull)
+  ubicacion      UbicacionEquipo?         @relation(fields: [ubicacionId], references: [id])
+  tipo           TipoEquipoPlanta?        @relation(fields: [tipoId], references: [id])
+  marca          MarcaEquipo?             @relation(fields: [marcaId], references: [id])
+  modelo         ModeloEquipo?            @relation(fields: [modeloId], references: [id])
+  proveedor      Proveedor?               @relation(fields: [proveedorId], references: [id])
+  renglonCompra  RenglonOrdenCompra?      @relation(fields: [renglonOrdenCompraId], references: [id], onDelete: SetNull)
   intervenciones Intervencion[]
   planes         PlanMantenimiento[]
   ordenesTrabajo OrdenTrabajo[]
   tareas         TareaProgramada[]
   rutinas        RutinaTarea[]
+  pendientes     PendienteMantenimiento[]
   manuales       ManualEquipo[]
   fotos          FotoEquipo[]
 
@@ -1467,6 +1471,9 @@ model VistaCredencial {
 model OrdenTrabajo {
   id String @id @default(uuid())
 
+  /// Los pendientes del anotador que se resolvieron con esta orden.
+  pendientes PendienteMantenimiento[]
+
   /// Correlativo legible: OT-2026-0001. Lo asigna el backend de forma atómica,
   /// con el mismo contador que las órdenes de compra.
   numero String @unique
@@ -1756,4 +1763,39 @@ model RutinaTarea {
   @@index([activa])
   @@index([equipoId])
   @@map("rutinas_tarea")
+}
+
+/// Un pendiente del anotador de mantenimiento: «comprar tal cosa», «mandar a
+/// reparar tal otra». No tiene fecha ni se programa, como una tarea del
+/// calendario: es lo que quedó por hacer y no se tiene que olvidar. Lo ve y lo
+/// maneja todo mantenimiento.
+model PendienteMantenimiento {
+  id      String  @id @default(uuid())
+  texto   String
+  urgente Boolean @default(false)
+
+  /// A quién le toca. Vacío: a cualquiera.
+  asignadoAId String?
+  /// Sobre qué máquina, si es sobre una.
+  equipoId    String?
+
+  creadoPorId   String?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  /// Cuándo se hizo y quién. Vacío: sigue pendiente.
+  hechaEn        DateTime?
+  hechaPorId     String?
+  /// Si era sobre una máquina, la orden de trabajo que se registró al hacerlo.
+  ordenTrabajoId String?
+
+  asignadoA    Usuario?      @relation("PendientesAsignados", fields: [asignadoAId], references: [id], onDelete: SetNull)
+  equipo       Equipo?       @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  creadoPor    Usuario?      @relation("PendientesAnotados", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  hechaPor     Usuario?      @relation("PendientesHechos", fields: [hechaPorId], references: [id], onDelete: SetNull)
+  ordenTrabajo OrdenTrabajo? @relation(fields: [ordenTrabajoId], references: [id], onDelete: SetNull)
+
+  @@index([hechaEn])
+  @@index([asignadoAId])
+  @@map("pendientes")
 }

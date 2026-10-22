@@ -10,6 +10,7 @@ import { CONSULTA_USUARIOS } from '../puertos/consulta-usuarios';
 import { CONTACTOS_DE_TALLERES, CORREO_TRABAJOS } from '../puertos/envio';
 import { EQUIPOS_EN_TALLER } from '../puertos/equipos-en-taller';
 import { REPOSITORIO_TAREAS } from '../puertos/repositorio-tareas';
+import { REPOSITORIO_PENDIENTES } from '../puertos/repositorio-pendientes';
 import { PLANES_DE_MANTENIMIENTO } from '../puertos/planes-de-mantenimiento';
 import { RELOJ_TRABAJOS, RelojDelSistema } from '../puertos/reloj';
 import { REPOSITORIO_ORDENES_TRABAJO } from '../puertos/repositorio-ordenes-trabajo';
@@ -23,6 +24,8 @@ import {
 import { CalendarioController } from './calendario.controller';
 import { OrdenesTrabajoController } from './ordenes-trabajo.controller';
 import { PrismaRepositorioTareas } from './prisma-repositorio-tareas';
+import { PrismaRepositorioPendientes } from './prisma-repositorio-pendientes';
+import { PendientesController } from './pendientes.controller';
 import { PrismaConsultaEquipos } from './prisma-consulta-equipos';
 import { PrismaConsultaEquiposIt } from './prisma-consulta-equipos-it';
 import { PlanesPorEquipos } from './planes-por-equipos';
@@ -49,7 +52,7 @@ import { casosDeUsoTrabajos } from './casos-de-uso.providers';
  */
 @Module({
   imports: [PanolModule, AuthModule, EquiposModule, CorreoModule, ProveedoresModule],
-  controllers: [OrdenesTrabajoController, CalendarioController],
+  controllers: [OrdenesTrabajoController, CalendarioController, PendientesController],
   providers: [
     { provide: REPOSITORIO_ORDENES_TRABAJO, useClass: PrismaRepositorioOrdenesTrabajo },
     { provide: CONSULTA_EQUIPOS, useClass: PrismaConsultaEquipos },
@@ -57,6 +60,7 @@ import { casosDeUsoTrabajos } from './casos-de-uso.providers';
     { provide: CONSULTA_USUARIOS, useClass: PrismaConsultaUsuarios },
     { provide: PLANES_DE_MANTENIMIENTO, useClass: PlanesPorEquipos },
     { provide: REPOSITORIO_TAREAS, useClass: PrismaRepositorioTareas },
+    { provide: REPOSITORIO_PENDIENTES, useClass: PrismaRepositorioPendientes },
     AvisadorDeTareas,
     { provide: STOCK, useClass: StockPorMovimientos },
     { provide: RELOJ_TRABAJOS, useClass: RelojDelSistema },

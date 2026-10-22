@@ -20,6 +20,7 @@ export class RepositorioTareasEnMemoria implements RepositorioTareas {
       equipoItNombre: tarea.equipoItId ? `Equipo IT ${tarea.equipoItId}` : null,
       planNombre: tarea.planId ? `Plan ${tarea.planId}` : null,
       rutinaTitulo: tarea.rutinaId ? `Rutina ${tarea.rutinaId}` : null,
+      cadaDias: (tarea as Partial<TareaConRelaciones>).cadaDias ?? null,
       ordenTrabajoNumero: tarea.ordenTrabajoId ? `OT-${tarea.ordenTrabajoId}` : null,
       postergaciones: (tarea as Partial<TareaConRelaciones>).postergaciones ?? [],
     };

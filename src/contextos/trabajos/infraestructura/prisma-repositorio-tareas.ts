@@ -14,8 +14,8 @@ const RELACIONES = {
   asignadoA: { select: { nombre: true } },
   equipo: { select: { nombre: true } },
   equipoIt: { select: SELECT_NOMBRE_EQUIPO_IT },
-  plan: { select: { nombre: true } },
-  rutina: { select: { titulo: true } },
+  plan: { select: { nombre: true, periodicidadDias: true } },
+  rutina: { select: { titulo: true, cadaDias: true } },
   ordenTrabajo: { select: { numero: true } },
   postergaciones: {
     orderBy: { creadoEn: 'asc' },
@@ -60,6 +60,7 @@ export class PrismaRepositorioTareas implements RepositorioTareas {
       equipoItNombre: fila.equipoIt ? nombreDeEquipoIt(fila.equipoIt) : null,
       planNombre: fila.plan?.nombre ?? null,
       rutinaTitulo: fila.rutina?.titulo ?? null,
+      cadaDias: fila.plan?.periodicidadDias ?? fila.rutina?.cadaDias ?? null,
       ordenTrabajoNumero: fila.ordenTrabajo?.numero ?? null,
       postergaciones: fila.postergaciones.map((p) => ({
         desde: p.desde,

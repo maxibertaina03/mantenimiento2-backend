@@ -85,6 +85,11 @@ export const PERMISOS = {
    */
   TAREAS_ASIGNAR: 'tareas.asignar',
 
+  // ── Anotador de pendientes de mantenimiento ───────────────────────────────
+  PENDIENTES_VER: 'pendientes.ver',
+  /** Anotar, editar, tildar como hecho y reabrir. Borrar, solo lo propio. */
+  PENDIENTES_EDITAR: 'pendientes.editar',
+
   // ── Equipos de planta y sus services ──────────────────────────────────────
   EQUIPOS_VER: 'equipos.ver',
   EQUIPOS_EDITAR: 'equipos.editar',
@@ -209,6 +214,14 @@ export const DESCRIPCION_PERMISOS: Record<Permiso, { grupo: string; etiqueta: st
     grupo: 'Calendario',
     etiqueta: 'Repartir tareas: dárselas a otra persona',
   },
+  [PERMISOS.PENDIENTES_VER]: {
+    grupo: 'Pendientes',
+    etiqueta: 'Ver el anotador de pendientes de mantenimiento',
+  },
+  [PERMISOS.PENDIENTES_EDITAR]: {
+    grupo: 'Pendientes',
+    etiqueta: 'Anotar pendientes, editarlos y tildarlos como hechos',
+  },
   [PERMISOS.ORDENES_VER]: { grupo: 'Compras', etiqueta: 'Ver órdenes de compra' },
   [PERMISOS.ORDENES_EDITAR]: { grupo: 'Compras', etiqueta: 'Crear, editar y anular órdenes' },
   [PERMISOS.ORDENES_RECIBIR]: {
@@ -290,6 +303,10 @@ export const PRESETS: Record<string, Permiso[]> = {
     // organiza.
     PERMISOS.TAREAS_VER,
     PERMISOS.TAREAS_EDITAR,
+
+    // El anotador es de todo mantenimiento: lo que quedó por hacer.
+    PERMISOS.PENDIENTES_VER,
+    PERMISOS.PENDIENTES_EDITAR,
 
     // Órdenes de trabajo NO va acá todavía, y no es un olvido: ver
     // TODAVIA_SOLO_ADMIN más arriba. El día que mantenimiento tenga equipos,

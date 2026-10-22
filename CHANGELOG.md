@@ -4,6 +4,28 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.6.0] — 2026-10-22
+
+### Agregado
+
+- **Anotador de pendientes** (`/api/pendientes`): lo que quedó por hacer y no es una tarea del
+  calendario («comprar rulemanes», «mandar a rebobinar el motor»), compartido por todo
+  mantenimiento. Lleva el texto, si es urgente y, si hace falta, a quién le toca y el equipo.
+  Los urgentes van primero; los hechos se ven 60 días y se pueden reabrir.
+  - Si le toca a alguien, **solo esa persona (o un administrador) lo da por hecho**.
+  - Si es sobre una máquina, al darlo por hecho se guarda la orden de trabajo que se registró
+    (tiene que ser de esa misma máquina).
+  - Borrar solo puede quien lo anotó o un administrador.
+  - Permisos nuevos `pendientes.ver` y `pendientes.editar`: como todo permiso nuevo, le llegan
+    solos al administrador; a los demás roles se les dan desde la pantalla Permisos.
+- **Cada tarea del calendario dice cada cuántos días se repite** (`cadaDias`, la del plan o la
+  de la rutina). Con eso las pantallas separan lo de todos los días de los services.
+
+### Base de datos
+
+- Dos migraciones aditivas: la tabla `pendientes` y su columna `ordenTrabajoId`. No tocan
+  ningún dato existente; ensayadas contra producción con ROLLBACK.
+
 ## [1.5.3] — 2026-10-20
 
 ### Documentación
@@ -141,6 +163,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.6.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.6.0
 [1.5.3]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.3
 [1.5.2]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.2
 [1.5.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.5.1

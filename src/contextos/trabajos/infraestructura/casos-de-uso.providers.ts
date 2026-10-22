@@ -4,6 +4,7 @@ import { ConsultarOrdenesTrabajo } from '../aplicacion/consultar-ordenes-trabajo
 import { EnviarOrdenesTrabajo } from '../aplicacion/enviar-ordenes-trabajo';
 import { GestionarOrdenesTrabajo } from '../aplicacion/gestionar-ordenes-trabajo';
 import { GestionarTareas } from '../aplicacion/gestionar-tareas';
+import { GestionarPendientes } from '../aplicacion/gestionar-pendientes';
 import { RegistrarTrabajoDePlan } from '../aplicacion/registrar-trabajo-de-plan';
 import { RegistrarTrabajoHecho } from '../aplicacion/registrar-trabajo-hecho';
 import { UsarMateriales } from '../aplicacion/usar-materiales';
@@ -24,6 +25,7 @@ import {
   RepositorioOrdenesTrabajo,
 } from '../puertos/repositorio-ordenes-trabajo';
 import { REPOSITORIO_TAREAS, RepositorioTareas } from '../puertos/repositorio-tareas';
+import { REPOSITORIO_PENDIENTES, RepositorioPendientes } from '../puertos/repositorio-pendientes';
 import { STOCK, Stock } from '../puertos/stock';
 
 /**
@@ -35,6 +37,11 @@ import { STOCK, Stock } from '../puertos/stock';
  * así que pasan por las mismas reglas: entre ellas, `RegistrarTrabajoDePlan`.
  */
 export const casosDeUsoTrabajos: Provider[] = [
+  {
+    provide: GestionarPendientes,
+    useFactory: (repo: RepositorioPendientes, reloj: Reloj) => new GestionarPendientes(repo, reloj),
+    inject: [REPOSITORIO_PENDIENTES, RELOJ_TRABAJOS],
+  },
   {
     provide: RegistrarTrabajoDePlan,
     useFactory: (planes: PlanesDeMantenimiento, tareas: RepositorioTareas) =>

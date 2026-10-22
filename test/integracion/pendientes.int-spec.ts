@@ -1,0 +1,114 @@
+import { AppDeIntegracion, levantarApp, vaciarBase } from './app-de-integracion';
+
+/**
+ * El anotador de pendientes contra un Postgres de verdad: lo anotado se guarda
+ * con su equipo, los urgentes van primero, y lo tildado pasa a «hechos».
+ */
+describe('Pendientes (integración, Postgres real)', () => {
+  let t: AppDeIntegracion;
+
+  beforeAll(async () => {
+    t = await levantarApp();
+  });
+
+  afterAll(async () => {
+    await t?.app.close();
+  });
+
+  beforeEach(async () => {
+    await vaciarBase(t);
+  });
+
+  it('se anota con su equipo, los urgentes primero, y lo hecho pasa a «hechos»', async () => {
+    const ubicacion = await t.prisma.ubicacionEquipo.create({ data: { nombre: 'Sala de bombas' } });
+    const equipo = await t.prisma.equipo.create({
+      data: { nombre: 'Bomba 2', ubicacionId: ubicacion.id },
+    });
+
+    const comun = await t.http
+      .post('/api/pendientes')
+      .send({ texto: '  Pedir presupuesto   de pintura ' })
+      .expect(201);
+    expect(comun.body.texto).toBe('Pedir presupuesto de pintura');
+
+    const urgente = await t.http
+      .post('/api/pendientes')
+      .send({ texto: 'Mandar a rebobinar el motor', urgente: true, equipoId: equipo.id })
+      .expect(201);
+    expect(urgente.body.equipoNombre).toBe('Bomba 2');
+
+    const abiertos = await t.http.get('/api/pendientes').expect(200);
+    expect(abiertos.body.map((p: { texto: string }) => p.texto)).toEqual([
+      'Mandar a rebobinar el motor',
+      'Pedir presupuesto de pintura',
+    ]);
+
+    await t.http.post(`/api/pendientes/${urgente.body.id}/hecho`).expect(200);
+    const despues = await t.http.get('/api/pendientes').expect(200);
+    expect(despues.body).toHaveLength(1);
+    const hechos = await t.http.get('/api/pendientes?estado=hechos').expect(200);
+    expect(hechos.body.map((p: { id: string }) => p.id)).toEqual([urgente.body.id]);
+    expect(hechos.body[0].hechaEn).toBeTruthy();
+
+    // Dos veces no: ya está hecho.
+    await t.http.post(`/api/pendientes/${urgente.body.id}/hecho`).expect(409);
+    await t.http.post(`/api/pendientes/${urgente.body.id}/reabrir`).expect(200);
+    expect((await t.http.get('/api/pendientes').expect(200)).body).toHaveLength(2);
+  });
+
+  it('sobre una máquina, se da por hecho con su orden de trabajo', async () => {
+    const ubicacion = await t.prisma.ubicacionEquipo.create({ data: { nombre: 'Sala de agua' } });
+    const ablandador = await t.prisma.equipo.create({
+      data: { nombre: 'Ablandador', ubicacionId: ubicacion.id },
+    });
+    const otra = await t.prisma.equipo.create({
+      data: { nombre: 'Caldera', ubicacionId: ubicacion.id },
+    });
+    const p = await t.http
+      .post('/api/pendientes')
+      .send({ texto: 'Purgar el ablandador', equipoId: ablandador.id })
+      .expect(201);
+
+    // El trabajo se registra como en la ficha: nace cerrado.
+    const orden = await t.http
+      .post('/api/ordenes-trabajo')
+      .send({
+        titulo: 'Purgar el ablandador',
+        tipo: 'PREVENTIVO',
+        equipoId: ablandador.id,
+        resolucion: 'Se purgó',
+      })
+      .expect(201);
+    const deOtra = await t.http
+      .post('/api/ordenes-trabajo')
+      .send({ titulo: 'Otra cosa', tipo: 'CORRECTIVO', equipoId: otra.id, resolucion: 'x' })
+      .expect(201);
+
+    // Una orden de otra máquina no va.
+    await t.http
+      .post(`/api/pendientes/${p.body.id}/hecho`)
+      .send({ ordenTrabajoId: deOtra.body.id })
+      .expect(400);
+
+    const hecho = await t.http
+      .post(`/api/pendientes/${p.body.id}/hecho`)
+      .send({ ordenTrabajoId: orden.body.id })
+      .expect(200);
+    expect(hecho.body.ordenTrabajoId).toBe(orden.body.id);
+    expect(hecho.body.ordenTrabajoNumero).toBe(orden.body.numero);
+  });
+
+  it('la lista de personas para asignar trae solo id y nombre', async () => {
+    const r = await t.http.get('/api/pendientes/personas').expect(200);
+    expect(r.body.length).toBeGreaterThan(0);
+    expect(Object.keys(r.body[0]).sort()).toEqual(['id', 'nombre']);
+  });
+
+  it('un texto vacío no se guarda, y borrar lo saca del todo', async () => {
+    await t.http.post('/api/pendientes').send({ texto: '   ' }).expect(400);
+
+    const p = await t.http.post('/api/pendientes').send({ texto: 'Anotado de más' }).expect(201);
+    await t.http.delete(`/api/pendientes/${p.body.id}`).expect(204);
+    expect(await t.prisma.pendienteMantenimiento.count()).toBe(0);
+  });
+});
