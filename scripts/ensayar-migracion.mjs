@@ -12,6 +12,9 @@
  *
  *   node -r dotenv/config scripts/ensayar-migracion.mjs dotenv_config_path=.env.produccion \
  *     --migracion=20260925130000_equipos_y_herramientas_en_compras
+ *
+ * Varias que dependen una de otra van separadas por comas, en orden: se
+ * ensayan juntas, en la misma transacción.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,8 +25,10 @@ if (!arg) {
   console.error('Falta --migracion=<carpeta dentro de prisma/migrations>');
   process.exit(1);
 }
-const carpeta = arg.slice('--migracion='.length);
-const sql = readFileSync(join('prisma', 'migrations', carpeta, 'migration.sql'), 'utf8');
+const carpetas = arg.slice('--migracion='.length).split(',');
+const sql = carpetas
+  .map((c) => readFileSync(join('prisma', 'migrations', c, 'migration.sql'), 'utf8'))
+  .join('\n');
 
 const url = process.env.DIRECT_URL ?? '';
 const host = (() => {
@@ -46,7 +51,7 @@ const sentencias = sql
   .filter((s) => s.length > 0);
 
 console.log(`\nBase:      ${host}`);
-console.log(`Migración: ${carpeta}`);
+console.log(`Migración: ${carpetas.join(', ')}`);
 console.log(`Sentencias: ${sentencias.length}\n`);
 
 const prisma = new PrismaClient({ datasources: { db: { url } } });
