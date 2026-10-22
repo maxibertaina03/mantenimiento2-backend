@@ -32,6 +32,16 @@ export class CrearPendienteDto {
   equipoId?: string | null;
 }
 
+export class MarcarHechoDto {
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'La orden de trabajo que se registró al hacerlo, si era sobre una máquina.',
+  })
+  @IsOptional()
+  @IsUUID()
+  ordenTrabajoId?: string | null;
+}
+
 export class EditarPendienteDto {
   @ApiPropertyOptional()
   @IsOptional()

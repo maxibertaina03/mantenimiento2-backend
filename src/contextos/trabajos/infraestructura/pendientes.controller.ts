@@ -21,7 +21,15 @@ import { PERMISOS } from '../../../common/auth/permisos';
 import { FiltroErroresDominio } from '../../../common/dominio/filtro-errores-dominio';
 import { GestionarPendientes } from '../aplicacion/gestionar-pendientes';
 import { CONSULTA_USUARIOS, ConsultaUsuarios } from '../puertos/consulta-usuarios';
-import { CrearPendienteDto, EditarPendienteDto, ListarPendientesDto } from './pendientes.dto';
+import {
+  CrearPendienteDto,
+  EditarPendienteDto,
+  ListarPendientesDto,
+  MarcarHechoDto,
+} from './pendientes.dto';
+
+/** Sin usuario (AUTH_DISABLED, en local) se trata como administrador. */
+const esAdministrador = (usuario?: Usuario) => !usuario || usuario.rol === RolUsuario.ADMIN;
 
 /**
  * El anotador de pendientes de mantenimiento: lo que quedó por hacer
@@ -76,9 +84,20 @@ export class PendientesController {
   @Permisos(PERMISOS.PENDIENTES_EDITAR)
   @Post(':id/hecho')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Tildarlo como hecho' })
-  hecho(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() usuario?: Usuario) {
-    return this.gestionar.marcarHecho(id, usuario?.id ?? null);
+  @ApiOperation({
+    summary: 'Darlo por hecho (si le toca a alguien, solo esa persona o un administrador)',
+  })
+  hecho(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: MarcarHechoDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.gestionar.marcarHecho(
+      id,
+      usuario?.id ?? null,
+      esAdministrador(usuario),
+      dto.ordenTrabajoId ?? null,
+    );
   }
 
   @Permisos(PERMISOS.PENDIENTES_EDITAR)
@@ -94,8 +113,6 @@ export class PendientesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Borrarlo (solo quien lo anotó, o un administrador)' })
   borrar(@Param('id', ParseUUIDPipe) id: string, @UsuarioActual() usuario?: Usuario) {
-    // Sin usuario (AUTH_DISABLED, en local) se trata como administrador.
-    const esAdministrador = !usuario || usuario.rol === RolUsuario.ADMIN;
-    return this.gestionar.borrar(id, usuario?.id ?? null, esAdministrador);
+    return this.gestionar.borrar(id, usuario?.id ?? null, esAdministrador(usuario));
   }
 }

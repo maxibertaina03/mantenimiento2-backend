@@ -1,11 +1,12 @@
 import {
   ordenarPendientes,
   validarQueEsteHecho,
+  validarQuePuedeDarPorHecho,
   validarQuePuedeBorrar,
   validarQueSigaPendiente,
   validarTextoPendiente,
 } from '../dominio/pendiente';
-import { ErrorNoEncontrado } from '../dominio/errores';
+import { ErrorDatosInvalidos, ErrorNoEncontrado } from '../dominio/errores';
 import type { Reloj } from '../puertos/reloj';
 import type {
   CambiosPendiente,
@@ -68,14 +69,38 @@ export class GestionarPendientes {
     return this.repo.actualizar(id, cambios);
   }
 
-  async marcarHecho(id: string, usuarioId: string | null): Promise<PendienteConNombres> {
-    validarQueSigaPendiente(await this.buscar(id));
-    return this.repo.actualizar(id, { hechaEn: this.reloj.ahora(), hechaPorId: usuarioId });
+  /**
+   * Darlo por hecho. Si era sobre una máquina y se registró el trabajo, se
+   * guarda su orden de trabajo: tiene que existir y ser de esa misma máquina.
+   */
+  async marcarHecho(
+    id: string,
+    usuarioId: string | null,
+    esAdministrador: boolean,
+    ordenTrabajoId: string | null = null,
+  ): Promise<PendienteConNombres> {
+    const p = await this.buscar(id);
+    validarQueSigaPendiente(p);
+    validarQuePuedeDarPorHecho(p, usuarioId, esAdministrador);
+    if (ordenTrabajoId) {
+      const orden = await this.repo.equipoDeLaOrden(ordenTrabajoId);
+      if (!orden) throw new ErrorDatosInvalidos(`No existe la orden de trabajo ${ordenTrabajoId}.`);
+      if (!p.equipoId || orden.equipoId !== p.equipoId) {
+        throw new ErrorDatosInvalidos('Esa orden de trabajo no es de la máquina del pendiente.');
+      }
+    }
+    return this.repo.actualizar(id, {
+      hechaEn: this.reloj.ahora(),
+      hechaPorId: usuarioId,
+      ordenTrabajoId,
+    });
   }
 
   async reabrir(id: string): Promise<PendienteConNombres> {
     validarQueEsteHecho(await this.buscar(id));
-    return this.repo.actualizar(id, { hechaEn: null, hechaPorId: null });
+    // La orden de trabajo, si hubo, queda en el historial de la máquina: solo
+    // se suelta del pendiente.
+    return this.repo.actualizar(id, { hechaEn: null, hechaPorId: null, ordenTrabajoId: null });
   }
 
   async borrar(id: string, usuarioId: string | null, esAdministrador: boolean): Promise<void> {

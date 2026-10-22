@@ -18,6 +18,8 @@ export interface Pendiente {
   creadoEn: Date;
   hechaEn: Date | null;
   hechaPorId: string | null;
+  /** La orden de trabajo que se registró al hacerlo, si era sobre una máquina. */
+  ordenTrabajoId: string | null;
 }
 
 export const LARGO_MAXIMO_PENDIENTE = 500;
@@ -58,6 +60,23 @@ export function validarQuePuedeBorrar(
       'Solo quien lo anotó puede borrarlo. Si ya está resuelto, marcalo como hecho.',
     );
   }
+}
+
+/**
+ * Si le toca a alguien, solo esa persona lo da por hecho (o un administrador,
+ * por si esa persona ya no está). Así nadie lo saca de la lista por tocar el
+ * círculo de uno ajeno. Sin responsable, lo puede hacer cualquiera.
+ */
+export function validarQuePuedeDarPorHecho(
+  p: Pick<Pendiente, 'asignadoAId'> & { asignadoANombre?: string | null },
+  usuarioId: string | null,
+  esAdministrador: boolean,
+): void {
+  if (!p.asignadoAId || esAdministrador || p.asignadoAId === usuarioId) return;
+  const quien = p.asignadoANombre ?? 'la persona a la que le toca';
+  throw new ErrorNoEsSuyo(
+    `Este pendiente le toca a ${quien}: solo ${quien} lo puede dar por hecho.`,
+  );
 }
 
 /** Los urgentes primero; entre iguales, los más viejos arriba: hace más que esperan. */

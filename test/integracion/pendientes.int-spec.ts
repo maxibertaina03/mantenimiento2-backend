@@ -56,6 +56,48 @@ describe('Pendientes (integración, Postgres real)', () => {
     expect((await t.http.get('/api/pendientes').expect(200)).body).toHaveLength(2);
   });
 
+  it('sobre una máquina, se da por hecho con su orden de trabajo', async () => {
+    const ubicacion = await t.prisma.ubicacionEquipo.create({ data: { nombre: 'Sala de agua' } });
+    const ablandador = await t.prisma.equipo.create({
+      data: { nombre: 'Ablandador', ubicacionId: ubicacion.id },
+    });
+    const otra = await t.prisma.equipo.create({
+      data: { nombre: 'Caldera', ubicacionId: ubicacion.id },
+    });
+    const p = await t.http
+      .post('/api/pendientes')
+      .send({ texto: 'Purgar el ablandador', equipoId: ablandador.id })
+      .expect(201);
+
+    // El trabajo se registra como en la ficha: nace cerrado.
+    const orden = await t.http
+      .post('/api/ordenes-trabajo')
+      .send({
+        titulo: 'Purgar el ablandador',
+        tipo: 'PREVENTIVO',
+        equipoId: ablandador.id,
+        resolucion: 'Se purgó',
+      })
+      .expect(201);
+    const deOtra = await t.http
+      .post('/api/ordenes-trabajo')
+      .send({ titulo: 'Otra cosa', tipo: 'CORRECTIVO', equipoId: otra.id, resolucion: 'x' })
+      .expect(201);
+
+    // Una orden de otra máquina no va.
+    await t.http
+      .post(`/api/pendientes/${p.body.id}/hecho`)
+      .send({ ordenTrabajoId: deOtra.body.id })
+      .expect(400);
+
+    const hecho = await t.http
+      .post(`/api/pendientes/${p.body.id}/hecho`)
+      .send({ ordenTrabajoId: orden.body.id })
+      .expect(200);
+    expect(hecho.body.ordenTrabajoId).toBe(orden.body.id);
+    expect(hecho.body.ordenTrabajoNumero).toBe(orden.body.numero);
+  });
+
   it('la lista de personas para asignar trae solo id y nombre', async () => {
     const r = await t.http.get('/api/pendientes/personas').expect(200);
     expect(r.body.length).toBeGreaterThan(0);

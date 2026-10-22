@@ -12,6 +12,7 @@ const RELACIONES = {
   equipo: { select: { nombre: true } },
   creadoPor: { select: { nombre: true } },
   hechaPor: { select: { nombre: true } },
+  ordenTrabajo: { select: { numero: true } },
 } as const;
 
 type Fila = {
@@ -24,10 +25,12 @@ type Fila = {
   creadoEn: Date;
   hechaEn: Date | null;
   hechaPorId: string | null;
+  ordenTrabajoId: string | null;
   asignadoA: { nombre: string } | null;
   equipo: { nombre: string } | null;
   creadoPor: { nombre: string } | null;
   hechaPor: { nombre: string } | null;
+  ordenTrabajo: { numero: string } | null;
 };
 
 function aPendiente(f: Fila): PendienteConNombres {
@@ -41,10 +44,12 @@ function aPendiente(f: Fila): PendienteConNombres {
     creadoEn: f.creadoEn,
     hechaEn: f.hechaEn,
     hechaPorId: f.hechaPorId,
+    ordenTrabajoId: f.ordenTrabajoId,
     asignadoANombre: f.asignadoA?.nombre ?? null,
     equipoNombre: f.equipo?.nombre ?? null,
     creadoPorNombre: f.creadoPor?.nombre ?? null,
     hechaPorNombre: f.hechaPor?.nombre ?? null,
+    ordenTrabajoNumero: f.ordenTrabajo?.numero ?? null,
   };
 }
 
@@ -96,5 +101,12 @@ export class PrismaRepositorioPendientes implements RepositorioPendientes {
 
   async borrar(id: string): Promise<void> {
     await this.prisma.pendienteMantenimiento.delete({ where: { id } });
+  }
+
+  async equipoDeLaOrden(ordenTrabajoId: string): Promise<{ equipoId: string | null } | null> {
+    return this.prisma.ordenTrabajo.findUnique({
+      where: { id: ordenTrabajoId },
+      select: { equipoId: true },
+    });
   }
 }

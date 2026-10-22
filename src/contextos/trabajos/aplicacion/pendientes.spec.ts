@@ -35,6 +35,8 @@ class PendientesEnMemoria implements RepositorioPendientes {
       equipoNombre: null,
       creadoPorNombre: null,
       hechaPorNombre: null,
+      ordenTrabajoId: null,
+      ordenTrabajoNumero: null,
     };
     this.filas.push(p);
     return p;
@@ -46,6 +48,10 @@ class PendientesEnMemoria implements RepositorioPendientes {
   }
   async borrar(id: string) {
     this.filas = this.filas.filter((p) => p.id !== id);
+  }
+  ordenes = new Map<string, string | null>([['ot-bomba', 'eq-bomba']]);
+  async equipoDeLaOrden(id: string) {
+    return this.ordenes.has(id) ? { equipoId: this.ordenes.get(id)! } : null;
   }
 }
 
@@ -89,7 +95,7 @@ describe('GestionarPendientes', () => {
     const p = await caso.crear({ texto: 'Mandar a rebobinar el motor de la bomba 2' }, 'u1');
     expect(await caso.listar('abiertos')).toHaveLength(1);
 
-    const hecho = await caso.marcarHecho(p.id, 'u2');
+    const hecho = await caso.marcarHecho(p.id, 'u2', false);
     expect(hecho.hechaPorId).toBe('u2');
     expect(await caso.listar('abiertos')).toHaveLength(0);
     expect((await caso.listar('hechos')).map((x) => x.id)).toEqual([p.id]);
@@ -98,8 +104,8 @@ describe('GestionarPendientes', () => {
   it('no se tilda dos veces, y reabrir lo vuelve a la lista', async () => {
     const { caso } = armar();
     const p = await caso.crear({ texto: 'Comprar lámparas' }, 'u1');
-    await caso.marcarHecho(p.id, 'u1');
-    await expect(caso.marcarHecho(p.id, 'u1')).rejects.toThrow(ErrorTransicionInvalida);
+    await caso.marcarHecho(p.id, 'u1', false);
+    await expect(caso.marcarHecho(p.id, 'u1', false)).rejects.toThrow(ErrorTransicionInvalida);
     await caso.reabrir(p.id);
     expect(await caso.listar('abiertos')).toHaveLength(1);
     await expect(caso.reabrir(p.id)).rejects.toThrow(ErrorTransicionInvalida);
@@ -108,9 +114,41 @@ describe('GestionarPendientes', () => {
   it('los hechos hace más de 60 días ya no se muestran', async () => {
     const { caso, avanzar } = armar();
     const p = await caso.crear({ texto: 'Pedir presupuesto de pintura' }, 'u1');
-    await caso.marcarHecho(p.id, 'u1');
+    await caso.marcarHecho(p.id, 'u1', false);
     avanzar(61);
     expect(await caso.listar('hechos')).toHaveLength(0);
+  });
+
+  it('si le toca a alguien, solo esa persona (o un administrador) lo da por hecho', async () => {
+    const { caso, repo } = armar();
+    const p = await caso.crear({ texto: 'Cambiar el filtro', asignadoAId: 'u2' }, 'u1');
+    repo.filas[0].asignadoANombre = 'Leandro';
+    await expect(caso.marcarHecho(p.id, 'u1', false)).rejects.toThrow(
+      /le toca a Leandro: solo Leandro/,
+    );
+    expect((await caso.marcarHecho(p.id, 'u2', false)).hechaPorId).toBe('u2');
+
+    const otro = await caso.crear({ texto: 'Pintar', asignadoAId: 'u2' }, 'u1');
+    expect((await caso.marcarHecho(otro.id, 'u9', true)).hechaEn).not.toBeNull();
+
+    // Sin responsable, cualquiera.
+    const libre = await caso.crear({ texto: 'Barrer el taller' }, 'u1');
+    expect((await caso.marcarHecho(libre.id, 'u3', false)).hechaEn).not.toBeNull();
+  });
+
+  it('se puede dar por hecho con la orden de trabajo de la misma máquina', async () => {
+    const { caso, repo } = armar();
+    const p = await caso.crear({ texto: 'Purgar', equipoId: 'eq-bomba' }, 'u1');
+    await expect(caso.marcarHecho(p.id, 'u1', false, 'ot-no-existe')).rejects.toThrow(
+      ErrorDatosInvalidos,
+    );
+    repo.ordenes.set('ot-otra', 'eq-otra');
+    await expect(caso.marcarHecho(p.id, 'u1', false, 'ot-otra')).rejects.toThrow(
+      /no es de la máquina/,
+    );
+    expect((await caso.marcarHecho(p.id, 'u1', false, 'ot-bomba')).ordenTrabajoId).toBe('ot-bomba');
+    // Reabrirlo suelta la orden (que queda en el historial de la máquina).
+    expect((await caso.reabrir(p.id)).ordenTrabajoId).toBeNull();
   });
 
   it('borrar: quien lo anotó o un administrador; el resto, no', async () => {

@@ -8,6 +8,8 @@ export interface PendienteConNombres extends Pendiente {
   equipoNombre: string | null;
   creadoPorNombre: string | null;
   hechaPorNombre: string | null;
+  /** El número de la orden de trabajo (OT-2026-0012), si se registró una. */
+  ordenTrabajoNumero: string | null;
 }
 
 export interface NuevoPendiente {
@@ -26,6 +28,7 @@ export interface CambiosPendiente {
   equipoId?: string | null;
   hechaEn?: Date | null;
   hechaPorId?: string | null;
+  ordenTrabajoId?: string | null;
 }
 
 export interface RepositorioPendientes {
@@ -37,4 +40,6 @@ export interface RepositorioPendientes {
   crear(datos: NuevoPendiente): Promise<PendienteConNombres>;
   actualizar(id: string, cambios: CambiosPendiente): Promise<PendienteConNombres>;
   borrar(id: string): Promise<void>;
+  /** De qué máquina es una orden de trabajo; `null` si la orden no existe. */
+  equipoDeLaOrden(ordenTrabajoId: string): Promise<{ equipoId: string | null } | null>;
 }

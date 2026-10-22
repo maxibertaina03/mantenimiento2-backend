@@ -1471,6 +1471,9 @@ model VistaCredencial {
 model OrdenTrabajo {
   id String @id @default(uuid())
 
+  /// Los pendientes del anotador que se resolvieron con esta orden.
+  pendientes PendienteMantenimiento[]
+
   /// Correlativo legible: OT-2026-0001. Lo asigna el backend de forma atómica,
   /// con el mismo contador que las órdenes de compra.
   numero String @unique
@@ -1781,13 +1784,16 @@ model PendienteMantenimiento {
   actualizadoEn DateTime @updatedAt
 
   /// Cuándo se hizo y quién. Vacío: sigue pendiente.
-  hechaEn    DateTime?
-  hechaPorId String?
+  hechaEn        DateTime?
+  hechaPorId     String?
+  /// Si era sobre una máquina, la orden de trabajo que se registró al hacerlo.
+  ordenTrabajoId String?
 
-  asignadoA Usuario? @relation("PendientesAsignados", fields: [asignadoAId], references: [id], onDelete: SetNull)
-  equipo    Equipo?  @relation(fields: [equipoId], references: [id], onDelete: SetNull)
-  creadoPor Usuario? @relation("PendientesAnotados", fields: [creadoPorId], references: [id], onDelete: SetNull)
-  hechaPor  Usuario? @relation("PendientesHechos", fields: [hechaPorId], references: [id], onDelete: SetNull)
+  asignadoA    Usuario?      @relation("PendientesAsignados", fields: [asignadoAId], references: [id], onDelete: SetNull)
+  equipo       Equipo?       @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  creadoPor    Usuario?      @relation("PendientesAnotados", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  hechaPor     Usuario?      @relation("PendientesHechos", fields: [hechaPorId], references: [id], onDelete: SetNull)
+  ordenTrabajo OrdenTrabajo? @relation(fields: [ordenTrabajoId], references: [id], onDelete: SetNull)
 
   @@index([hechaEn])
   @@index([asignadoAId])
