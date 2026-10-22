@@ -1,4 +1,4 @@
-import { RenglonToma, TomaInventario } from '../dominio/toma-inventario';
+import { RenglonToma, TomaInventario, Ubicacion } from '../dominio/toma-inventario';
 
 export const REPOSITORIO_TOMAS = Symbol('REPOSITORIO_TOMAS');
 
@@ -16,11 +16,25 @@ export interface TomaConRelaciones extends TomaInventario {
 export interface RenglonConMaterial extends RenglonToma {
   materialNombre: string;
   unidad: string;
+  estanteriaId: string | null;
   estanteriaNombre: string | null;
   fila: number | null;
   /** El stock que figura ahora mismo. */
   stockActual: number;
   contadoPorNombre: string | null;
+}
+
+/** Un material que se cambió de lugar durante la toma, con los nombres para mostrarlo. */
+export interface ReubicacionConNombres {
+  id: string;
+  materialId: string;
+  materialNombre: string;
+  desdeEstanteria: string | null;
+  desdeFila: number | null;
+  haciaEstanteria: string | null;
+  haciaFila: number | null;
+  hechaEn: Date;
+  hechaPorNombre: string | null;
 }
 
 export interface RepositorioTomas {
@@ -47,4 +61,21 @@ export interface RepositorioTomas {
 
   /** Si el material tuvo algún movimiento registrado después de ese momento. */
   seMovioDespues(materialId: string, desde: Date): Promise<boolean>;
+
+  /** Si la estantería existe y está en uso. */
+  estanteriaActiva(id: string): Promise<boolean>;
+  /**
+   * Cambia la ubicación del material y deja el registro en la toma, las dos
+   * cosas juntas: no puede quedar una sin la otra.
+   */
+  reubicar(datos: {
+    tomaId: string;
+    materialId: string;
+    desde: Ubicacion;
+    hacia: Ubicacion;
+    hechaEn: Date;
+    hechaPorId: string | null;
+  }): Promise<void>;
+  /** Lo que se cambió de lugar en la toma, en el orden en que se hizo. */
+  reubicaciones(tomaId: string): Promise<ReubicacionConNombres[]>;
 }

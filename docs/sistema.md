@@ -72,10 +72,10 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Repo | Código | Tests |
 |---|---|---|
-| Backend | 5 contextos, 44 tablas, 44 migraciones | 1.188 unitarios, 194 de punta a punta, 28 de integración |
-| Frontend | 19 pantallas | 622 tests |
+| Backend | 5 contextos, 45 tablas, 45 migraciones | 1.190 unitarios, 194 de punta a punta, 29 de integración |
+| Frontend | 19 pantallas | 624 tests |
 
-Números de la v1.6.0 (2026-10-22).
+Números de la v1.7.0 (2026-10-22).
 
 ---
 
@@ -98,7 +98,7 @@ mantenimiento2-backend/
 │   ├── modules/              catálogos simples (guardan un nombre y lo devuelven)
 │   └── common/               lo compartido: login, permisos, base, correo, errores…
 ├── prisma/
-│   ├── schema.prisma         el modelo de la base (44 tablas)
+│   ├── schema.prisma         el modelo de la base (45 tablas)
 │   └── migrations/           cada cambio a la base, en orden y escrito a mano
 ├── test/                     tests de punta a punta y de integración
 ├── scripts/                  herramientas de mantenimiento (conteos, ensayos, copias)
@@ -136,7 +136,7 @@ Materiales, stock y movimientos.
 - **Movimientos:** cada entrada, salida o ajuste. El stock se calcula con ellos. Un movimiento se puede corregir y la corrección queda auditada (`EdicionMovimiento`).
 - **Regla de la fecha de ajuste:** no se puede cargar un movimiento con fecha anterior al último ajuste de inventario de ese material, porque desarmaría el conteo.
 - **Avisos de bajo stock:** materiales por debajo del mínimo y cobertura de alertas.
-- **Toma de inventario** (`TomaInventario`, `RenglonToma`): se abre sobre una categoría, una estantería o todo el pañol (TI-2026-0001) con un renglón por material en uso. Se cuenta desde el celular (a ciegas: no se muestra cuánto figura) o con la planilla impresa, y pueden contar varias personas a la vez. Al **confirmar**, cada diferencia genera un AJUSTE por el camino de siempre, con la nota de la toma. Si un material tuvo movimientos después de contarlo, no se ajusta: queda para **volver a contar**. La toma sigue abierta mientras falte contar, así se cuenta por tandas; «Cerrar la toma» la termina y lo no contado no se toca. Se anula solo si no ajustó nada.
+- **Toma de inventario** (`TomaInventario`, `RenglonToma`): se abre sobre una categoría, una estantería o todo el pañol (TI-2026-0001) con un renglón por material en uso. Se cuenta desde el celular (a ciegas: no se muestra cuánto figura) o con la planilla impresa, y pueden contar varias personas a la vez. Al **confirmar**, cada diferencia genera un AJUSTE por el camino de siempre, con la nota de la toma. Si un material tuvo movimientos después de contarlo, no se ajusta: queda para **volver a contar**. La toma sigue abierta mientras falte contar, así se cuenta por tandas; «Cerrar la toma» la termina y lo no contado no se toca. Se anula solo si no ajustó nada. Con la toma abierta, quien cuenta puede **reubicar** un material (otra estantería o fila): queda así en todo el sistema y la toma guarda de dónde a dónde, quién y cuándo (`ReubicacionToma`), que el informe PDF lista como «Reubicados».
 - **Puerta pública:** `MaterialesService` y `MovimientosStockService`, que usan compras (al recibir) y trabajos (al usar materiales).
 - **Endpoints:** `/api/materiales…` (con `/:id/foto` para ponerla o sacarla y `/fotos/estado`), `/api/movimientos…`, `/api/tomas-inventario…` (abrir, `/:id/renglones/:renglonId` para contar, `/:id/confirmar`, `/:id/cerrar`, `/:id/anular`).
 
@@ -243,11 +243,11 @@ Hay cuatro roles: **ADMIN**, **GERENCIA**, **ADMINISTRATIVO** y **MANTENIMIENTO*
 
 ### 3.7 La base de datos
 
-44 tablas, definidas en `prisma/schema.prisma`, agrupadas así:
+45 tablas, definidas en `prisma/schema.prisma`, agrupadas así:
 
 | Área | Tablas |
 |---|---|
-| Pañol | `Material`, `CategoriaMaterial`, `UnidadMedida`, `EstanteriaMaterial`, `MovimientoStock`, `EdicionMovimiento`, `TomaInventario`, `RenglonToma` |
+| Pañol | `Material`, `CategoriaMaterial`, `UnidadMedida`, `EstanteriaMaterial`, `MovimientoStock`, `EdicionMovimiento`, `TomaInventario`, `RenglonToma`, `ReubicacionToma` |
 | Compras | `OrdenCompra`, `RenglonOrdenCompra`, `RecepcionOrden`, `RecepcionRenglon`, `EnvioOrden`, `ComprobanteOrden`, `Proveedor`, `ContadorDocumento` |
 | Equipos | `Equipo`, `UbicacionEquipo`, `TipoEquipoPlanta`, `MarcaEquipo`, `ModeloEquipo`, `FotoEquipo`, `ManualEquipo`, `MontajeEquipo`, `RepuestoEquipo`, `PlanMantenimiento`, `AvisoEnviado`, `Intervencion` (sin uso, ver abajo) |
 | Trabajos | `OrdenTrabajo`, `MaterialUsadoTrabajo`, `EnvioOrdenTrabajo`, `TareaProgramada`, `PostergacionTarea`, `RutinaTarea`, `PendienteMantenimiento` |

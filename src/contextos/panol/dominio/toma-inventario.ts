@@ -206,3 +206,28 @@ export function resumirToma(
     recontar: renglones.filter((r) => r.resultado === 'RECONTAR').length,
   };
 }
+
+/** Dónde está guardado un material: estantería y, si se sabe, la fila. */
+export interface Ubicacion {
+  estanteriaId: string | null;
+  fila: number | null;
+}
+
+/**
+ * Cambiar de lugar un material mientras se cuenta: pasa seguido que al recorrer
+ * el pañol algo aparece en otro estante. Solo con la toma abierta, y a un lugar
+ * distinto del que ya tiene.
+ */
+export function validarReubicacion(
+  toma: Pick<TomaInventario, 'numero' | 'estado'>,
+  desde: Ubicacion,
+  hacia: Ubicacion,
+): void {
+  validarQueEstaAbierta(toma, 'reubicar materiales');
+  if (!hacia.estanteriaId) {
+    throw new ErrorDatosInvalidos('Elegí en qué estantería quedó el material.');
+  }
+  if (desde.estanteriaId === hacia.estanteriaId && desde.fila === hacia.fila) {
+    throw new ErrorDatosInvalidos('El material ya está en ese lugar.');
+  }
+}
