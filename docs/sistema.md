@@ -72,8 +72,8 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Repo | Código | Tests |
 |---|---|---|
-| Backend | 5 contextos, 44 tablas, 43 migraciones | 1.186 unitarios, 194 de punta a punta, 27 de integración |
-| Frontend | 19 pantallas | 620 tests |
+| Backend | 5 contextos, 44 tablas, 44 migraciones | 1.188 unitarios, 194 de punta a punta, 28 de integración |
+| Frontend | 19 pantallas | 622 tests |
 
 Números de la v1.6.0 (2026-10-22).
 
@@ -189,7 +189,7 @@ Máquinas de planta y herramientas.
 - **Postergar una tarea** que todavía no venció: a otro día, con el motivo, y sin pasar de la vez siguiente que toca. Queda en `PostergacionTarea` (quién, de qué día a qué día, por qué). La tarea guarda su día original (`fechaOriginal`), así el calendario no vuelve a generar una rutina en el día que se dejó. Si es de un plan, el plan se mueve con ella.
 - **Dar por hecha** una tarea crea su orden de trabajo, descuenta los materiales y, si la tarea es de un plan, corre el plan.
 - **Hoy:** lo de cada persona más lo que no es de nadie.
-- **Anotador de pendientes** (`PendienteMantenimiento`, tabla `pendientes`): lo que quedó por hacer y no es una tarea del calendario («comprar rulemanes», «mandar a rebobinar el motor»), compartido por todo mantenimiento. Lleva el texto (hasta 500 caracteres), si es urgente y, opcionalmente, a quién le toca y el equipo. Se marca hecho (queda quién y cuándo) y se puede reabrir; las hechas se ven 60 días. Se lista con las urgentes primero y después las más viejas. Borrar solo puede quien lo anotó o un administrador: para el resto, se marca hecho. La lógica está en `dominio/pendiente.ts` y `aplicacion/gestionar-pendientes.ts`.
+- **Anotador de pendientes** (`PendienteMantenimiento`, tabla `pendientes`): lo que quedó por hacer y no es una tarea del calendario («comprar rulemanes», «mandar a rebobinar el motor»), compartido por todo mantenimiento. Lleva el texto (hasta 500 caracteres), si es urgente y, opcionalmente, a quién le toca y el equipo. Antes de tildarlo se confirma. Si le toca a alguien, **solo esa persona (o un administrador) lo da por hecho**. Si es sobre una máquina, al darlo por hecho se registra el trabajo con el mismo formulario de la ficha, y el pendiente guarda su orden de trabajo (`ordenTrabajoId`, validada: tiene que ser de esa máquina); también se puede cerrar sin orden. Queda quién y cuándo, y se puede reabrir; las hechas se ven 60 días. Se lista con las urgentes primero y después las más viejas. Borrar solo puede quien lo anotó o un administrador: para el resto, se marca hecho. La lógica está en `dominio/pendiente.ts` y `aplicacion/gestionar-pendientes.ts`.
 - **`RegistrarTrabajoDePlan`:** es el único lugar que sabe qué pasa cuando se hace el trabajo de un plan: el plan corre y la tarea del calendario queda hecha, venga el trabajo de donde venga.
 - **Endpoints:** `/api/ordenes-trabajo…` (con `?ejecutor=EXTERNO`, `/:id/enviar-correo`, `/:id/registrar-whatsapp`, `/:id/envios`) `/api/calendario…` (tareas, rutinas, `mias`, `planes/:id/tarea`) y `/api/pendientes…` (`?estado=abiertos|hechos`, `/personas`, `/:id/hecho`, `/:id/reabrir`).
 
