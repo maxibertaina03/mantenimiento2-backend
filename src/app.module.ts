@@ -16,6 +16,7 @@ import { UnidadesMedidaModule } from './modules/unidades-medida/unidades-medida.
 import { PanolModule } from './contextos/panol';
 import { ComprasModule } from './contextos/compras';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
+import { SistemaModule } from './modules/sistema/sistema.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
     TiposEquipoModule,
     UnidadesMedidaModule,
     UsuariosModule,
+    SistemaModule, // la versión que corre
   ],
 })
 export class AppModule {}
