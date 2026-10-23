@@ -1,7 +1,7 @@
 # Backup diario de la base de producción, cifrado, a Google Drive.
 #
 # Ya se perdió la base una vez y los movimientos no se recuperaron
-# (docs/base-de-prueba.md). Este es el respaldo propio, fuera de Supabase.
+# (docs/como-probar.md). Este es el respaldo propio, fuera de Supabase.
 #
 # - De producción SOLO LEE: pg_dump abre una transacción de solo lectura.
 # - El archivo se cifra ACÁ, antes de salir de GitHub (gpg AES256 con la frase

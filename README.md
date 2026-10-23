@@ -42,7 +42,7 @@ Cada contexto (`src/contextos/<contexto>`) tiene cuatro capas —`dominio`, `pue
 `aplicacion`, `infraestructura`— y las dependencias apuntan hacia adentro: las reglas de negocio
 no conocen Nest, ni Prisma, ni HTTP, y se prueban en milisegundos. Un contexto usa a otro solo
 por su `index.ts`; el lint lo controla. Detalle en [docs/sistema.md](docs/sistema.md#3-el-backend-mantenimiento2-backend)
-y en [docs/plan-arquitectura.md](docs/plan-arquitectura.md).
+y, la historia de cómo se llegó, en [docs/historico/plan-arquitectura.md](docs/historico/plan-arquitectura.md).
 
 ```
 src/
@@ -97,8 +97,8 @@ Ramas, formato de los commits, pull requests, versiones y migraciones:
 | Documento | De qué trata |
 |---|---|
 | [docs/sistema.md](docs/sistema.md) | El sistema completo: qué hace cada parte y cómo está armado |
-| [docs/plan-arquitectura.md](docs/plan-arquitectura.md) | Por qué está organizado en contextos y capas, y cómo se llegó |
+| [docs/como-probar.md](docs/como-probar.md) | Cómo se prueba sin tocar producción: copia local, ensayo con ROLLBACK, conteo de filas |
 | [docs/tests-de-integracion.md](docs/tests-de-integracion.md) | Los tests contra Postgres real |
 | [docs/backups.md](docs/backups.md) | El backup nocturno cifrado y cómo restaurarlo |
 | [docs/avisos-de-mantenimiento.md](docs/avisos-de-mantenimiento.md) | El correo diario con los services que vencen |
-| [docs/base-de-prueba.md](docs/base-de-prueba.md) | Las bases de datos y los archivos de entorno |
+| [docs/historico/plan-arquitectura.md](docs/historico/plan-arquitectura.md) | Registro: por qué está organizado en contextos y capas, y cómo se llegó |
