@@ -72,10 +72,10 @@ Todo lo que hace la pantalla pasa por la API. La pantalla nunca habla directo co
 
 | Repo | Código | Tests |
 |---|---|---|
-| Backend | 5 contextos, 45 tablas, 45 migraciones | 1.190 unitarios, 194 de punta a punta, 29 de integración |
-| Frontend | 19 pantallas | 624 tests |
+| Backend | 5 contextos, 45 tablas, 45 migraciones | 1.192 unitarios, 194 de punta a punta, 30 de integración |
+| Frontend | 19 pantallas | 625 tests |
 
-Números de la v1.7.0 (2026-10-22).
+Números de la v1.8.0 (2026-10-23).
 
 ---
 
@@ -136,7 +136,7 @@ Materiales, stock y movimientos.
 - **Movimientos:** cada entrada, salida o ajuste. El stock se calcula con ellos. Un movimiento se puede corregir y la corrección queda auditada (`EdicionMovimiento`).
 - **Regla de la fecha de ajuste:** no se puede cargar un movimiento con fecha anterior al último ajuste de inventario de ese material, porque desarmaría el conteo.
 - **Avisos de bajo stock:** materiales por debajo del mínimo y cobertura de alertas.
-- **Toma de inventario** (`TomaInventario`, `RenglonToma`): se abre sobre una categoría, una estantería o todo el pañol (TI-2026-0001) con un renglón por material en uso. Se cuenta desde el celular (a ciegas: no se muestra cuánto figura) o con la planilla impresa, y pueden contar varias personas a la vez. Al **confirmar**, cada diferencia genera un AJUSTE por el camino de siempre, con la nota de la toma. Si un material tuvo movimientos después de contarlo, no se ajusta: queda para **volver a contar**. La toma sigue abierta mientras falte contar, así se cuenta por tandas; «Cerrar la toma» la termina y lo no contado no se toca. Se anula solo si no ajustó nada. Con la toma abierta, quien cuenta puede **reubicar** un material (otra estantería o fila): queda así en todo el sistema y la toma guarda de dónde a dónde, quién y cuándo (`ReubicacionToma`), que el informe PDF lista como «Reubicados».
+- **Toma de inventario** (`TomaInventario`, `RenglonToma`): se abre sobre una categoría, una estantería o todo el pañol (TI-2026-0001) con un renglón por material en uso. Se cuenta desde el celular (a ciegas: no se muestra cuánto figura) o con la planilla impresa, y pueden contar varias personas a la vez. Al **confirmar**, cada diferencia genera un AJUSTE por el camino de siempre, con la nota de la toma. Si un material tuvo movimientos después de contarlo, no se ajusta: queda para **volver a contar**. La toma sigue abierta mientras falte contar, así se cuenta por tandas; «Cerrar la toma» la termina y lo no contado no se toca. Se anula solo si no ajustó nada. Lo que figura en 0 y no se contó va a la pestaña **«En cero»**: se mira el estante, al que tiene algo se le escribe la cantidad, y el resto se da por contado en 0 de una vez (`POST /tomas-inventario/:id/contar-en-cero`, con los renglones que se vieron; si a alguno le entró stock mientras tanto, se saltea). La planilla impresa los deja al final, aparte. Con la toma abierta, quien cuenta puede **reubicar** un material (otra estantería o fila): queda así en todo el sistema y la toma guarda de dónde a dónde, quién y cuándo (`ReubicacionToma`), que el informe PDF lista como «Reubicados».
 - **Puerta pública:** `MaterialesService` y `MovimientosStockService`, que usan compras (al recibir) y trabajos (al usar materiales).
 - **Endpoints:** `/api/materiales…` (con `/:id/foto` para ponerla o sacarla y `/fotos/estado`), `/api/movimientos…`, `/api/tomas-inventario…` (abrir, `/:id/renglones/:renglonId` para contar, `/:id/confirmar`, `/:id/cerrar`, `/:id/anular`).
 
