@@ -4,6 +4,13 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.9.0] — 2026-10-23
+
+### Agregado
+
+- **`GET /api/version`**: la versión del servidor y el commit desplegado, para que las pantallas
+  la muestren al pie del menú. Pide solo haber entrado.
+
 ## [1.8.1] — 2026-10-23
 
 ### Documentación
@@ -202,6 +209,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.9.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.9.0
 [1.8.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.8.1
 [1.8.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.8.0
 [1.7.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.7.0
