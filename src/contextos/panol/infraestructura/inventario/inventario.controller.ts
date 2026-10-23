@@ -21,6 +21,9 @@ import {
 import type { Usuario } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsInt,
   IsNumber,
   IsOptional,
@@ -73,6 +76,18 @@ export class ContarDto {
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
   contado!: number | null;
+}
+
+export class ContarEnCeroDto {
+  @ApiProperty({
+    type: [String],
+    description: 'Los renglones que se miraron y están en 0 (los de la pestaña «En cero»).',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(5000)
+  @IsUUID('all', { each: true })
+  renglonIds!: string[];
 }
 
 export class ReubicarDto {
@@ -159,6 +174,23 @@ export class InventarioController {
     return traducirErrores(() =>
       this.tomas.contar(id, renglonId, dto.contado, usuario?.id ?? null),
     );
+  }
+
+  @Permisos(PERMISOS.INVENTARIO_CONTAR)
+  @Post(':id/contar-en-cero')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dar por contados en 0 los materiales que figuran en 0',
+    description:
+      'Solo los que siguen figurando en 0 y sin contar: si a alguno le entró stock mientras ' +
+      'tanto, se saltea y se avisa en `salteados`.',
+  })
+  contarEnCero(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ContarEnCeroDto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return traducirErrores(() => this.tomas.contarEnCero(id, dto.renglonIds, usuario?.id ?? null));
   }
 
   @Permisos(PERMISOS.INVENTARIO_CONTAR)

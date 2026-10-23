@@ -280,6 +280,38 @@ describe('TomarInventario', () => {
     expect(repo.registro).toHaveLength(1);
   });
 
+  it('contar en cero: los que figuran en 0 y no se contaron quedan contados en 0', async () => {
+    const { tomas, repo } = armar([
+      { id: 'cable', nombre: 'Cable 2,5 mm', stock: 0 },
+      { id: 'llave', nombre: 'Llave térmica', stock: 0 },
+      { id: 'cinta', nombre: 'Cinta aisladora', stock: 8 },
+    ]);
+    await tomas.abrir({}, 'u1');
+    // Mientras se miraba, a la llave le entró stock: se saltea, no se cuenta en 0 a ciegas.
+    repo.stock.set('llave', 2);
+
+    const res = await tomas.contarEnCero('toma-1', ['r-1', 'r-2'], 'u2');
+    expect(res.contadosEnCero).toBe(1);
+    expect(res.salteados).toEqual(['Llave térmica']);
+    expect(repo.renglonesGuardados[0]).toEqual(
+      expect.objectContaining({ contado: 0, stockAlContar: 0, contadoPorId: 'u2' }),
+    );
+    expect(repo.renglonesGuardados[1].contado).toBeNull();
+
+    // Uno ya contado tampoco se pisa.
+    const otra = await tomas.contarEnCero('toma-1', ['r-1'], 'u3');
+    expect(otra.contadosEnCero).toBe(0);
+    expect(repo.renglonesGuardados[0].contadoPorId).toBe('u2');
+  });
+
+  it('contar en cero: un renglón de otra toma no va, y con la toma cerrada tampoco', async () => {
+    const { tomas } = armar([{ id: 'cable', nombre: 'Cable 2,5 mm', stock: 0 }]);
+    await tomas.abrir({}, 'u1');
+    await expect(tomas.contarEnCero('toma-1', ['r-99'], 'u1')).rejects.toThrow(/no están/);
+    await tomas.cerrar('toma-1', 'u1');
+    await expect(tomas.contarEnCero('toma-1', ['r-1'], 'u1')).rejects.toThrow(/cerrada/);
+  });
+
   it('sin materiales en el alcance, no abre', async () => {
     const { tomas } = armar([]);
     await expect(tomas.abrir({}, 'u1')).rejects.toThrow(/No hay materiales/);

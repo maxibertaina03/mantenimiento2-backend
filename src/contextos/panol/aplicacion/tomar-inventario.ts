@@ -3,6 +3,7 @@ import { ErrorDatosInvalidos, ErrorNoEncontrado } from '../dominio/errores';
 import {
   contarRenglon,
   decidir,
+  figuraEnCero,
   resumirToma,
   ResumenToma,
   validarAnulable,
@@ -118,6 +119,43 @@ export class TomarInventario {
       renglonId,
       contarRenglon(toma, renglon, cantidad, renglon.stockActual, this.reloj.ahora(), usuarioId),
     );
+  }
+
+  /**
+   * Da por contados en 0, de una vez, los materiales que figuran en 0 y
+   * todavía no se contaron: los de la pestaña «En cero», después de que
+   * alguien miró que de verdad no hay nada.
+   *
+   * Vienen los renglones que la persona vio, no «todos los que estén en 0»:
+   * si mientras tanto a uno le entró stock, ya no figura en 0 y se saltea (y
+   * se dice), en vez de contarlo en 0 sin que nadie lo haya mirado.
+   */
+  async contarEnCero(
+    tomaId: string,
+    renglonIds: string[],
+    usuarioId: string | null,
+  ): Promise<DetalleToma & { contadosEnCero: number; salteados: string[] }> {
+    const toma = await this.traer(tomaId);
+    validarQueEstaAbierta(toma, 'cargar conteos');
+    const ahora = this.reloj.ahora();
+    const pedidos = new Set(renglonIds);
+    let contadosEnCero = 0;
+    const salteados: string[] = [];
+    for (const r of await this.repo.renglones(tomaId)) {
+      if (!pedidos.has(r.id)) continue;
+      pedidos.delete(r.id);
+      if (!figuraEnCero(r, r.stockActual)) {
+        salteados.push(r.materialNombre);
+        continue;
+      }
+      await this.repo.actualizarRenglon(
+        r.id,
+        contarRenglon(toma, r, 0, r.stockActual, ahora, usuarioId),
+      );
+      contadosEnCero += 1;
+    }
+    if (pedidos.size > 0) throw new ErrorNoEncontrado('Hay materiales que no están en esta toma.');
+    return { ...(await this.detalle(tomaId)), contadosEnCero, salteados };
   }
 
   /**
