@@ -123,6 +123,17 @@ export function contarRenglon(
 }
 
 /**
+ * Si el renglón va a «En cero»: figura en 0 y todavía no se contó. Esos se
+ * pueden dar por contados en 0 todos juntos, después de mirar el estante.
+ */
+export function figuraEnCero(
+  renglon: Pick<RenglonToma, 'contado' | 'resultado'>,
+  stockActual: number,
+): boolean {
+  return renglon.contado === null && !estaResuelto(renglon) && mismaCantidad(stockActual, 0);
+}
+
+/**
  * Qué hacer con un renglón al confirmar.
  *
  * - Sin contar, o ya resuelto: nada.

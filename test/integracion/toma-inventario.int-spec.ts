@@ -198,4 +198,36 @@ describe('Toma de inventario (integración, Postgres real)', () => {
       .send({ estanteriaId: estante.id, fila: 0 })
       .expect(400);
   });
+
+  it('contar en cero: los que figuran en 0 se cuentan de una, y confirmar no ajusta nada', async () => {
+    // Dos materiales nuevos, sin ninguna entrada: figuran en 0. Los demás tienen stock.
+    for (const nombre of ['Fusible 10 A', 'Borne 4 mm']) {
+      await t.prisma.material.create({ data: { nombre, categoriaId } });
+    }
+    const toma = await t.http.post('/api/tomas-inventario').send({ categoriaId }).expect(201);
+    const detalle = await t.http.get(`/api/tomas-inventario/${toma.body.id}`).expect(200);
+    const enCero = detalle.body.renglones
+      .filter((r: { stockActual: number }) => r.stockActual === 0)
+      .map((r: { id: string }) => r.id);
+    expect(enCero).toHaveLength(2);
+
+    const res = await t.http
+      .post(`/api/tomas-inventario/${toma.body.id}/contar-en-cero`)
+      .send({ renglonIds: enCero })
+      .expect(200);
+    expect(res.body.contadosEnCero).toBe(2);
+    expect(res.body.salteados).toEqual([]);
+    expect(res.body.resumen.contados).toBe(2);
+
+    // Sin diferencia: confirmar no genera ningún ajuste.
+    const confirmado = await t.http
+      .post(`/api/tomas-inventario/${toma.body.id}/confirmar`)
+      .expect(200);
+    expect(confirmado.body).toEqual(expect.objectContaining({ ajustados: 0, sinDiferencia: 2 }));
+
+    await t.http
+      .post(`/api/tomas-inventario/${toma.body.id}/contar-en-cero`)
+      .send({ renglonIds: [] })
+      .expect(400);
+  });
 });
