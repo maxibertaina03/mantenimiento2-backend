@@ -161,7 +161,7 @@ Hay dos formas conviviendo, y es a propósito:
 
 Cuál usar para algo nuevo: **si no tiene reglas, módulo**. Envolver un
 `findMany` en cuatro capas no lo hace más limpio, lo hace más largo. El plan
-de para dónde va esto está en [docs/plan-arquitectura.md](docs/plan-arquitectura.md).
+de para dónde va esto está en [docs/historico/plan-arquitectura.md](docs/historico/plan-arquitectura.md).
 
 ### Las cuatro capas
 

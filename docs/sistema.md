@@ -398,6 +398,8 @@ Los valores no se escriben en ningún lado del código. Viven en el panel de Ren
 6. Un refactor no cambia ninguna ruta, DTO ni respuesta. Si cambia algo visible, ya no es un refactor.
 7. Las reglas de negocio van en `dominio/`, con su test. Si hace falta algo de otro contexto, se pide por su puerta pública.
 
+El paso a paso (copia local, ensayo, conteo) está en [`docs/como-probar.md`](como-probar.md).
+
 ---
 
 ## 7. Pendientes conocidos

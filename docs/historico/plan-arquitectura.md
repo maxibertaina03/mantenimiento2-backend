@@ -1,5 +1,8 @@
 # Plan: llevar el backend a bounded contexts
 
+> **Documento histórico.** El plan se cumplió entero; se guarda como registro de
+> por qué el backend está armado así. Cómo está hoy: [docs/sistema.md](../sistema.md).
+
 > **Estado al 2026-10-06: terminado.** Las fases 0 a 3 movieron los cinco
 > contextos a `src/contextos/`, y la fase B (al final de este documento)
 > cerró los bordes: composición en los módulos, un dueño para «trabajo de
