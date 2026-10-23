@@ -54,6 +54,14 @@ describe('API (e2e)', () => {
   let materialId: string;
   let proveedorId: string;
 
+  it('GET /api/version dice qué versión del servidor corre', async () => {
+    const res = await http.get('/api/version').expect(200);
+    expect(res.body).toEqual({
+      version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
+      commit: 'local',
+    });
+  });
+
   describe('Categorías', () => {
     it('POST /api/categorias-material crea una categoría', async () => {
       const res = await http
