@@ -4,6 +4,15 @@ Lo que cambia en cada versión de la API, escrito para quien usa el sistema. El 
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y las versiones,
 [versionado semántico](https://semver.org/lang/es/) (ver [CONTRIBUTING.md](CONTRIBUTING.md#las-versiones)).
 
+## [1.8.0] — 2026-10-23
+
+### Agregado
+
+- **Contar en cero de una vez** (`POST /tomas-inventario/:id/contar-en-cero`): los renglones
+  que figuran en 0 y todavía no se contaron quedan contados en 0, a nombre de quien confirma.
+  Llegan los renglones que la persona vio; si a alguno le entró stock mientras tanto, se saltea
+  y se avisa en `salteados`. Sin cambios en la base.
+
 ## [1.7.0] — 2026-10-22
 
 ### Agregado
@@ -184,6 +193,7 @@ todo lo que se le fue sumando. A partir de acá, cada publicación tiene su núm
   guardias que impiden tocar producción por error; backup nocturno cifrado (pendiente de sus
   claves).
 
+[1.8.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.8.0
 [1.7.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.7.0
 [1.6.1]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.6.1
 [1.6.0]: https://github.com/maxibertaina03/mantenimiento2-backend/releases/tag/v1.6.0
